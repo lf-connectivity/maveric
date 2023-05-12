@@ -1,0 +1,47 @@
+{
+    "simulation_time_interval_seconds": 0.01,
+    "ue_tracks": {
+        "ue_tracks_generation" : {
+            "simulation_duration_seconds": 10,
+            "ue_class_distribution": {
+                "stationary": {
+                    "count": 5,
+                    "velocity": 1,
+                    "velocity_variance": 1
+                },
+                "pedestrian": {
+                    "count": 5,
+                    "velocity": 1,
+                    "velocity_variance": 1
+                },
+                "cyclist": {
+                    "count": 5,
+                    "velocity": 1,
+                    "velocity_variance": 1
+                },
+                "car": {
+                    "count": 5,
+                    "velocity": 1,
+                    "velocity_variance": 1
+                }
+            },
+            "lat_lon_boundaries": {
+                "min_lat": -90,
+                "max_lat": 90,
+                "min_lon": -180,
+                "max_lon": 180
+            },
+            "gauss_markov_params": {
+                "alpha": 0.5,
+                "variance": 0.8,
+                "rng_seed": 42,
+                "lon_x_dims": 100,
+                "lon_y_dims": 100
+            }
+        }
+    },
+    "rf_prediction": {
+        "model_id": "example_test_model",
+        "config_id": "test_config_1"
+    }
+}

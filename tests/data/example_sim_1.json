@@ -1,0 +1,10 @@
+{
+    "simulation_time_interval_seconds": 0.01,
+    "ue_tracks": {
+        "ue_data_id": "ue_data_1"
+    },
+    "rf_prediction": {
+        "model_id": "happy_case_rf_prediction_model",
+        "config_id": "test_config_1"
+    }
+}

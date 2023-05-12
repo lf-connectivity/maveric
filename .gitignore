@@ -1,0 +1,74 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+*.egg
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+cover/
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Notebooks
+.ipynb_checkpoints
+
+# mypy
+.mypy*
+.dmypy.json
+dmypy.json
+
+# pickle files
+*.pickle
+
+# scratch files
+scratch.*
+
+# DS store files
+*.DS_STORE
+.DS_Store
+
+# virtual env
+.venv*/
+
+# dot env
+.env
+
+# tmp folders
+*tmp
+
+# simulation data
+anp_sim_data*
+
+# cached files
+srv/
+
+# kmz files
+*.kmz
+
+# notebook data
+notebooks/data/sim_data/
+
+# lock files
+*.lock

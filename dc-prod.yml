@@ -1,0 +1,41 @@
+name: radp_prod
+
+services:
+  kafka:
+    ports:
+      - "9094:9094"
+  api_manager:
+    build:
+      target: prod
+    command: python3 -m flask run --host=0.0.0.0 --port=5000
+    ports:
+      - "8080:5000"
+    volumes:
+      - radp:/srv/radp
+  orchestration:
+    build:
+      target: prod
+    command: python3 orchestration/main.py
+    volumes:
+      - radp:/srv/radp
+  training:
+    build:
+      target: prod
+    command: python3 training/main.py
+    volumes:
+      - radp:/srv/radp
+  rf_prediction:
+    build:
+      target: prod
+    command: python3 rf_prediction/main.py
+    volumes:
+      - radp:/srv/radp
+  ue_tracks_generation:
+    build:
+      target: prod
+    command: python3 ue_tracks_generation/main.py
+    volumes:
+      - radp:/srv/radp
+
+volumes:
+  radp:

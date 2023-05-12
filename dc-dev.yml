@@ -1,0 +1,59 @@
+name: radp_dev
+
+services:
+  kafka:
+    ports:
+      - "9095:9094"
+  api_manager:
+    build:
+      target: dev
+    command: python3 -m debugpy --listen 0.0.0.0:5678 -m flask run --host=0.0.0.0 --port=5000 --no-debugger --no-reload
+    environment:
+      FLASK_DEBUG: 1
+    ports:
+      - "8081:5000"
+      - "5678:5678"
+    volumes:
+      - ./radp:/app/radp
+      - ./services/api_manager:/app/api_manager
+      - ./srv/radp:/srv/radp
+  orchestration:
+    build:
+      target: dev
+    command: python3 -m debugpy --listen 0.0.0.0:5678 orchestration/main.py
+    ports:
+      - "5679:5678"
+    volumes:
+      - ./radp:/app/radp
+      - ./services/orchestration:/app/orchestration
+      - ./srv/radp:/srv/radp
+  training:
+    build:
+      target: dev
+    command: python3 -m debugpy --listen 0.0.0.0:5678 training/main.py
+    ports:
+      - "5680:5678"
+    volumes:
+      - ./radp:/app/radp
+      - ./services/training:/app/training
+      - ./srv/radp:/srv/radp
+  rf_prediction:
+    build:
+      target: dev
+    command: python3 -m debugpy --listen 0.0.0.0:5678 rf_prediction/main.py
+    ports:
+      - "5681:5678"
+    volumes:
+      - ./radp:/app/radp
+      - ./services/rf_prediction:/app/rf_prediction
+      - ./srv/radp:/srv/radp
+  ue_tracks_generation:
+    build:
+      target: dev
+    command: python3 -m debugpy --listen 0.0.0.0:5678 ue_tracks_generation/main.py
+    ports:
+      - "5682:5678"
+    volumes:
+      - ./radp:/app/radp
+      - ./services/ue_tracks_generation:/app/ue_tracks_generation
+      - ./srv/radp:/srv/radp

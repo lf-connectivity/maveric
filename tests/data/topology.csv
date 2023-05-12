@@ -1,0 +1,4 @@
+cell_lat,cell_lon,cell_id,cell_az_deg,cell_carrier_freq_mhz
+35.690556,139.691944,cell_1,0,2100
+35.690556,139.691944,cell_2,120,2100
+35.690556,139.691944,cell_3,240,2100

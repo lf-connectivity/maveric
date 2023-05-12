@@ -1,0 +1,24 @@
+name: cuda_test
+
+services:
+  nvidia-smi:
+    image: nvidia/cuda:11.7.1-runtime-ubuntu20.04
+    command: nvidia-smi
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+
+  pytorch:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: bash -c "pip3 list; python3 main.py"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]

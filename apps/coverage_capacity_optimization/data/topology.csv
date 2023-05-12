@@ -1,0 +1,7 @@
+ecgi,site_id,cell_name,enodeb_id,cell_az_deg,tac,cell_lat,cell_lon,cell_id,cell_carrier_freq_mhz
+1001,Site1,Cell1,1,0,1,40.725995,-73.989308,cell_1_0,2100
+1001,Site1,Cell1,1,120,1,40.725995,-73.989308,cell_1_120,2100
+1001,Site1,Cell1,1,240,1,40.725995,-73.989308,cell_1_240,2100
+1002,Site2,Cell2,1,0,1,40.750476,-73.885210,cell_2_0,2100
+1002,Site2,Cell2,1,120,1,40.750476,-73.885210,cell_2_120,2100
+1002,Site2,Cell2,1,240,1,40.750476,-73.885210,cell_2_240,2100

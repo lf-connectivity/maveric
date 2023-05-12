@@ -1,0 +1,65 @@
+services:
+  zookeeper:
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    image: confluentinc/cp-zookeeper:7.3.1
+  kafka:
+    build:
+      context: .
+      dockerfile: ./services/kafka/Dockerfile
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,OUTSIDE://localhost:9094
+      KAFKA_BROKER_ID: 1
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,OUTSIDE:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,OUTSIDE://0.0.0.0:9094
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TOPICS: "jobs, outputs"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "0.0.0.0:9092", "--list"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+  api_manager:
+    build:
+      context: .
+      dockerfile: ./services/api_manager/Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      FLASK_APP: api_manager/app
+  orchestration:
+    build:
+      context: .
+      dockerfile: ./services/orchestration/Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+  training:
+    build:
+      context: .
+      dockerfile: ./services/training/Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+  rf_prediction:
+    build:
+      context: .
+      dockerfile: ./services/rf_prediction/Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+  ue_tracks_generation:
+    build:
+      context: .
+      dockerfile: ./services/ue_tracks_generation/Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy

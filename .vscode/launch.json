@@ -1,0 +1,136 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "connect": {
+                "host": "localhost",
+                "port": 5678
+            },
+            "name": "Attach - API Manager",
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}/services/api_manager",
+                    "remoteRoot": "/app/api_manager"
+                },
+                {
+                    "localRoot": "${workspaceFolder}/radp",
+                    "remoteRoot": "/app/radp"
+                }
+            ],
+            "request": "attach",
+            "type": "python"
+        },
+        {
+            "connect": {
+                "host": "localhost",
+                "port": 5679
+            },
+            "name": "Attach - Orchestration",
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}/services/orchestration",
+                    "remoteRoot": "/app/orchestration"
+                },
+                {
+                    "localRoot": "${workspaceFolder}/radp",
+                    "remoteRoot": "/app/radp"
+                }
+            ],
+            "request": "attach",
+            "type": "python"
+        },
+        {
+            "connect": {
+                "host": "localhost",
+                "port": 5680
+            },
+            "name": "Attach - Training",
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}/services/training",
+                    "remoteRoot": "/app/training"
+                },
+                {
+                    "localRoot": "${workspaceFolder}/radp",
+                    "remoteRoot": "/app/radp"
+                }
+            ],
+            "request": "attach",
+            "type": "python"
+        },
+        {
+            "connect": {
+                "host": "localhost",
+                "port": 5681
+            },
+            "name": "Attach - RF Prediction",
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}/services/rf_prediction",
+                    "remoteRoot": "/app/rf_prediction"
+                },
+                {
+                    "localRoot": "${workspaceFolder}/radp",
+                    "remoteRoot": "/app/radp"
+                }
+            ],
+            "request": "attach",
+            "type": "python"
+        },
+        {
+            "connect": {
+                "host": "localhost",
+                "port": 5682
+            },
+            "name": "Attach - UE Tracks Generation",
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}/services/ue_tracks_generation",
+                    "remoteRoot": "/app/ue_tracks_generation"
+                },
+                {
+                    "localRoot": "${workspaceFolder}/radp",
+                    "remoteRoot": "/app/radp"
+                }
+            ],
+            "request": "attach",
+            "type": "python"
+        },
+        {
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "name": "Launch - Tests - Component",
+            "program": "${workspaceFolder}/tests/run_component_tests.py",
+            "request": "launch",
+            "type": "python"
+        },
+        {
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "name": "Launch - Tests - E2E",
+            "program": "${workspaceFolder}/tests/run_end_to_end_tests.py",
+            "request": "launch",
+            "type": "python"
+        },
+        {
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "name": "Launch - Apps - Example",
+            "program": "${workspaceFolder}/apps/example/example_app.py",
+            "request": "launch",
+            "type": "python"
+        },
+        {
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "name": "Launch - Apps - CCO Example",
+            "program": "${workspaceFolder}/apps/coverage_capacity_optimization/cco_example_app.py",
+            "request": "launch",
+            "type": "python"
+        }
+    ]
+}

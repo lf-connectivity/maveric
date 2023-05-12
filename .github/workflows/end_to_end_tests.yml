@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+    # branches: [main]
+
+jobs:
+  end-to-end-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build the RADP stack
+        run: |
+          docker build -t radp radp
+          docker compose -f dc.yml -f dc-prod.yml up -d --build
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set python path
+        run:
+          echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
+
+      - name: Install client dependencies
+        run: |
+          pip3 install --upgrade pip
+          pip3 install -r radp/client/requirements.txt
+
+      - name: Install test dependencies
+        run: |
+          pip3 install --upgrade pip
+          pip3 install -r tests/requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+
+      - name: Run end-to-end tests
+        run: python3 tests/run_end_to_end_tests.py --delayed-start

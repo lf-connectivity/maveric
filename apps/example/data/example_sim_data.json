@@ -1,0 +1,10 @@
+{
+    "simulation_time_interval_seconds": 0.01,
+    "ue_tracks": {
+        "ue_data_id": "ue_data_all"
+    },
+    "rf_prediction": {
+        "model_id": "example_test_model",
+        "config_id": "test_config_2"
+    }
+}

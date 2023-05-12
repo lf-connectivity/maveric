@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+    # branches: [main]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set python path
+        run:
+          echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
+
+      - name: Install dev dependencies
+        run: |
+          pip3 install --upgrade pip
+          pip3 install -r requirements-dev.txt
+          pip3 install -r radp/digital_twin/requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+          pip3 install -r radp/client/requirements.txt
+          pip3 install -r radp/common/requirements.txt
+          pip3 install -r radp/utility/requirements.txt
+          pip3 install -r services/requirements-dev.txt
+          pip3 install -r services/api_manager/requirements.txt
+          pip3 install -r services/orchestration/requirements.txt
+          pip3 install -r services/rf_prediction/requirements.txt
+          pip3 install -r services/training/requirements.txt
+          pip3 install -r services/ue_tracks_generation/requirements.txt
+
+      - name: Run tests with pytest
+        run: pytest

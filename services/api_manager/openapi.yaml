@@ -1,0 +1,217 @@
+# TODO: update this, it's out of date
+openapi: 3.0.0
+info:
+  title: RAN Algorithm Development Platform
+  description: |
+    API for RAN Algorithm Development Platform (RADP) via Meta Inc.
+  version: 1.0.0
+paths:
+  /model/{modelId}:
+    get:
+      summary: Describe a Digital Twin model
+      operationId: describeModel
+      tags:
+        - Service Operation
+      parameters:
+        - name: modelId
+          in: path
+          description: Digital twin model name
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK (successful query of model resource)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DescribeModelResponse'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+        default:
+          $ref: '#/components/responses/default'
+  /train:
+    post:
+      summary: Train a Digital Twin model
+      operationId: train
+      tags:
+        - Service Operation
+      requestBody:
+        description: Training request input definition
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                payload:
+                  $ref: '#/components/schemas/TrainRequest'
+                trainingData:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: OK (successful handling of training request)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainResponse'
+        '400':
+          $ref: '#/components/responses/400'
+        '500':
+          $ref: '#/components/responses/500'
+        default:
+          $ref: '#/components/responses/default'
+  /infer:
+    post:
+      summary: Infer using a Digital Twin model
+      operationId: infer
+      tags:
+        - Service Operation
+      requestBody:
+        description: Infer request input definition
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                payload:
+                  $ref: '#/components/schemas/InferRequest'
+                inferData:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: OK (successful handling of infer request)
+          content:
+            application/octet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+        default:
+          $ref: '#/components/responses/default'
+components:
+  schemas:
+    TrainRequest:
+      type: object
+      description: The request payload of the train API
+      properties:
+        modelName:
+          $ref: '#/components/schemas/ModelName'
+        params:
+          $ref: '#/components/schemas/DigitalTwinTrainingParams'
+    InferRequest:
+      type: object
+      description: The request payload of the infer API
+      properties:
+        modelName:
+          $ref: '#/components/schemas/ModelName'
+    DescribeModelResponse:
+      type: object
+      description: The response object of the describeModel API
+      properties:
+        modelName:
+          $ref: '#/components/schemas/ModelName'
+        numCells:
+          type: integer
+          description: The number of cells in the digital twin model
+    TrainResponse:
+      type: object
+      description: The response object of the train API
+      properties:
+        modelName:
+          $ref: '#/components/schemas/ModelName'
+    DigitalTwinTrainingParams:
+      type: object
+      description: Object to hold digital twin training parameters
+      properties:
+        maxiter:
+          type: integer
+          description: The max iterations to run training
+        lr:
+          type: number
+          description: The learning rate of training
+        stoppingThreshold:
+          type: number
+          description: The stopping threshold for training
+
+    #
+    # COMMON SIMPLE DATA TYPES
+    #
+
+    SupportedFeatures:
+      type: string
+      pattern: '^[A-Fa-f0-9]*$'
+    Uri:
+      type: string
+    ModelName:
+      type: string
+      description: The name of a digital twin model
+
+    #
+    # COMMON STRUCTURED DATA TYPES
+    #
+
+    InvalidParam:
+      type: object
+      properties:
+        param:
+          type: string
+        reason:
+          type: string
+      required:
+        - param
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          $ref: '#/components/schemas/Uri'
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          $ref: '#/components/schemas/Uri'
+        cause:
+          type: string
+        invalidParams:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvalidParam'
+          minItems: 1
+        supportedFeatures:
+          $ref: '#/components/schemas/SupportedFeatures'
+  responses:
+    '400':
+      description: Bad request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    '404':
+      description: Not Found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    '500':
+      description: Internal Server Error
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    default:
+      description: Generic Error
