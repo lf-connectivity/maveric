@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from radp.common.utils import seed_everything
+from radp.utility.simulation_utils import seed_everything
 from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin
 from radp.digital_twin.utils import constants
 from radp.digital_twin.utils.gis_tools import GISTools
