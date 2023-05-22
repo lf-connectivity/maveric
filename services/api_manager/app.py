@@ -6,6 +6,8 @@
 import json
 import logging
 
+from flask import Flask, jsonify, request, send_file
+
 from api_manager.exceptions.base_api_exception import APIException
 from api_manager.exceptions.invalid_parameter_exception import InvalidParameterException
 from api_manager.handlers.consume_simulation_output_handler import ConsumeSimulationOutputHandler
@@ -14,7 +16,6 @@ from api_manager.handlers.describe_simulation_handler import DescribeSimulationH
 from api_manager.handlers.simulation_handler import SimulationHandler
 from api_manager.handlers.train_handler import TrainHandler
 from api_manager.utils.file_io import bootstrap_radp_filesystem, save_input_file
-from flask import Flask, jsonify, request, send_file
 
 from radp.common import constants
 from radp.common.enums import InputFileType

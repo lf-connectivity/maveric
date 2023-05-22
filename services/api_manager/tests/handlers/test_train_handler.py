@@ -2,6 +2,7 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
+
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
@@ -39,20 +40,20 @@ class TestTrainHandler(TestCase):
         with self.assertRaises(InvalidParameterException):
             TrainHandler().handle_train_request(invalid_train_request_2, dummy_files)
 
-    @patch("api_manager.handlers.train_handler.Producer")
-    @patch("api_manager.handlers.train_handler.pd")
     @patch("builtins.open")
-    @patch("api_manager.handlers.train_handler.RADPFileSystemHelper")
+    @patch("api_manager.handlers.train_handler.pd")
     @patch("api_manager.handlers.train_handler.write_feather_df")
+    @patch("api_manager.handlers.train_handler.Producer")
+    @patch("api_manager.handlers.train_handler.RADPFileSystemHelper")
     @patch("api_manager.handlers.train_handler.produce_object_to_kafka_topic")
     def test_handle_train_request__missing_model_id(
         self,
         mock_produce,
-        mock_write_feather_,
         mock_file_system_helper,
-        mock_open,
-        mock_pd,
         mock_producer,
+        mock_write_feather_,
+        mock_pd_,
+        mock_open_,
     ):
         mock_producer_instance = MagicMock
         mock_producer.return_value = mock_producer_instance

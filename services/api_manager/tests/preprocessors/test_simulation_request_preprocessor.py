@@ -3,19 +3,6 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-#!/usr/bin/env python3
-
-"""
-
-# Run tests
-
-On command line (ensure that you are three directories above, i.e. in the directory
-that contains the `radp` directory) :
-
-        python3 -m unittest radp/preprocessors/tests/test_simulation_request_preprocessor.py
-
-"""
-
 import copy
 import unittest
 from typing import Dict
