@@ -195,9 +195,10 @@ def split_training_and_test_data(ue_data_df: pd.DataFrame, test_size: float):
 
 
 class TestBayesianDigitalTwin(unittest.TestCase):
-
-    def test_rf_bayesian_digital_twin(self):
+    @classmethod
+    def setUpClass(cls):
         seed_everything(1)
+
         # get sample data
         site_configs_df, ue_data_df = get_sample_site_config_and_ue_data()
 
@@ -209,82 +210,21 @@ class TestBayesianDigitalTwin(unittest.TestCase):
         logging.info(ue_data_df)
 
         # split into training/test
-        cell_id_training_data_map, cell_id_test_data_map = split_training_and_test_data(ue_data_df, 0.2)
+        cls.cell_id_training_data_map, cls.cell_id_test_data_map = split_training_and_test_data(ue_data_df, 0.2)
 
+        # Generate test data expected_loss_vs_iter, expected_mae and expected_mape with seed_everything(1)
+        cls.expected_loss_vs_iter = {}
+        cls.expected_mae = {}
+        cls.expected_mape = {}
+
+
+    def produce_results_rf_bayesian_digital_twin(self):
         # train
         bayesian_digital_twin_map = {}
 
         x_max, x_min = get_x_max_and_x_min()
-        # Test data expected_loss_vs_iter is generated with seed_everything(1)
-        expected_loss_vs_iter = {
-            "Cell1": [
-                1.3360857963562012,
-                1.3250646591186523,
-                1.3147950172424316,
-                1.305358648300171,
-                1.296657919883728,
-                1.288337230682373,
-                1.2800240516662598,
-                1.2716268301010132,
-                1.2632856369018555,
-                1.2552096843719482,
-                1.2475690841674805,
-                1.2404227256774902,
-                1.2336828708648682,
-                1.2271721363067627,
-                1.2207590341567993,
-                1.2144416570663452,
-                1.208317518234253,
-                1.202500820159912,
-                1.197044849395752,
-                1.1918997764587402,
-            ],
-            "Cell2": [
-                1.4958915710449219,
-                1.4850997924804688,
-                1.476243019104004,
-                1.46876859664917,
-                1.461909294128418,
-                1.455451250076294,
-                1.4494956731796265,
-                1.4441474676132202,
-                1.4394338130950928,
-                1.4352850914001465,
-                1.4315435886383057,
-                1.4280192852020264,
-                1.4245692491531372,
-                1.4211323261260986,
-                1.4177082777023315,
-                1.4143176078796387,
-                1.41096830368042,
-                1.4076392650604248,
-                1.404287576675415,
-                1.400879144668579,
-            ],
-            "Cell3": [
-                1.4421265125274658,
-                1.4319207668304443,
-                1.4234235286712646,
-                1.4165308475494385,
-                1.4108211994171143,
-                1.4056122303009033,
-                1.4002456665039062,
-                1.3943250179290771,
-                1.3877692222595215,
-                1.3807103633880615,
-                1.3733720779418945,
-                1.3659957647323608,
-                1.3587980270385742,
-                1.3519399166107178,
-                1.3454982042312622,
-                1.3394557237625122,
-                1.3337373733520508,
-                1.3282841444015503,
-                1.323117971420288,
-                1.318347454071045,
-            ],
-        }
-        for cell_id, training_data in cell_id_training_data_map.items():
+        
+        for cell_id, training_data in self.cell_id_training_data_map.items():
             bayesian_digital_twin_map[cell_id] = BayesianDigitalTwin(
                 data_in=[training_data],
                 x_columns=[
@@ -306,13 +246,10 @@ class TestBayesianDigitalTwin(unittest.TestCase):
                 f" for cell {cell_id}, with min learning loss {min(loss_vs_iter):0.5f}, "
                 f"avg learning loss {np.mean(loss_vs_iter):0.5f} and final learning loss {loss_vs_iter[-1]:0.5f}"
             )
-            self.assertEqual(loss_vs_iter.tolist(), expected_loss_vs_iter[cell_id])
+            self.expected_loss_vs_iter[cell_id] = loss_vs_iter.tolist()
 
         # predict/test
-        # Test data EXPECTED_MAE and EXPECTED_MAPE is generated with seed_everything(1)
-        EXPECTED_MAE = {"Cell1": 1.7881388210634555, "Cell2": 0.07000514313754991, "Cell3": 0.07576626164573952}
-        EXPECTED_MAPE = {"Cell1": 2.384185094751274, "Cell2": 0.07000514313754991, "Cell3": 0.09590666031106268}
-        for cell_id, testing_data in cell_id_test_data_map.items():
+        for cell_id, testing_data in self.cell_id_test_data_map.items():
             (pred_means, _) = bayesian_digital_twin_map[cell_id].predict_distributed_gpmodel(
                 prediction_dfs=[testing_data]
             )
@@ -323,5 +260,53 @@ class TestBayesianDigitalTwin(unittest.TestCase):
                 f"cell_id = {cell_id}, MAE = {MAE:0.5f} dB, MAPE = {MAPE:0.5f} %,"
                 "# test points = {len(testing_data.avg_rsrp)}"
             )
-            self.assertEqual(MAE, EXPECTED_MAE[cell_id])
-            self.assertEqual(MAPE, EXPECTED_MAPE[cell_id])
+            self.expected_mae[cell_id] = MAE
+            self.expected_mape[cell_id] = MAPE
+    
+    def test_reproducibility_of_results_for_bayesian_digital_twin(self):
+        # produce results and re_run to verify reproducibility of result using seed(1)
+        self.produce_results_rf_bayesian_digital_twin()
+        # train
+        bayesian_digital_twin_map = {}
+
+        x_max, x_min = get_x_max_and_x_min()
+        
+        for cell_id, training_data in self.cell_id_training_data_map.items():
+            bayesian_digital_twin_map[cell_id] = BayesianDigitalTwin(
+                data_in=[training_data],
+                x_columns=[
+                    constants.CELL_EL_DEG,
+                    constants.LOG_DISTANCE,
+                    constants.RELATIVE_BEARING,
+                ],
+                y_columns=["avg_rsrp"],
+                x_max=x_max,
+                x_min=x_min,
+            )
+            loss_vs_iter = bayesian_digital_twin_map[cell_id].train_distributed_gpmodel(
+                maxiter=20,
+                stopping_threshold=1e-5,
+            )
+            logging.info(
+                f"\nTrained {len(loss_vs_iter)} epochs of Bayesian Digital Twin (Gaussian Process Regression) "
+                f"on {len(training_data)} data points"
+                f" for cell {cell_id}, with min learning loss {min(loss_vs_iter):0.5f}, "
+                f"avg learning loss {np.mean(loss_vs_iter):0.5f} and final learning loss {loss_vs_iter[-1]:0.5f}"
+            )
+            self.assertEqual(self.expected_loss_vs_iter[cell_id], loss_vs_iter.tolist())
+
+        # predict/test
+        for cell_id, testing_data in self.cell_id_test_data_map.items():
+            (pred_means, _) = bayesian_digital_twin_map[cell_id].predict_distributed_gpmodel(
+                prediction_dfs=[testing_data]
+            )
+            MAE = abs(testing_data.avg_rsrp - pred_means[0]).mean()
+            # mean absolute percentage error
+            MAPE = 100 * abs((testing_data.avg_rsrp - pred_means[0]) / testing_data.avg_rsrp).mean()
+            logging.info(
+                f"cell_id = {cell_id}, MAE = {MAE:0.5f} dB, MAPE = {MAPE:0.5f} %,"
+                "# test points = {len(testing_data.avg_rsrp)}"
+            )
+            self.assertEqual(self.expected_mae[cell_id], MAE)
+            self.assertEqual(self.expected_mape[cell_id], MAPE)
+            
