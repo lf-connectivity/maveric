@@ -6,13 +6,6 @@
 """
 This test demonstrates how the BayesianDigitalTwin (a RADP RF Digital Twin model)
 is trained and inferred on, using small sample data.
-
-Run tests :
-
-On command line (ensure that you are in the root of the repository) :
-
-        python3 -m unittest radp/tests/lib/digital_twin/rf/bayesian/test_bayesian_engine.py
-
 """
 
 import logging

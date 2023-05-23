@@ -8,7 +8,6 @@ import os
 import sys
 import unittest
 from typing import List, Tuple
-from unittest import TestResult
 
 import coverage
 
@@ -84,8 +83,8 @@ else:
     test_results, total_tests = run_tests([radp_top_level_path, services_top_level_path])
 
 success = True
-failed: List[Tuple[TestResult, str]] = []
-errors: List[Tuple[TestResult, str]] = []
+failed: List[Tuple[unittest.TestResult, str]] = []
+errors: List[Tuple[unittest.TestResult, str]] = []
 
 # gather results
 for test_result in test_results:
