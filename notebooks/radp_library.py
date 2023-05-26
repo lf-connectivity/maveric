@@ -446,7 +446,7 @@ def bdt(
 
     metadata_df = pd.DataFrame(
         {
-            "cell_id": [i + 1 for i in range(n_cell)],
+            "cell_id": [cell_id for cell_id in site_config_df.cell_id],
             "idx": [i + 1 for i in range(n_cell)],
         }
     )
@@ -497,24 +497,23 @@ def bdt(
         axs[1].set_xticks([])
         axs[1].set_yticks([])
     for i in range(len(desired_idxs)):
-        training_data[desired_idxs[i]] = pd.concat([tilt_per_cell_df[i] for tilt_per_cell_df in percell_data_list])
+        train_cell_id = idx_cell_id_mapping[i + 1]
+        training_data[train_cell_id] = pd.concat([tilt_per_cell_df[i] for tilt_per_cell_df in percell_data_list])
         if track_sampling:
-            training_data[desired_idxs[i]] = get_track_samples(
-                training_data[desired_idxs[i]],
+            training_data[train_cell_id] = get_track_samples(
+                training_data[train_cell_id],
                 num_UEs=num_UEs,
                 ticks=ticks,
             )
         if plot_loss_vs_iter:
             axs[0].scatter(
-                training_data[desired_idxs[i]].loc_x,
-                training_data[desired_idxs[i]].loc_y,
-                c=training_data[desired_idxs[i]].cell_rxpwr_dbm,
+                training_data[train_cell_id].loc_x,
+                training_data[train_cell_id].loc_y,
+                c=training_data[train_cell_id].cell_rxpwr_dbm,
                 cmap=cmap,
                 s=25,
             )
-
-    for idx, training_data_idx in training_data.items():
-        train_cell_id = idx_cell_id_mapping[idx]
+    for train_cell_id, training_data_idx in training_data.items():
         training_data_idx["cell_id"] = train_cell_id
         training_data_idx["cell_lat"] = site_config_df[site_config_df["cell_id"] == train_cell_id]["cell_lat"].values[0]
         training_data_idx["cell_lon"] = site_config_df[site_config_df["cell_id"] == train_cell_id]["cell_lon"].values[0]
@@ -568,7 +567,7 @@ def bdt(
 
     bayesian_digital_twins = {}
     loss_vs_iters = []
-    for idx, training_data_idx in training_data.items():
+    for train_cell_id, training_data_idx in training_data.items():
         # filter out "too far" readings that are "too weak"
         training_data_idx = training_data_idx.drop(
             training_data_idx[
@@ -587,15 +586,16 @@ def bdt(
                 cmap=cmap,
                 s=25,
             )
-        logging.info(f"training cell at idx =  : {idx}")
-        bayesian_digital_twins[idx] = BayesianDigitalTwin(
+        logging.info(f"training cell =  : {train_cell_id}")
+
+        bayesian_digital_twins[train_cell_id] = BayesianDigitalTwin(
             data_in=[training_data_idx],
             x_columns=["log_distance", "relative_bearing", "cell_el_deg"],
             y_columns=["cell_rxpwr_dbm"],
             norm_method=NormMethod.MINMAX,
         )
         loss_vs_iters.append(
-            bayesian_digital_twins[idx].train_distributed_gpmodel(
+            bayesian_digital_twins[train_cell_id].train_distributed_gpmodel(
                 maxiter=maxiter,
             )
         )
@@ -623,14 +623,14 @@ def bdt(
         )[0][0]
 
     for i in range(len(desired_idxs)):
-        test_data[desired_idxs[i]] = pd.concat(
+        test_cell_id = idx_cell_id_mapping[i + 1]
+        test_data[test_cell_id] = pd.concat(
             [
                 tilt_test_per_cell_df_list[i],
             ]
         )
 
-    for idx, test_data_idx in test_data.items():
-        test_cell_id = idx_cell_id_mapping[idx]
+    for test_cell_id, test_data_idx in test_data.items():
         test_data_idx["cell_id"] = test_cell_id
         test_data_idx["cell_lat"] = site_config_df[site_config_df["cell_id"] == test_cell_id]["cell_lat"].values[0]
         test_data_idx["cell_lon"] = site_config_df[site_config_df["cell_id"] == test_cell_id]["cell_lon"].values[0]
@@ -700,10 +700,9 @@ def bdt(
         )
         full_prediction_frame = (
             pd.concat([full_prediction_frame, test_data_percell_bing_tile])
-            .groupby(["loc_x", "loc_y"], as_index=False)["cell_rxpwr_dbm", "pred_means"]
+            .groupby(["loc_x", "loc_y"], as_index=False)[["cell_rxpwr_dbm", "pred_means"]]
             .max()
         )
-
     # re-convert to lat/lon
     full_prediction_frame = full_prediction_frame.apply(bing_tile_to_center_df_row, level=bing_tile_level, axis=1)
 
