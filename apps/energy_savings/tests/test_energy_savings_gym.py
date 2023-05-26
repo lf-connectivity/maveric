@@ -181,29 +181,34 @@ class TestEnergySavingsGym(unittest.TestCase):
             ],
         )
 
+        cell_id_1 = 71560196
+        cell_id_2 = 71560197
         training_data = {
-            1: df_0,
-            2: df_1,
+            cell_id_1: df_0,
+            cell_id_2: df_1,
         }
 
-        bayesian_digital_twin = BayesianDigitalTwin(
-            data_in=list(training_data.values()),
-            x_columns=[
-                CELL_LAT,
-                CELL_LON,
-                CELL_EL_DEG,
-                LOG_DISTANCE,
-                RELATIVE_BEARING,
-            ],
-            y_columns=[CELL_RXPWR_DBM],
-            x_max=self.x_max,
-            x_min=self.x_min,
-        )
+        bayesian_digital_twins = {}
+        for idx, cell_id in enumerate(site_config_df.cell_id):
+            bayesian_digital_twin = BayesianDigitalTwin(
+                data_in=[training_data[cell_id]],
+                x_columns=[
+                    CELL_LAT,
+                    CELL_LON,
+                    CELL_EL_DEG,
+                    LOG_DISTANCE,
+                    RELATIVE_BEARING,
+                ],
+                y_columns=[CELL_RXPWR_DBM],
+                x_max=self.x_max,
+                x_min=self.x_min,
+            )
+            bayesian_digital_twins[cell_id] = bayesian_digital_twin
 
         energy_savings_gym = EnergySavingsGym(
-            bayesian_digital_twin=bayesian_digital_twin,
-            site_config_df=site_config_df[site_config_df.cell_id.isin(bayesian_digital_twin.cell_ids)].reset_index(),
-            prediction_frame_template=list(training_data.values())[0],
+            bayesian_digital_twins=bayesian_digital_twins,
+            site_config_df=site_config_df,
+            prediction_frame_template=training_data,
             tilt_set=[0, 1],
             horizon=2,
         )

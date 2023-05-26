@@ -345,7 +345,7 @@ class BayesianDigitalTwin:
         """
         `site_config_df` : 1 unique cell per row, contains at least the columns
             [cell_lat, cell_lon, cell_el_deg, cell_az_deg, cell_id]
-            Assumption : `bayesian_digital_twin` was trained with respect tp `site_config_df`
+            Assumption : `bayesian_digital_twin` was trained with respect to `site_config_df`
         `prediction_frame_template` : 1 prediction point per row, contains columsn [loc_x, loc_y]
             e.g. loc_x is longitude, and loc_y is latitude
         """

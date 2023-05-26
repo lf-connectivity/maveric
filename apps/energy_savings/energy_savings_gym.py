@@ -3,7 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-from typing import List
+from typing import Dict, List
 
 import gym
 import numpy as np
@@ -14,7 +14,7 @@ from apps.coverage_capacity_optimization.cco_engine import CcoEngine
 from radp.digital_twin.mobility.ue_tracks import UETracksGenerator
 from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin
 from radp.digital_twin.utils.cell_selection import perform_attachment
-from radp.digital_twin.utils.constants import CELL_EL_DEG, LOC_X, LOC_Y, RXPOWER_DBM
+from radp.digital_twin.utils.constants import CELL_EL_DEG, LOC_X, LOC_Y
 from radp.digital_twin.utils.gis_tools import GISTools
 
 
@@ -30,9 +30,9 @@ class EnergySavingsGym(gym.Env):
 
     def __init__(
         self,
-        bayesian_digital_twin: BayesianDigitalTwin,
+        bayesian_digital_twins: Dict[int, BayesianDigitalTwin],
         site_config_df: pd.DataFrame,
-        prediction_frame_template: pd.DataFrame,
+        prediction_frame_template: Dict[int, pd.DataFrame],
         tilt_set: List[int],
         weak_coverage_threshold: float = -90,
         over_coverage_threshold: float = 0,
@@ -48,15 +48,16 @@ class EnergySavingsGym(gym.Env):
     ):
         """
         @args
-            `bayesian_digital_twin`: Trained Bayesian Gaussian Process Regression Model
+            `bayesian_digital_twins`: Dict of trained Bayesian Gaussian Process Regression Models per cell
+             {<cell_id>:<bayesian_digital_twin>}
             `site_config_df` : 1 unique cell per row, contains at least the columns
                 [cell_lat, cell_lon, cell_el_deg, cell_az_deg, cell_id]
-                Assumption : `bayesian_digital_twin` was trained with respect tp `site_config_df`
-            `prediction_frame_template` : 1 prediction point per row, contains columsn [loc_x, loc_y]
+                Assumption : `bayesian_digital_twins` were trained with respect to `site_config_df`.
+                `bayesian_digital_twins` should consist 1 twin per cell_id in the `site_config_df`.
+            `prediction_frame_template` : Test data per cell in this format -> {<cell_id>:<test data in dataframe>}
+                For each cell test data, 1 prediction point per row, contains columns [loc_x, loc_y]
                 e.g. loc_x is longitude, and loc_y is latitude
-            `valid_configuration_values`: dictionary containibg valid values for settings,
-                keyed by attribute id that must correspond to a column in site_config_df,
-                for e.g. `cell_el_deg`
+            `tilt_set`: list of tilts e.g: [1,0]
         """
         # TODO (paulvarkey) : ensure consistencies :
         # 1. that bayesian_digital_twin has x_columns
@@ -65,7 +66,7 @@ class EnergySavingsGym(gym.Env):
 
         super(EnergySavingsGym, self).__init__()
 
-        self.bayesian_digital_twin = bayesian_digital_twin
+        self.bayesian_digital_twins = bayesian_digital_twins
         self.site_config_df = site_config_df
         self.num_cells = len(self.site_config_df)
         self.weak_coverage_threshold = weak_coverage_threshold
@@ -93,10 +94,15 @@ class EnergySavingsGym(gym.Env):
         # the order of `prediction_dfs` is the same
         # as the row-order of `site_config_df`
         self.prediction_frame_template = prediction_frame_template
-        self.prediction_dfs = BayesianDigitalTwin.create_prediction_frames(
-            site_config_df=self.site_config_df,
-            prediction_frame_template=prediction_frame_template,
-        )
+
+        self.prediction_dfs = dict()
+        for cell_id in site_config_df.cell_id:
+            prediction_dfs = BayesianDigitalTwin.create_prediction_frames(
+                site_config_df=self.site_config_df[self.site_config_df.cell_id.isin([cell_id])].reset_index(),
+                prediction_frame_template=prediction_frame_template[cell_id],
+            )
+            self.prediction_dfs.update(prediction_dfs)
+
         # Init on-off and tilt states
         self.on_off_state = [1] * len(self.prediction_dfs)
         self.tilt_state = []
@@ -158,22 +164,32 @@ class EnergySavingsGym(gym.Env):
                 site_config_df=self.site_config_df,
                 prediction_frame_template=main_dataframe,
             )
-        prediction_dfs = list(self.prediction_dfs.values())
-        (pred_means, _) = self.bayesian_digital_twin.predict_distributed_gpmodel(
-            prediction_dfs=prediction_dfs,
-        )
 
-        # zero out cells that are turned off and re-compute RSRP and SINR
-        for idx in range(self.num_cells):
-            if self.on_off_state[idx] == 0:
-                pred_means[idx] = self.min_rsrp
+        on_cells_prediction_dfs = []
+        for idx, cell_id in enumerate(self.site_config_df.cell_id):
+            # skip cells that are turned off
+            if self.on_off_state[idx] != 0:
+                # Calculate RXPOWER_DBM and add to prediction_dfs
+                self.bayesian_digital_twins[cell_id].predict_distributed_gpmodel(
+                    prediction_dfs=[self.prediction_dfs[cell_id]],
+                )
+                # Get prediction_dfs for all cells that are turned ON
+                on_cells_prediction_dfs.append(self.prediction_dfs[cell_id])
 
-        # add pred_means and pred_std to prediction_dfs
-        for idx in range(self.num_cells):
-            prediction_dfs[idx][RXPOWER_DBM] = pred_means[idx]
+        # Return if all cells are turned OFF
+        CELL_STATE_ON = 1
+        if CELL_STATE_ON not in self.on_off_state:
+            return (
+                0,
+                0.0,
+                0.0,
+            )
+
+        # Merge prediction_dfs for all cells that are turned ON
+        merged_prediction_dfs = pd.concat(on_cells_prediction_dfs)
 
         # compute RSRP and SINR
-        rf_dataframe = perform_attachment(prediction_dfs[0], self.site_config_df)
+        rf_dataframe = perform_attachment(merged_prediction_dfs, self.site_config_df)
 
         coverage_dataframe = CcoEngine.rf_to_coverage_dataframe(
             rf_dataframe=rf_dataframe,
@@ -210,7 +226,11 @@ class EnergySavingsGym(gym.Env):
         energy_consumption: float,
         cco_objective_metric: float,
     ) -> float:
-        return self.lambda_ * -1.0 * energy_consumption + (1 - self.lambda_) * cco_objective_metric - self.r_norm
+        # Return r_norm when energy_consumption is 0 i.e all cells are OFF
+        if energy_consumption == 0:
+            return self.r_norm
+        else:
+            return self.lambda_ * -1.0 * energy_consumption + (1 - self.lambda_) * cco_objective_metric - self.r_norm
 
     def make_action_from_state(self):
         action = np.empty(self.num_cells, dtype=int)
@@ -243,10 +263,14 @@ class EnergySavingsGym(gym.Env):
 
         # Update site_config and re-create the prediction frames
         self.site_config_df_state[CELL_EL_DEG] = self.tilt_state
-        self.prediction_dfs = BayesianDigitalTwin.create_prediction_frames(
-            site_config_df=self.site_config_df_state,
-            prediction_frame_template=self.prediction_frame_template,
-        )
+        for cell_id in self.site_config_df_state.cell_id:
+            prediction_dfs = BayesianDigitalTwin.create_prediction_frames(
+                site_config_df=self.site_config_df_state[
+                    self.site_config_df_state.cell_id.isin([cell_id])
+                ].reset_index(),
+                prediction_frame_template=self.prediction_frame_template[cell_id],
+            )
+            self.prediction_dfs.update(prediction_dfs)
 
     def reset(self):
         # TODO : check if we need to reset self.current_step
