@@ -135,7 +135,6 @@ class UETracksGenerationHandler:
         
         ue_data = self.generate_ue_data()
         all_dataframes = []  # List to hold all batch dataframes
-<<<<<<< HEAD
 
         # Iterate through each batch
         for batch_no, xy_batches in enumerate(ue_data):
@@ -170,42 +169,6 @@ class UETracksGenerationHandler:
             if batch_no + 1 >= self.num_batches:  # Check if the specified number of batches has been reached
                 break
 
-=======
-
-        # Iterate through each batch
-        for batch_no, xy_batches in enumerate(ue_data):
-            batch_dataframe_list = []
-
-            # Iterate through ticks in each batch
-            for tick, xy_batch in enumerate(xy_batches):
-                # Transforming (x, y) into (lon, lat)
-                lon_lat_pairs = GISTools.converting_xy_points_into_lonlat_pairs(
-                    xy_batch,
-                    self.lon_x_dims,
-                    self.lon_y_dims,
-                    self.min_lon,
-                    self.max_lon,
-                    self.min_lat,
-                    self.max_lat
-                )
-
-                # Building DataFrame for this tick
-                df_tick = pd.DataFrame({
-                    'mock_ue_id': range(self.num_UEs),
-                    'longitude': [pair[0] for pair in lon_lat_pairs],
-                    'latitude': [pair[1] for pair in lon_lat_pairs],
-                    'tick': np.full(self.num_UEs, tick)
-                })
-
-                batch_dataframe_list.append(df_tick)
-
-            # Concatenate all ticks data for the current batch
-            all_dataframes.append(pd.concat(batch_dataframe_list, ignore_index=True))
-
-            if batch_no + 1 >= self.num_batches:  # Check if the specified number of batches has been reached
-                break
-
->>>>>>> origin/tanzim/mobility-model
         # Concatenate all batches into a single DataFrame and return
         return pd.concat(all_dataframes, ignore_index=True)
 
@@ -293,5 +256,11 @@ class UETracksGenerationHandler:
         data.to_csv(filename, index=False)
         print(f"Data successfully saved to {filename}")
 
+
+
+class UETracksGenerationParamHandler:
+
+    def __init__(self, params: Dict):
+        self.params = params
 
 
