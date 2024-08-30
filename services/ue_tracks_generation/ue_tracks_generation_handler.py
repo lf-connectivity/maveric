@@ -17,7 +17,32 @@ from radp.digital_twin.mobility.ue_tracks import MobilityClass
 
 
 class UETracksGenerationHandler:
+    
+    """
+    A handler for generating and managing User Equipment (UE) tracks based on the Gauss-Markov mobility model.
 
+    This class provides functionality to generate UE tracks, convert them to longitude and latitude coordinates,
+    plot them with direction indicators, and save the generated data to a CSV file. The tracks are generated 
+    according to specified parameters such as the number of ticks, UEs, batches, and mobility characteristics.
+
+    Attributes:
+        rng_seed (int): Seed for the random number generator.
+        num_batches (int): Number of batches to generate.
+        lon_x_dims (int): Longitudinal dimension for x-coordinates.
+        lon_y_dims (int): Longitudinal dimension for y-coordinates.
+        num_ticks (int): Number of ticks per batch.
+        num_UEs (int): Number of User Equipment (UE) instances.
+        alpha (float): Alpha parameter for the Gauss-Markov mobility model.
+        variance (float): Variance parameter for the Gauss-Markov mobility model.
+        min_lat (float): Minimum latitude boundary.
+        max_lat (float): Maximum latitude boundary.
+        min_lon (float): Minimum longitude boundary.
+        max_lon (float): Maximum longitude boundary.
+        mobility_class_distribution (Dict[MobilityClass, float]): Distribution of mobility classes.
+        mobility_class_velocities (Dict[MobilityClass, float]): Average velocities for each mobility class.
+        mobility_class_velocity_variances (Dict[MobilityClass, float]): Variance of velocities for each mobility class.
+    """
+    
     def __init__(
         self,
         rng_seed: int,
@@ -57,75 +82,107 @@ class UETracksGenerationHandler:
 
     def generate_ue_data(self) -> List[Any]:
 
-      ue_generator = UETracksGenerator(
-        rng=np.random.default_rng(self.rng_seed),
-        mobility_class_distribution=self.mobility_class_distribution,
-        mobility_class_velocities=self.mobility_class_velocities,
-        mobility_class_velocity_variances=self.mobility_class_velocity_variances,
-        lon_x_dims=self.lon_x_dims,
-        lon_y_dims=self.lon_y_dims,
-        num_ticks=self.num_ticks,
-        num_UEs=self.num_UEs,
-        alpha = self.alpha,
-        variance = self.variance,
-        min_lat = self.min_lat,
-        max_lat = self.max_lat,
-        min_lon = self.min_lon,
-        max_lon = self.max_lon
-        ) 
+        """
+        Generates the UE Tracks using the specified Gauss-Markov Mobility Parameters.
+        
+        return: A list containing the batches of all the UE Tracks data created.
+        """
 
+        ue_generator = UETracksGenerator(
+            rng=np.random.default_rng(self.rng_seed),
+            mobility_class_distribution=self.mobility_class_distribution,
+            mobility_class_velocities=self.mobility_class_velocities,
+            mobility_class_velocity_variances=self.mobility_class_velocity_variances,
+            lon_x_dims=self.lon_x_dims,
+            lon_y_dims=self.lon_y_dims,
+            num_ticks=self.num_ticks,
+            num_UEs=self.num_UEs,
+            alpha = self.alpha,
+            variance = self.variance,
+            min_lat = self.min_lat,
+            max_lat = self.max_lat,
+            min_lon = self.min_lon,
+            max_lon = self.max_lon
+            ) 
 
-      all_batches = []
-      for batch_no in range(self.num_batches):
+        all_batches = []
+        for batch_no in range(self.num_batches):
             batch = next(ue_generator.generate())
             all_batches.append(batch)
-      print("Batches of Data: " , all_batches)
-      return all_batches
+        print("Batches of Data: " , all_batches)
+        return all_batches
 
 
 
     def mobility_data_generation(self) -> pd.DataFrame:
-      ue_data = self.generate_ue_data()
-      all_dataframes = []  # List to hold all batch dataframes
 
-      # Iterate through each batch
-      for batch_no, xy_batches in enumerate(ue_data):
-          batch_dataframe_list = []
+        """
+        Generates UE Mobility Data, converts X and Y Co-ordinates to Latitude and Longitude respectively,
+        and organises everything into dataframes of the following format:
+            +------------+------------+-----------+------+
+            | mock_ue_id | lon        | lat       | tick |
+            +============+============+===========+======+
+            |   0        | 102.219377 | 33.674572 |   0  |
+            |   1        | 102.415954 | 33.855534 |   0  |
+            |   2        | 102.545935 | 33.878075 |   0  |
+            |   0        | 102.297766 | 33.575942 |   1  |
+            |   1        | 102.362725 | 33.916477 |   1  |
+            |   2        | 102.080675 | 33.832793 |   1  |
+            +------------+------------+-----------+------+
+            
+        return: A pandas DataFrame containing the UE tracks data of all the batches.
+        """
+        
+        ue_data = self.generate_ue_data()
+        all_dataframes = []  # List to hold all batch dataframes
 
-          # Iterate through ticks in each batch
-          for tick, xy_batch in enumerate(xy_batches):
-              # Transforming (x, y) into (lon, lat)
-              lon_lat_pairs = GISTools.converting_xy_points_into_lonlat_pairs(
-                  xy_batch,
-                  self.lon_x_dims,
-                  self.lon_y_dims,
-                  self.min_lon,
-                  self.max_lon,
-                  self.min_lat,
-                  self.max_lat
-              )
+        # Iterate through each batch
+        for batch_no, xy_batches in enumerate(ue_data):
+            batch_dataframe_list = []
 
-              # Building DataFrame for this tick
-              df_tick = pd.DataFrame({
-                  'mock_ue_id': range(self.num_UEs),
-                  'longitude': [pair[0] for pair in lon_lat_pairs],
-                  'latitude': [pair[1] for pair in lon_lat_pairs],
-                  'tick': np.full(self.num_UEs, tick)
-              })
+            # Iterate through ticks in each batch
+            for tick, xy_batch in enumerate(xy_batches):
+                # Transforming (x, y) into (lon, lat)
+                lon_lat_pairs = GISTools.converting_xy_points_into_lonlat_pairs(
+                    xy_batch,
+                    self.lon_x_dims,
+                    self.lon_y_dims,
+                    self.min_lon,
+                    self.max_lon,
+                    self.min_lat,
+                    self.max_lat
+                )
 
-              batch_dataframe_list.append(df_tick)
+                # Building DataFrame for this tick
+                df_tick = pd.DataFrame({
+                    'mock_ue_id': range(self.num_UEs),
+                    'longitude': [pair[0] for pair in lon_lat_pairs],
+                    'latitude': [pair[1] for pair in lon_lat_pairs],
+                    'tick': np.full(self.num_UEs, tick)
+                })
 
-          # Concatenate all ticks data for the current batch
-          all_dataframes.append(pd.concat(batch_dataframe_list, ignore_index=True))
+                batch_dataframe_list.append(df_tick)
 
-          if batch_no + 1 >= self.num_batches:  # Check if the specified number of batches has been reached
-              break
+            # Concatenate all ticks data for the current batch
+            all_dataframes.append(pd.concat(batch_dataframe_list, ignore_index=True))
 
-      # Concatenate all batches into a single DataFrame and return
-      return pd.concat(all_dataframes, ignore_index=True)
+            if batch_no + 1 >= self.num_batches:  # Check if the specified number of batches has been reached
+                break
+
+        # Concatenate all batches into a single DataFrame and return
+        return pd.concat(all_dataframes, ignore_index=True)
 
 
     def plot_ue_tracks(self,csv_file) -> None:
+
+        """
+        Plot UE tracks from a CSV file in respect to time. 
+        Each plotted graph represents a batch of data, and the lines and arrows in the graph
+        are used to represent the direction of movement of the respective UE's.
+        
+        param csv_file: Path to the CSV file containing the UE Tracks data.
+        """
+        
         # Load the data
         data = pd.read_csv(csv_file)
 
