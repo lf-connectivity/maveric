@@ -143,7 +143,7 @@ class UETracksGenerationHandler:
           # Iterate through ticks in each batch
             for tick, xy_batch in enumerate(xy_batches):
               # Transforming (x, y) into (lon, lat)
-                lon_lat_pairs = converting_xy_points_into_lonlat_pairs(
+                lon_lat_pairs = GISTools.converting_xy_points_into_lonlat_pairs(
                   xy_batch,
                   self.lon_x_dims,
                   self.lon_y_dims,
