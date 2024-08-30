@@ -70,7 +70,7 @@ class BayesianDigitalTwin:
         in `data_in` -- if these are provided, they are used instead of observed ranges
         during input pre-training normalization.
 
-        `data_in` and `stats` may be constructed using `get_percell_data`.
+        `data_in` and `stats` may be constructed using `get_perc ell_data`.
         """
         self.is_cuda = False
         if torch.cuda.is_available():

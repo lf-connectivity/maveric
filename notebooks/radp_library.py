@@ -484,7 +484,6 @@ def bdt(
             )
 
         percell_data_list.append(tilt_per_cell_df_processed)
-
     training_data = {}
     if plot_loss_vs_iter:
         _, axs = plt.subplots(1, 2, figsize=(16, 12))
