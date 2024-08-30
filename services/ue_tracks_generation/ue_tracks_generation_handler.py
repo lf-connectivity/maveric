@@ -1,13 +1,12 @@
 from enum import Enum
 from typing import Dict, Generator, List, Tuple
 
+from typing import List, Any
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-
-import random
-from datetime import datetime
 
 from radp.common import constants
 from radp.digital_twin.mobility.ue_tracks import UETracksGenerator
@@ -56,7 +55,7 @@ class UETracksGenerationHandler:
 
 
 
-    def generate_ue_data(self):
+    def generate_ue_data(self) -> List[Any]:
 
       ue_generator = UETracksGenerator(
         rng=np.random.default_rng(self.rng_seed),
@@ -73,7 +72,7 @@ class UETracksGenerationHandler:
         max_lat = self.max_lat,
         min_lon = self.min_lon,
         max_lon = self.max_lon
-        )
+        ) 
 
 
       all_batches = []
@@ -85,7 +84,7 @@ class UETracksGenerationHandler:
 
 
 
-    def mobility_data_generation(self):
+    def mobility_data_generation(self) -> pd.DataFrame:
       ue_data = self.generate_ue_data()
       all_dataframes = []  # List to hold all batch dataframes
 
@@ -96,7 +95,7 @@ class UETracksGenerationHandler:
           # Iterate through ticks in each batch
           for tick, xy_batch in enumerate(xy_batches):
               # Transforming (x, y) into (lon, lat)
-              lon_lat_pairs = converting_xy_points_into_lonlat_pairs(
+              lon_lat_pairs = GISTools.converting_xy_points_into_lonlat_pairs(
                   xy_batch,
                   self.lon_x_dims,
                   self.lon_y_dims,
@@ -126,7 +125,7 @@ class UETracksGenerationHandler:
       return pd.concat(all_dataframes, ignore_index=True)
 
 
-    def plot_ue_tracks(self,csv_file):
+    def plot_ue_tracks(self,csv_file) -> None:
         # Load the data
         data = pd.read_csv(csv_file)
 
@@ -187,7 +186,7 @@ class UETracksGenerationHandler:
             # Update start_idx for the next batch
             start_idx = end_idx
 
-    def save_data_to_csv(self, filename: str):
+    def save_data_to_csv(self, filename: str) -> None:
         """
         Save the UE tracks data to a CSV file.
 
