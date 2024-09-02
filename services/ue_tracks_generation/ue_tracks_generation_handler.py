@@ -315,7 +315,25 @@ class UEMobilitySimulationManager:
                     "// cov_around_anchor": {}
                 }
             }
-        }
+        }    
+
+    Attributes:
+        rng_seed (int): Seed for the random number generator.
+        num_batches (int): Number of batches to generate.
+        lon_x_dims (int): Longitudinal dimension for x-coordinates.
+        lon_y_dims (int): Longitudinal dimension for y-coordinates.
+        num_ticks (int): Number of ticks per batch.
+        num_UEs (int): Number of User Equipment (UE) instances.
+        alpha (float): Alpha parameter for the Gauss-Markov mobility model.
+        variance (float): Variance parameter for the Gauss-Markov mobility model.
+        min_lat (float): Minimum latitude boundary.
+        max_lat (float): Maximum latitude boundary.
+        min_lon (float): Minimum longitude boundary.
+        max_lon (float): Maximum longitude boundary.
+        mobility_class_distribution (Dict[MobilityClass, float]): Distribution of mobility classes.
+        mobility_class_velocities (Dict[MobilityClass, float]): Average velocities for each mobility class.
+        mobility_class_velocity_variances (Dict[MobilityClass, float]): Variance of velocities for each mobility class.
+    
     '''
 
 
