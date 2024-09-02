@@ -259,12 +259,14 @@ class UETracksGenerationHandler:
 
 
 
-class UETracksGenerationParamHandler:
+class UEMobilitySimulationManager:
   '''
-    The UETracksGenerationParamHandler Class handles execution of the UE Tracks Generation parameterss
+    The UEMobilitySimulationManager Class handles execution of the UE Tracks Generation parameters
+    and generates UE tracks based on the Gauss-Markov Mobility Model.
 
-    The UE Tracks Generation Service will take in as input an UE Tracks Generation job
+    The UE Mobility Simulation will take in as input an UE Tracks Generation params
     with the following format:
+    
     
     "ue_tracks_generation": {
             "output_file_prefix": "",
