@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, Generator, List, Tuple
+from typing import Dict, List, Tuple
 
 from typing import List, Any
 
@@ -454,10 +454,7 @@ class UEMobilitySimulationManager:
               MobilityClass.car: car_velocity_variances,
       }
 
-      print(self.mobility_class_distribution)
-      print(self.mobility_class_velocities)
-      print(self.mobility_class_velocity_variances)
-      print(self.num_UEs)
+
 
   def generate_ue_data(self) -> List[List[Tuple[float, float]]]:
 
