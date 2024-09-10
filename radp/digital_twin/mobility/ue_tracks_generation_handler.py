@@ -12,10 +12,7 @@ from radp.common import constants
 from radp.digital_twin.mobility.ue_tracks import UETracksGenerator
 from radp.digital_twin.utils.gis_tools import GISTools
 from radp.digital_twin.mobility.ue_tracks import MobilityClass
-from ue_tracks_generation.ue_tracks_generation_helper import UETracksGenerationHelper
-
-
-
+from services.ue_tracks_generation.ue_tracks_generation_helper import UETracksGenerationHelper
 
 class UETracksGenerationHandler:
     
