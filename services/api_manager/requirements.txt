@@ -1,5 +1,5 @@
 confluent-kafka==2.0.2
 Flask==2.2.2
 pandas==1.5.3
-pyarrow==11.0.0
+pyarrow==13.0.0
 Werkzeug==2.2.2

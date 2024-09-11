@@ -2,8 +2,8 @@ confluent-kafka==2.0.2
 coverage==7.1.0
 gpytorch==1.9.1
 pandas==1.5.3
-pyarrow==11.0.0
+pyarrow==13.0.0
 python-dotenv==0.21.1
 scikit-image==0.19.3
 scikit-learn==1.2.1
-torch==1.13.1
+torch==2.0.0
