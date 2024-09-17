@@ -1,6 +1,6 @@
 import unittest
 from services.ue_tracks_generation.ue_tracks_generation_helper import UETracksGenerationHelper
-from common import constants
+from radp.common import constants
 
 
 class TestUETracksGenerationHelper(unittest.TestCase):
