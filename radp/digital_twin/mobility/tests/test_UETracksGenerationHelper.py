@@ -1,35 +1,6 @@
 import unittest
-from digital_twin.mobility.ue_tracks_generation_helper import UETracksGenerationHelper
+from services.ue_tracks_generation.ue_tracks_generation_helper import UETracksGenerationHelper
 from common import constants
-
-# Mock constants to simulate the actual constants used in the UETracksGenerationHelper class.
-class constants:
-    SIMULATION_ID = "simulation_id"
-    UE_TRACKS_GENERATION = "ue_tracks_generation"
-    PARAMS = "params"
-    OUTPUT_FILE_PREFIX = "output_file_prefix"
-    SIMULATION_TIME_INTERVAL = "simulation_time_interval_seconds"
-    NUM_TICKS = "num_ticks"
-    NUM_BATCHES = "num_batches"
-    UE_CLASS_DISTRIBUTION = "ue_class_distribution"
-    STATIONARY = "stationary"
-    PEDESTRIAN = "pedestrian"
-    CYCLIST = "cyclist"
-    CAR = "car"
-    COUNT = "count"
-    VELOCITY = "velocity"
-    VELOCITY_VARIANCE = "velocity_variance"
-    LON_LAT_BOUNDARIES = "lat_lon_boundaries"
-    MIN_LAT = "min_lat"
-    MAX_LAT = "max_lat"
-    MIN_LON = "min_lon"
-    MAX_LON = "max_lon"
-    GAUSS_MARKOV_PARAMS = "gauss_markov_params"
-    ALPHA = "alpha"
-    VARIANCE = "variance"
-    RNG_SEED = "rng_seed"
-    LON_X_DIMS = "lon_x_dims"
-    LON_Y_DIMS = "lon_y_dims"
 
 
 class TestUETracksGenerationHelper(unittest.TestCase):
