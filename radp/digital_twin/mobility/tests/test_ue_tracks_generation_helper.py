@@ -23,8 +23,15 @@ class TestUETracksGenerationHelper(unittest.TestCase):
         - Accuracy of Gauss-Markov model parameters, specifically the alpha value.
 
         Mock data is used to simulate job configurations and expected outputs.
-        """
         
+        How to Run:
+        ------------
+        To run these tests, execute the following command in your terminal:
+        ```
+        python -m unittest radp/digital_twin/mobility/tests/test_ue_tracks_generation_helper.py
+        ```
+        """
+
         self.job_data = {
             constants.SIMULATION_ID: "1234",
             constants.UE_TRACKS_GENERATION: {
