@@ -28,7 +28,7 @@ class TestUETracksGenerationHelper(unittest.TestCase):
         ------------
         To run these tests, execute the following command in your terminal:
         ```
-        python -m unittest radp/digital_twin/mobility/tests/test_ue_tracks_generation_helper.py
+        python3 -m unittest radp/digital_twin/mobility/tests/test_ue_tracks_generation_helper.py
         ```
         """
 
