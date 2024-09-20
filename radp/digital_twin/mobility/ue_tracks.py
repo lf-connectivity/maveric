@@ -162,7 +162,6 @@ class UETracksGenerator:
             self.gauss_markov_models[k].close()
 
     def generate_as_lon_lat_points(
-        self,
         rng_seed: int,
         lon_x_dims: int,
         lon_y_dims: int,
