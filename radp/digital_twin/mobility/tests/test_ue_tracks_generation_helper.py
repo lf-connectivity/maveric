@@ -8,7 +8,23 @@ from radp.common import constants
 class TestUETracksGenerationHelper(unittest.TestCase):
 
     def setUp(self):
-        # Mock data for testing
+        """
+        Unit tests for the UETracksGenerationHelper class.
+
+        This test suite validates key functionalities of the UETracksGenerationHelper
+        class, which handles mobility data generation for user equipment (UE).
+        The tests focus on verifying:
+
+        - Correct retrieval of simulation parameters such as simulation ID, number
+        of ticks, and batches.
+        - Proper generation of output file prefixes.
+        - Accurate calculation of UE class distributions (counts and velocities).
+        - Correct geographic boundary values for latitude and longitude.
+        - Accuracy of Gauss-Markov model parameters, specifically the alpha value.
+
+        Mock data is used to simulate job configurations and expected outputs.
+        """
+        
         self.job_data = {
             constants.SIMULATION_ID: "1234",
             constants.UE_TRACKS_GENERATION: {
