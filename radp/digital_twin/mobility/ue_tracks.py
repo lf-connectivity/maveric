@@ -161,6 +161,7 @@ class UETracksGenerator:
         for k in self.gauss_markov_models.keys():
             self.gauss_markov_models[k].close()
 
+    @staticmethod
     def generate_as_lon_lat_points(
         rng_seed: int,
         lon_x_dims: int,
