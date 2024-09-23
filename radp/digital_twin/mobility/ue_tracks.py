@@ -5,7 +5,7 @@
 
 from enum import Enum
 from typing import Dict, Generator, List, Any
-import itertools
+ 
 
 import numpy as np
 import pandas as pd
