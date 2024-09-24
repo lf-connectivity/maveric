@@ -4,6 +4,28 @@ from typing import Tuple
 
 
 class ParameterRegression:
+    """
+    A class designed for parameter regression analysis,
+    tailored to model the movement dynamics of user equipment (UE) using velocities and angles.
+    This class employs polynomial regression with a least squares optimization technique to estimate the parameter alpha.
+    Alpha characterizes the dependency of future states on current states,
+    optimizing it to minimize residuals and closely align predicted states with actual observed states.
+
+    Attributes:
+        df (pd.DataFrame): The input DataFrame containing 'velocity' and 'mock_ue_id' columns which represent the velocities of the UEs and their respective identifiers.
+        num_users (int): Number of unique users (UEs) determined by the count of unique 'mock_ue_id'.
+        MAX_X (int), MAX_Y (int): Constants used as spatial boundaries or limits in computations, set to 100.
+        USERS (np.ndarray): Array of user indices based on the number of users.
+        velocity_mean (float): The mean of all velocity readings across the dataset.
+        variance (float): The variance of the velocity readings, used in the regression model.
+        rng (np.random.Generator): Random number generator with a predefined seed for reproducibility.
+        v_t_full_data (np.ndarray): The velocity data converted to a numpy array for processing.
+        f (np.poly1d): A polynomial function applied to the velocity data to simulate angle (theta) values.
+        v_t, theta_t (np.ndarray): Current state velocities and angles.
+        v_t_next, theta_t_next (np.ndarray): Subsequent state velocities and angles used for comparison and fitting.
+        t_array, t_next_array (np.ndarray): Arrays combining the current and next state values for velocities and angles for use in optimization.
+    """
+
     def __init__(self, df) -> None:
         """
         Initializes the ParameterRegression class with the dataset and precomputes constants and data arrays.
