@@ -9,7 +9,22 @@ from unittest.mock import patch
 
 
 class TestUETracksParams(unittest.TestCase):
-    def setUp(self):
+    """
+    Unit tests for the UETracksGenerationParams class.
+
+    Tests the initialization and attribute extraction of UETracksGenerationParams
+    from valid parameter configurations, ensuring correct handling of mobility class
+    distributions and velocities.
+
+    How to Run:
+    ------------
+    To run these tests, execute the following command in your terminal:
+    ```
+    python3 -m unittest radp/digital_twin/mobility/tests/test_ue_tracks_params.py
+    ```
+    """
+
+    def setUp(self) -> None:
         self.valid_params = {
             constants.UE_TRACKS_GENERATION: {
                 constants.PARAMS: {
@@ -63,7 +78,18 @@ class TestUETracksParams(unittest.TestCase):
     )
     def test_initialization_and_extraction(
         self, mock_velocity_variances, mock_velocity, mock_count
-    ):
+    ) -> None:
+        """
+        Test the initialization and attribute extraction of UETracksGenerationParams.
+
+        Args:
+            mock_velocity_variances: Mock for velocity variances method.
+            mock_velocity: Mock for velocity method.
+            mock_count: Mock for count method.
+
+        Returns:
+            None
+        """
         # Set up the mock return values
         mock_count.return_value = (10, 10, 10, 10)
         mock_velocity.return_value = (1, 1, 1, 1)
