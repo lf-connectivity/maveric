@@ -88,8 +88,12 @@ class UETracksGenerationParams:
         self.params = params[constants.UE_TRACKS_GENERATION][constants.PARAMS]
         self.rng_seed = self.params[constants.GAUSS_MARKOV_PARAMS][constants.RNG_SEED]
         self.num_batches = self.params[constants.NUM_BATCHES]
-        self.lon_x_dims = self.params[constants.GAUSS_MARKOV_PARAMS][constants.LON_X_DIMS]
-        self.lon_y_dims = self.params[constants.GAUSS_MARKOV_PARAMS][constants.LON_Y_DIMS]
+        self.lon_x_dims = self.params[constants.GAUSS_MARKOV_PARAMS][
+            constants.LON_X_DIMS
+        ]
+        self.lon_y_dims = self.params[constants.GAUSS_MARKOV_PARAMS][
+            constants.LON_Y_DIMS
+        ]
         self.num_ticks = self.params[constants.NUM_TICKS]
         self.num_UEs = self.extract_ue_class_distribution()
         self.alpha = self.params[constants.GAUSS_MARKOV_PARAMS][constants.ALPHA]
@@ -98,7 +102,7 @@ class UETracksGenerationParams:
         self.max_lat = self.params[constants.LON_LAT_BOUNDARIES][constants.MAX_LAT]
         self.min_lon = self.params[constants.LON_LAT_BOUNDARIES][constants.MIN_LON]
         self.max_lon = self.params[constants.LON_LAT_BOUNDARIES][constants.MAX_LON]
-        self.extract_ue_class_distribution()   # Initialize the method to extract the UE class distribution
+        self.extract_ue_class_distribution()  # Initialize the method to extract the UE class distribution
 
     def extract_ue_class_distribution(self):
         """
