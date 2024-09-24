@@ -32,12 +32,16 @@ def U(rng, MIN, MAX, SAMPLES):
 
 # define a Truncated Power Law Distribution
 def P(rng, ALPHA, MIN, MAX, SAMPLES):
-    return ((MAX ** (ALPHA + 1.0) - 1.0) * rng.random(SAMPLES.shape) + 1.0) ** (1.0 / (ALPHA + 1.0))
+    return ((MAX ** (ALPHA + 1.0) - 1.0) * rng.random(SAMPLES.shape) + 1.0) ** (
+        1.0 / (ALPHA + 1.0)
+    )
 
 
 # *************** Palm state probability **********************
 def pause_probability_init(pause_low, pause_high, speed_low, speed_high, dimensions):
-    alpha1 = ((pause_high + pause_low) * (speed_high - speed_low)) / (2 * np.log(speed_high / speed_low))
+    alpha1 = ((pause_high + pause_low) * (speed_high - speed_low)) / (
+        2 * np.log(speed_high / speed_low)
+    )
     delta1 = np.sqrt(np.sum(np.square(dimensions)))
     return alpha1 / (alpha1 + delta1)
 
@@ -51,7 +55,9 @@ def residual_time(rng, mean, delta, shape=(1,)):
     if delta != 0.0:
         case_1_u = u < (2.0 * t1 / (t1 + t2))
         residual[case_1_u] = u[case_1_u] * (t1 + t2) / 2.0
-        residual[np.logical_not(case_1_u)] = t2 - np.sqrt((1.0 - u[np.logical_not(case_1_u)]) * (t2 * t2 - t1 * t1))
+        residual[np.logical_not(case_1_u)] = t2 - np.sqrt(
+            (1.0 - u[np.logical_not(case_1_u)]) * (t2 * t2 - t1 * t1)
+        )
     else:
         residual = u * mean
     return residual
@@ -65,7 +71,9 @@ def initial_speed(rng, speed_mean, speed_delta, shape=(1,)):
     return pow(v1, u) / pow(v0, u - 1)
 
 
-def init_random_waypoint(rng, nr_nodes, dimensions, speed_low, speed_high, pause_low, pause_high):
+def init_random_waypoint(
+    rng, nr_nodes, dimensions, speed_low, speed_high, pause_low, pause_high
+):
     ndim = len(dimensions)
     positions = np.empty((nr_nodes, ndim))
     waypoints = np.empty((nr_nodes, ndim))
@@ -76,11 +84,17 @@ def init_random_waypoint(rng, nr_nodes, dimensions, speed_low, speed_high, pause
     speed_high = float(speed_high)
 
     moving = np.ones(nr_nodes)
-    speed_mean, speed_delta = (speed_low + speed_high) / 2.0, (speed_high - speed_low) / 2.0
-    pause_mean, pause_delta = (pause_low + pause_high) / 2.0, (pause_high - pause_low) / 2.0
+    speed_mean, speed_delta = (speed_low + speed_high) / 2.0, (
+        speed_high - speed_low
+    ) / 2.0
+    pause_mean, pause_delta = (pause_low + pause_high) / 2.0, (
+        pause_high - pause_low
+    ) / 2.0
 
     # steady-state pause probability for Random Waypoint
-    q0 = pause_probability_init(pause_low, pause_high, speed_low, speed_high, dimensions)
+    q0 = pause_probability_init(
+        pause_low, pause_high, speed_low, speed_high, dimensions
+    )
 
     for i in range(nr_nodes):
         while True:
@@ -109,7 +123,9 @@ def init_random_waypoint(rng, nr_nodes, dimensions, speed_low, speed_high, pause
     # steady-state speed and pause time
     paused_bool = moving == 0.0
     paused_idx = np.where(paused_bool)[0]
-    pause_time[paused_idx] = residual_time(rng, pause_mean, pause_delta, paused_idx.shape)
+    pause_time[paused_idx] = residual_time(
+        rng, pause_mean, pause_delta, paused_idx.shape
+    )
     speed[paused_idx] = 0.0
 
     moving_bool = np.logical_not(paused_bool)
@@ -219,7 +235,9 @@ class RandomWaypoint(object):
                 velocity[arrived] = U(self.rng, MIN_V, MAX_V, arrived)
 
                 new_direction = waypoints[arrived] - positions[arrived]
-                direction[arrived] = new_direction / np.linalg.norm(new_direction, axis=1)[:, np.newaxis]
+                direction[arrived] = (
+                    new_direction / np.linalg.norm(new_direction, axis=1)[:, np.newaxis]
+                )
 
             self.velocity = velocity
             self.wt = wt
@@ -652,7 +670,10 @@ class HeterogeneousTruncatedLevyWalk(StochasticWalk):
         FL_MIN = FL_MAX / 10.0
 
         def FL_DISTR(SAMPLES):
-            return rng.random(len(SAMPLES)) * (FL_MAX[SAMPLES] - FL_MIN[SAMPLES]) + FL_MIN[SAMPLES]
+            return (
+                rng.random(len(SAMPLES)) * (FL_MAX[SAMPLES] - FL_MIN[SAMPLES])
+                + FL_MIN[SAMPLES]
+            )
 
         def WT_DISTR(SAMPLES):
             return P(rng, WT_EXP, 1.0, WT_MAX, SAMPLES)
@@ -747,7 +768,9 @@ def gauss_markov(
         old_num_users = num_users
         num_users = int(num_users / len(anchor_loc)) * len(anchor_loc)
         if old_num_users != num_users:
-            logging.info("len(anchor_loc) must evenly divide num_users.....terminating....")
+            logging.info(
+                "len(anchor_loc) must evenly divide num_users.....terminating...."
+            )
             return
 
         num_users_per_anchor = int(num_users / len(anchor_loc))
@@ -790,9 +813,17 @@ def gauss_markov(
         angle_mean[b] = -angle_mean[b]
 
         # calculate new speed and direction based on the model
-        velocity = alpha * velocity + alpha2 * velocity_mean + alpha3 * rng.normal(0.0, 1.0, num_users)
+        velocity = (
+            alpha * velocity
+            + alpha2 * velocity_mean
+            + alpha3 * rng.normal(0.0, 1.0, num_users)
+        )
 
-        theta = alpha * theta + alpha2 * angle_mean + alpha3 * rng.normal(0.0, 1.0, num_users)
+        theta = (
+            alpha * theta
+            + alpha2 * angle_mean
+            + alpha3 * rng.normal(0.0, 1.0, num_users)
+        )
 
         yield np.dstack((x, y))[0]
 
@@ -814,7 +845,11 @@ def non_homogeneous_drop(
     user_loc = []
     for anchor_it in range(num_anchors):
         anchor_mean = anchor_loc[anchor_it, :]
-        user_loc.append(rng.multivariate_normal(mean=anchor_mean, cov=cov_around_anchor, size=num_users_per_anchor))
+        user_loc.append(
+            rng.multivariate_normal(
+                mean=anchor_mean, cov=cov_around_anchor, size=num_users_per_anchor
+            )
+        )
 
     user_loc = np.concatenate(user_loc, axis=0)
 

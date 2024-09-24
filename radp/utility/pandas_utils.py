@@ -37,7 +37,9 @@ def cross_replicate(df_a: pd.DataFrame, df_b: pd.DataFrame) -> pd.DataFrame:
     """Cross replicate two pandas dataframes"""
     # raise exception if the dfs share a column name
     if any(df_a.columns.intersection(df_b.columns)):
-        raise ValueError("Cannot call cross_replicate on dataframes with shared column names")
+        raise ValueError(
+            "Cannot call cross_replicate on dataframes with shared column names"
+        )
 
     size_a, size_b = df_a.shape[0], df_b.shape[0]
 

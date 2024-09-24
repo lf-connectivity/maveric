@@ -27,7 +27,9 @@ class UETracksGenerationConsumer:
         self.ue_tracks_generation_driver = UETracksGenerationDriver()
 
         # subscribe to topics
-        safe_subscribe(consumer=self.consumer, topics=UE_TRACKS_GENERATION_CONSUMER_TOPICS)
+        safe_subscribe(
+            consumer=self.consumer, topics=UE_TRACKS_GENERATION_CONSUMER_TOPICS
+        )
         logger.info(f"Subscribed to topics: {UE_TRACKS_GENERATION_CONSUMER_TOPICS}")
 
     def consume_from_jobs(self) -> None:
@@ -45,23 +47,34 @@ class UETracksGenerationConsumer:
                     logger.debug("Waiting...")
                     continue
                 if message.error():
-                    logger.exception(f"Error consuming from {constants.KAFKA_JOBS_TOPIC_NAME} topic: {message.error()}")
+                    logger.exception(
+                        f"Error consuming from {constants.KAFKA_JOBS_TOPIC_NAME} topic: {message.error()}"
+                    )
                     continue
 
                 # Extract the (optional) key and value, and print.
-                logger.debug(f"Consumed message value = {message.value().decode('utf-8')}")
+                logger.debug(
+                    f"Consumed message value = {message.value().decode('utf-8')}"
+                )
                 job_data = json.loads(message.value().decode("utf-8"))
 
                 # ignore non-ue_tracks_generation related jobs
-                if job_data[constants.KAFKA_JOB_TYPE] != constants.JOB_TYPE_UE_TRACKS_GENERATION:
+                if (
+                    job_data[constants.KAFKA_JOB_TYPE]
+                    != constants.JOB_TYPE_UE_TRACKS_GENERATION
+                ):
                     continue
 
                 # execute ue_tracks_generation
                 try:
-                    self.ue_tracks_generation_driver.handle_ue_tracks_generation_job(job_data)
+                    self.ue_tracks_generation_driver.handle_ue_tracks_generation_job(
+                        job_data
+                    )
                     logger.info("Successfully executed UE Tracks Generation job")
                 except Exception as e:
-                    logger.exception(f"Exception occurred while handling ue_tracks_generation job: {job_data}\n{e}")
+                    logger.exception(
+                        f"Exception occurred while handling ue_tracks_generation job: {job_data}\n{e}"
+                    )
         except KeyboardInterrupt:
             pass
         finally:

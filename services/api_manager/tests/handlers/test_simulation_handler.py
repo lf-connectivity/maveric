@@ -42,12 +42,11 @@ class TestDescribeSimulationHandler(TestCase):
             "simulation_id": "dummy_sim_id",
         }
 
-        expected_job = {
-            "job_type": "orchestration",
-            "simulation_id": "dummy_sim_id"
-        }
+        expected_job = {"job_type": "orchestration", "simulation_id": "dummy_sim_id"}
 
-        assert SimulationHandler().handle_simulation_request(dummy_rf_sim, dummy_files) == {
+        assert SimulationHandler().handle_simulation_request(
+            dummy_rf_sim, dummy_files
+        ) == {
             "job_id": "dummy_job_id",
             "simulation_id": "dummy_sim_id",
         }
@@ -60,4 +59,6 @@ class TestDescribeSimulationHandler(TestCase):
             "dummy_sim_id", config_file_path="dummy_config_file_path"
         )
 
-        mock_produce.assert_called_once_with(producer=mock_producer_instance, topic="jobs", value=expected_job)
+        mock_produce.assert_called_once_with(
+            producer=mock_producer_instance, topic="jobs", value=expected_job
+        )

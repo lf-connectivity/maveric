@@ -98,7 +98,9 @@ class EnergySavingsGym(gym.Env):
         self.prediction_dfs = dict()
         for cell_id in site_config_df.cell_id:
             prediction_dfs = BayesianDigitalTwin.create_prediction_frames(
-                site_config_df=self.site_config_df[self.site_config_df.cell_id.isin([cell_id])].reset_index(),
+                site_config_df=self.site_config_df[
+                    self.site_config_df.cell_id.isin([cell_id])
+                ].reset_index(),
                 prediction_frame_template=prediction_frame_template[cell_id],
             )
             self.prediction_dfs.update(prediction_dfs)
@@ -140,11 +142,13 @@ class EnergySavingsGym(gym.Env):
 
         # Reward when all cells are off:
         self.r_norm = (1 - lambda_) * (
-            -10 * np.log10(self.num_cells) - over_coverage_threshold + min_rsrp - weak_coverage_threshold
+            -10 * np.log10(self.num_cells)
+            - over_coverage_threshold
+            + min_rsrp
+            - weak_coverage_threshold
         )
 
     def _next_observation(self):
-
         if self.ue_tracks:
             data = next(self.ue_tracks)
             for batch in data:
@@ -198,17 +202,22 @@ class EnergySavingsGym(gym.Env):
         )
         if self.traffic_model_df is None:
             cco_objective_metric = (
-                coverage_dataframe["weak_coverage"].mean() + coverage_dataframe["over_coverage"].mean()
+                coverage_dataframe["weak_coverage"].mean()
+                + coverage_dataframe["over_coverage"].mean()
             )
 
         else:
-            processed_coverage_dataframe = CcoEngine.augment_coverage_df_with_normalized_traffic_model(
-                self.traffic_model_df,
-                "avg_of_average_egress_kbps_across_all_time",
-                coverage_dataframe,
+            processed_coverage_dataframe = (
+                CcoEngine.augment_coverage_df_with_normalized_traffic_model(
+                    self.traffic_model_df,
+                    "avg_of_average_egress_kbps_across_all_time",
+                    coverage_dataframe,
+                )
             )
 
-            cco_objective_metric = CcoEngine.traffic_normalized_cco_metric(processed_coverage_dataframe)
+            cco_objective_metric = CcoEngine.traffic_normalized_cco_metric(
+                processed_coverage_dataframe
+            )
 
         # Output for debugging/postprocessing purposes
         if self.debug:
@@ -216,7 +225,9 @@ class EnergySavingsGym(gym.Env):
             self.coverage_dataframe = coverage_dataframe
 
         return (
-            EnergySavingsGym.ENERGY_MAX_PER_CELL * sum(self.on_off_state) / len(self.on_off_state),
+            EnergySavingsGym.ENERGY_MAX_PER_CELL
+            * sum(self.on_off_state)
+            / len(self.on_off_state),
             0.0,
             cco_objective_metric,  # TODO : normalized this against MAX_CLUSTER_CCO
         )
@@ -230,7 +241,11 @@ class EnergySavingsGym(gym.Env):
         if energy_consumption == 0:
             return self.r_norm
         else:
-            return self.lambda_ * -1.0 * energy_consumption + (1 - self.lambda_) * cco_objective_metric - self.r_norm
+            return (
+                self.lambda_ * -1.0 * energy_consumption
+                + (1 - self.lambda_) * cco_objective_metric
+                - self.r_norm
+            )
 
     def make_action_from_state(self):
         action = np.empty(self.num_cells, dtype=int)
@@ -242,7 +257,6 @@ class EnergySavingsGym(gym.Env):
         return action
 
     def _take_action(self, action):
-
         num_cells = len(self.site_config_df)
         # on_off_cell_state captures the on/off state of each cell (on is `1`)
         on_off_cell_state = [1] * num_cells
@@ -277,7 +291,6 @@ class EnergySavingsGym(gym.Env):
         return self._next_observation()
 
     def step(self, action):
-
         # Execute one time step within the environment
         self._take_action(action)
 
@@ -293,7 +306,9 @@ class EnergySavingsGym(gym.Env):
 
         return obs, reward, done, {}
 
-    def get_all_possible_actions(self, possible_actions: List[List[int]]) -> List[List[int]]:
+    def get_all_possible_actions(
+        self, possible_actions: List[List[int]]
+    ) -> List[List[int]]:
         """
         A recursive function to get all possible actions as a list.
         Useful for bruteforce search.

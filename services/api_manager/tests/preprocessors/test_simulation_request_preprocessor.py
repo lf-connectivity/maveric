@@ -99,7 +99,11 @@ class TestRICSimulationRequestPreprocessor(unittest.TestCase):
         ue_tracks_specifier_key: str,
     ):
         chained_hash_val = deterministic_hash_dict(
-            {"simulation_time_interval_seconds": request["simulation_time_interval_seconds"]}
+            {
+                "simulation_time_interval_seconds": request[
+                    "simulation_time_interval_seconds"
+                ]
+            }
         )
 
         self.assertEqual(

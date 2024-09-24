@@ -31,7 +31,6 @@ class TestUETracksGenerationHelper(unittest.TestCase):
     """
 
     def setUp(self):
-
         self.job_data = {
             constants.SIMULATION_ID: "1234",
             constants.UE_TRACKS_GENERATION: {
