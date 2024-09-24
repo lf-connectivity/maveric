@@ -47,18 +47,24 @@ class UETracksGenerationHelper:
     @staticmethod
     def get_ue_class_distribution_count(ue_tracks_generation_params: Dict):
         """Helper method to return ue_class_distribution of an UE Tracks Generation job"""
-        stationary_count = ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][constants.STATIONARY][
-            constants.COUNT
-        ]
-        pedestrian_count = ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][constants.PEDESTRIAN][
-            constants.COUNT
-        ]
-        cyclist_count = ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][constants.CYCLIST][constants.COUNT]
-        car_count = ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][constants.CAR][constants.COUNT]
+        stationary_count = ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][
+            constants.STATIONARY
+        ][constants.COUNT]
+        pedestrian_count = ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][
+            constants.PEDESTRIAN
+        ][constants.COUNT]
+        cyclist_count = ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][
+            constants.CYCLIST
+        ][constants.COUNT]
+        car_count = ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][
+            constants.CAR
+        ][constants.COUNT]
         return stationary_count, pedestrian_count, cyclist_count, car_count
 
     @staticmethod
-    def get_ue_class_distribution_velocity(ue_tracks_generation_params: Dict, simulation_time_interval: int):
+    def get_ue_class_distribution_velocity(
+        ue_tracks_generation_params: Dict, simulation_time_interval: int
+    ):
         """
         Helper method to return ue_class_distribution_velocity of an UE Tracks Generation job
 
@@ -70,19 +76,27 @@ class UETracksGenerationHelper:
         """
 
         stationary_velocity = (
-            ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][constants.STATIONARY][constants.VELOCITY]
+            ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][
+                constants.STATIONARY
+            ][constants.VELOCITY]
             * simulation_time_interval
         )
         pedestrian_velocity = (
-            ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][constants.PEDESTRIAN][constants.VELOCITY]
+            ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][
+                constants.PEDESTRIAN
+            ][constants.VELOCITY]
             * simulation_time_interval
         )
         cyclist_velocity = (
-            ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][constants.CYCLIST][constants.VELOCITY]
+            ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][
+                constants.CYCLIST
+            ][constants.VELOCITY]
             * simulation_time_interval
         )
         car_velocity = (
-            ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][constants.CAR][constants.VELOCITY]
+            ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][constants.CAR][
+                constants.VELOCITY
+            ]
             * simulation_time_interval
         )
         return (
@@ -93,7 +107,9 @@ class UETracksGenerationHelper:
         )
 
     @staticmethod
-    def get_ue_class_distribution_velocity_variances(ue_tracks_generation_params: Dict, simulation_time_interval: int):
+    def get_ue_class_distribution_velocity_variances(
+        ue_tracks_generation_params: Dict, simulation_time_interval: int
+    ):
         """
         Helper method to return ue_class_distribution_velocity_variances of an UE Tracks Generation job
 
@@ -105,23 +121,27 @@ class UETracksGenerationHelper:
         """
 
         stationary_velocity_variance = (
-            ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][constants.STATIONARY][
-                constants.VELOCITY_VARIANCE
-            ]
+            ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][
+                constants.STATIONARY
+            ][constants.VELOCITY_VARIANCE]
             * simulation_time_interval
         )
         pedestrian_velocity_variance = (
-            ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][constants.PEDESTRIAN][
-                constants.VELOCITY_VARIANCE
-            ]
+            ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][
+                constants.PEDESTRIAN
+            ][constants.VELOCITY_VARIANCE]
             * simulation_time_interval
         )
         cyclist_velocity_variance = (
-            ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][constants.CYCLIST][constants.VELOCITY_VARIANCE]
+            ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][
+                constants.CYCLIST
+            ][constants.VELOCITY_VARIANCE]
             * simulation_time_interval
         )
         car_velocity_variances = (
-            ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][constants.CAR][constants.VELOCITY_VARIANCE]
+            ue_tracks_generation_params[constants.UE_CLASS_DISTRIBUTION][constants.CAR][
+                constants.VELOCITY_VARIANCE
+            ]
             * simulation_time_interval
         )
 
@@ -138,34 +158,52 @@ class UETracksGenerationHelper:
         Helper method to return latitude-longitude boundaries in which to generate UE tracks
         """
 
-        min_lat = ue_tracks_generation_params[constants.LON_LAT_BOUNDARIES][constants.MIN_LAT]
-        max_lat = ue_tracks_generation_params[constants.LON_LAT_BOUNDARIES][constants.MAX_LAT]
-        min_lon = ue_tracks_generation_params[constants.LON_LAT_BOUNDARIES][constants.MIN_LON]
-        max_lon = ue_tracks_generation_params[constants.LON_LAT_BOUNDARIES][constants.MAX_LON]
+        min_lat = ue_tracks_generation_params[constants.LON_LAT_BOUNDARIES][
+            constants.MIN_LAT
+        ]
+        max_lat = ue_tracks_generation_params[constants.LON_LAT_BOUNDARIES][
+            constants.MAX_LAT
+        ]
+        min_lon = ue_tracks_generation_params[constants.LON_LAT_BOUNDARIES][
+            constants.MIN_LON
+        ]
+        max_lon = ue_tracks_generation_params[constants.LON_LAT_BOUNDARIES][
+            constants.MAX_LON
+        ]
 
         return min_lat, max_lat, min_lon, max_lon
 
     @staticmethod
     def get_gauss_markov_alpha(ue_tracks_generation_params: Dict) -> str:
         """Helper method to return gauss_markov alpha of an UE Tracks Generation job"""
-        alpha = ue_tracks_generation_params[constants.GAUSS_MARKOV_PARAMS][constants.ALPHA]
+        alpha = ue_tracks_generation_params[constants.GAUSS_MARKOV_PARAMS][
+            constants.ALPHA
+        ]
         return alpha
 
     @staticmethod
     def get_gauss_markov_variance(ue_tracks_generation_params: Dict) -> str:
         """Helper method to return gauss_markov variance of an UE Tracks Generation job"""
-        variance = ue_tracks_generation_params[constants.GAUSS_MARKOV_PARAMS][constants.VARIANCE]
+        variance = ue_tracks_generation_params[constants.GAUSS_MARKOV_PARAMS][
+            constants.VARIANCE
+        ]
         return variance
 
     @staticmethod
     def get_gauss_markov_rng_seed(ue_tracks_generation_params: Dict) -> str:
         """Helper method to return gauss_markov rng_seed of an UE Tracks Generation job"""
-        rng_seed = ue_tracks_generation_params[constants.GAUSS_MARKOV_PARAMS][constants.RNG_SEED]
+        rng_seed = ue_tracks_generation_params[constants.GAUSS_MARKOV_PARAMS][
+            constants.RNG_SEED
+        ]
         return rng_seed
 
     @staticmethod
     def get_gauss_markov_xy_dims(ue_tracks_generation_params: Dict) -> Tuple[str, str]:
         """Helper method to return gauss_markov lon_x_dims and lon_y_dims of a UE Tracks Generation job"""
-        lon_x_dims = ue_tracks_generation_params[constants.GAUSS_MARKOV_PARAMS][constants.LON_X_DIMS]
-        lon_y_dims = ue_tracks_generation_params[constants.GAUSS_MARKOV_PARAMS][constants.LON_Y_DIMS]
+        lon_x_dims = ue_tracks_generation_params[constants.GAUSS_MARKOV_PARAMS][
+            constants.LON_X_DIMS
+        ]
+        lon_y_dims = ue_tracks_generation_params[constants.GAUSS_MARKOV_PARAMS][
+            constants.LON_Y_DIMS
+        ]
         return lon_x_dims, lon_y_dims
