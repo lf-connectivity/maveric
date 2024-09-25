@@ -15,7 +15,9 @@ from typing import Dict
 
 from api_manager.config.kafka import kafka_producer_config
 from api_manager.dtos.responses.simulation_response import SimulationResponse
-from api_manager.preprocessors.simulation_request_preprocessor import RICSimulationRequestPreprocessor
+from api_manager.preprocessors.simulation_request_preprocessor import (
+    RICSimulationRequestPreprocessor,
+)
 from confluent_kafka import Producer
 
 from radp.common import constants
@@ -65,12 +67,16 @@ class SimulationHandler:
         simulation_id = processed_request[constants.SIMULATION_ID]
 
         # create the simulation directory if it doesn't already exist
-        simulation_directory = RADPFileSystemHelper.gen_simulation_directory(simulation_id)
+        simulation_directory = RADPFileSystemHelper.gen_simulation_directory(
+            simulation_id
+        )
         if not os.path.exists(simulation_directory):
             os.makedirs(simulation_directory)
 
         # write simulation metadata to file
-        RADPFileSystemHelper.save_simulation_metadata(sim_metadata=processed_request, simulation_id=simulation_id)
+        RADPFileSystemHelper.save_simulation_metadata(
+            sim_metadata=processed_request, simulation_id=simulation_id
+        )
 
         # save ue data and config to simulation directory if provided
         if constants.UE_DATA_FILE_PATH_KEY in files:

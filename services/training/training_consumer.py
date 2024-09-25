@@ -45,11 +45,15 @@ class TrainingConsumer:
                     logger.debug("Waiting...")
                     continue
                 if message.error():
-                    logger.exception(f"Error consuming from {constants.KAFKA_JOBS_TOPIC_NAME} topic: {message.error()}")
+                    logger.exception(
+                        f"Error consuming from {constants.KAFKA_JOBS_TOPIC_NAME} topic: {message.error()}"
+                    )
                     continue
 
                 # Extract the (optional) key and value, and print.
-                logger.debug(f"Consumed message value = {message.value().decode('utf-8')}")
+                logger.debug(
+                    f"Consumed message value = {message.value().decode('utf-8')}"
+                )
                 job_data = json.loads(message.value().decode("utf-8"))
 
                 # ignore non-training related jobs
@@ -59,9 +63,13 @@ class TrainingConsumer:
                 # execute training
                 try:
                     self.training_driver.handle_training_job(job_data)
-                    logger.info(f"Successfully trained model {job_data[constants.MODEL_ID]}")
+                    logger.info(
+                        f"Successfully trained model {job_data[constants.MODEL_ID]}"
+                    )
                 except Exception as e:
-                    logger.exception(f"Exception occurred while handling training job: {job_data}\n{e}")
+                    logger.exception(
+                        f"Exception occurred while handling training job: {job_data}\n{e}"
+                    )
         except KeyboardInterrupt:
             pass
         finally:

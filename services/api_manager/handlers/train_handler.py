@@ -60,7 +60,9 @@ class TrainHandler:
             topology_file_path=files[constants.TOPOLOGY_FILE_PATH_KEY],
         )
 
-        model_file_path = RADPFileSystemHelper.gen_model_file_path(train_request.model_id)
+        model_file_path = RADPFileSystemHelper.gen_model_file_path(
+            train_request.model_id
+        )
 
         # create a unique id for the kafka job event key
         job = {
@@ -83,10 +85,7 @@ class TrainHandler:
         )
 
         logger.info(f"Initiated ML training on model {train_request.model_id}.")
-        return TrainResponse(
-            job_id=job_id,
-            model_id=train_request.model_id
-        ).to_dict()
+        return TrainResponse(job_id=job_id, model_id=train_request.model_id).to_dict()
 
     # TODO: refactor this method, it's gross
     def _save_metadata_and_topology(self, model_id: str, topology_file_path: str):
@@ -97,7 +96,9 @@ class TrainHandler:
                 topology_df = pd.read_csv(csv_file)
                 num_cells = len(topology_df)
         except Exception as e:
-            logger.exception(f"Exception occurred while reading file: {topology_file_path}")
+            logger.exception(
+                f"Exception occurred while reading file: {topology_file_path}"
+            )
             raise e
         model_specific_params = {constants.NUM_CELLS: num_cells}
 
@@ -124,7 +125,9 @@ class TrainHandler:
             logger.exception("Exception occurred reading cell topology.csv")
             raise e
 
-        model_topology_file_path = RADPFileSystemHelper.gen_model_topology_file_path(model_id=model_id)
+        model_topology_file_path = RADPFileSystemHelper.gen_model_topology_file_path(
+            model_id=model_id
+        )
         write_feather_df(file_path=model_topology_file_path, df=topology_df)
 
     def _parse_train_request(self, event) -> TrainRequest:

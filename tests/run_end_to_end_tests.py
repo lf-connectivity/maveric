@@ -9,7 +9,9 @@ import time
 from datetime import datetime
 
 from happy_case_tests.happy_rf_prediction import happy_case__rf_prediction
-from happy_case_tests.happy_ue_track_gen_rf_prediction import happy_case__ue_track_gen_rf_prediction
+from happy_case_tests.happy_ue_track_gen_rf_prediction import (
+    happy_case__ue_track_gen_rf_prediction,
+)
 
 # Create the Logger
 logger = logging.getLogger(__name__)
@@ -64,19 +66,25 @@ for test in tests:
 
     logger.info("")
     logger.info(f"{'Result:' : <20}{'SUCCESS' if test_passed else 'FAILED' : >36}")
-    logger.info(f"{'Test duration:' : <20}{str(datetime.now() - test_start_time) : >36}")
+    logger.info(
+        f"{'Test duration:' : <20}{str(datetime.now() - test_start_time) : >36}"
+    )
 
 # report results
 logger.info("--------------------------------------------------------")
 logger.info("--------------------------------------------------------")
-logger.info(f"{'TEST RESULT SUMMARY:' : <24}{'SUCCESS' if all_passed else 'FAILURE' : >32}")
+logger.info(
+    f"{'TEST RESULT SUMMARY:' : <24}{'SUCCESS' if all_passed else 'FAILURE' : >32}"
+)
 logger.info(f"{'TESTS RUN:' : <20}{run : >36}")
 logger.info(f"{'TESTS PASSED:' : <20}{passed : >36}")
 logger.info(f"{'TESTS FAILED:' : <20}{failed : >36}")
 logger.info(f"{'TESTS DURATION:' : <20}{str(datetime.now() - start_time) : >36}")
 logger.info("--------------------------------------------------------")
 
-message = "SUCCESS" if all_passed else "TESTS FAILED: Check logs above to see failure(s)"
+message = (
+    "SUCCESS" if all_passed else "TESTS FAILED: Check logs above to see failure(s)"
+)
 logger.info(message)
 logger.info("--------------------------------------------------------")
 

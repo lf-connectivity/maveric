@@ -116,7 +116,9 @@ class BayesianDigitalTwin:
         train_X, train_Y = self._create_training_tensors(data_in)
 
         # initialize likelihood and model
-        likelihood = gpytorch.likelihoods.GaussianLikelihood(batch_shape=torch.Size([self.num_cells]))
+        likelihood = gpytorch.likelihoods.GaussianLikelihood(
+            batch_shape=torch.Size([self.num_cells])
+        )
 
         self.model = ExactGPModel(train_X, train_Y, likelihood)
 
@@ -127,20 +129,30 @@ class BayesianDigitalTwin:
         n_train = data_in[0].shape[0]
 
         # Get train_X and train_Y, create training tensors
-        train_X = torch.zeros([self.num_cells, n_train, self.num_features], dtype=torch.float32)
+        train_X = torch.zeros(
+            [self.num_cells, n_train, self.num_features], dtype=torch.float32
+        )
 
         train_Y = torch.zeros([self.num_cells, n_train], dtype=torch.float32)
 
         for m in range(self.num_cells):
             if self.norm_method == NormMethod.MINMAX:
-                train_x_cell = (data_in[m][self.x_columns] - self.xmin[m]) / (self.xmax[m] - self.xmin[m])
+                train_x_cell = (data_in[m][self.x_columns] - self.xmin[m]) / (
+                    self.xmax[m] - self.xmin[m]
+                )
             elif self.norm_method == NormMethod.ZSCORE:
-                train_x_cell = (data_in[m][self.x_columns] - self.xmeans[m]) / self.xstds[m]
+                train_x_cell = (
+                    data_in[m][self.x_columns] - self.xmeans[m]
+                ) / self.xstds[m]
 
-            train_X_cell = torch.tensor(train_x_cell.iloc[:, :].values, dtype=torch.float32)
+            train_X_cell = torch.tensor(
+                train_x_cell.iloc[:, :].values, dtype=torch.float32
+            )
 
             train_y_cell = (data_in[m][self.y_columns] - self.ymeans[m]) / self.ystds[m]
-            train_Y_cell = torch.tensor(train_y_cell.iloc[:, :].values, dtype=torch.float32)
+            train_Y_cell = torch.tensor(
+                train_y_cell.iloc[:, :].values, dtype=torch.float32
+            )
 
             train_X[m] = train_X_cell.reshape(shape=(1, -1, self.num_features))
             train_Y[m] = torch.transpose(train_Y_cell, 0, 1)
@@ -148,7 +160,9 @@ class BayesianDigitalTwin:
         return train_X, train_Y
 
     @staticmethod
-    def preprocess_ue_training_data(ue_training_data_df: pd.DataFrame, topology_df: pd.DataFrame) -> Dict:
+    def preprocess_ue_training_data(
+        ue_training_data_df: pd.DataFrame, topology_df: pd.DataFrame
+    ) -> Dict:
         """Preprocess UE data before training
 
         ue_training_data_df -   dataframe containing location data as well as config
@@ -159,7 +173,9 @@ class BayesianDigitalTwin:
 
         # feature engineering -- add relative bearing and distance
         for i in ue_training_data_df.index:
-            cell_topology = topology_df[topology_df.cell_id == ue_training_data_df.at[i, "cell_id"]]
+            cell_topology = topology_df[
+                topology_df.cell_id == ue_training_data_df.at[i, "cell_id"]
+            ]
 
             # change lon/lat to loc_x/loc_y in ue data
             ue_training_data_df.at[i, "loc_x"] = ue_training_data_df.at[i, "lon"]
@@ -168,8 +184,12 @@ class BayesianDigitalTwin:
             # add the topology columns to training data
             ue_training_data_df.at[i, "cell_lat"] = cell_topology.cell_lat.values[0]
             ue_training_data_df.at[i, "cell_lon"] = cell_topology.cell_lon.values[0]
-            ue_training_data_df.at[i, "cell_az_deg"] = cell_topology.cell_az_deg.values[0]
-            ue_training_data_df.at[i, "cell_carrier_freq_mhz"] = cell_topology.cell_carrier_freq_mhz.values[0]
+            ue_training_data_df.at[i, "cell_az_deg"] = cell_topology.cell_az_deg.values[
+                0
+            ]
+            ue_training_data_df.at[
+                i, "cell_carrier_freq_mhz"
+            ] = cell_topology.cell_carrier_freq_mhz.values[0]
 
             # engineer and add the log distance and relative bearing features
             ue_training_data_df.at[i, "log_distance"] = np.log(
@@ -225,7 +245,9 @@ class BayesianDigitalTwin:
         for i in ue_data_df.index:
             # pull the config and topology for this cell
             cell_config = config_df[config_df.cell_id == ue_data_df.at[i, "cell_id"]]
-            cell_topology = topology_df[topology_df.cell_id == ue_data_df.at[i, "cell_id"]]
+            cell_topology = topology_df[
+                topology_df.cell_id == ue_data_df.at[i, "cell_id"]
+            ]
 
             # change lon/lat to loc_x/loc_y in ue data
             ue_data_df.at[i, "loc_x"] = ue_data_df.at[i, "lon"]
@@ -235,7 +257,9 @@ class BayesianDigitalTwin:
             ue_data_df.at[i, "cell_lat"] = cell_topology.cell_lat.values[0]
             ue_data_df.at[i, "cell_lon"] = cell_topology.cell_lon.values[0]
             ue_data_df.at[i, "cell_az_deg"] = cell_topology.cell_az_deg.values[0]
-            ue_data_df.at[i, "cell_carrier_freq_mhz"] = cell_topology.cell_carrier_freq_mhz.values[0]
+            ue_data_df.at[
+                i, "cell_carrier_freq_mhz"
+            ] = cell_topology.cell_carrier_freq_mhz.values[0]
 
             # add the config columns to ue data
             ue_data_df.at[i, "cell_el_deg"] = cell_config.cell_el_deg.values[0]
@@ -281,7 +305,9 @@ class BayesianDigitalTwin:
                 model_map: Dict[str, BayesianDigitalTwin] = pickle.load(pickle_file)
                 return model_map
         except Exception as e:
-            logger.exception(f"Exception occurred while loading digital twin model from file: {model_file_path}")
+            logger.exception(
+                f"Exception occurred while loading digital twin model from file: {model_file_path}"
+            )
             raise e
 
     @staticmethod
@@ -295,7 +321,9 @@ class BayesianDigitalTwin:
                 pickle.dump(model_map, pickle_file)
             logger.info(f"Successfully saved model to file: {model_file_path}")
         except Exception as e:
-            logger.exception(f"Exception occurred writing digital twin model to file: {model_file_path}")
+            logger.exception(
+                f"Exception occurred writing digital twin model to file: {model_file_path}"
+            )
             raise e
 
     @staticmethod
@@ -331,9 +359,15 @@ class BayesianDigitalTwin:
         """
         n_training_group = np.max([int(alpha * 0.01 * n_sim), 1])
         n_test_group = n_sim - n_training_group
-        logger.info(f"Splitting data into {n_training_group} training and {n_test_group} test groups...")
-        training_data = data_in[data_in[constants.SIM_IDX] > n_test_group].reset_index(drop=True)
-        test_data = data_in[data_in[constants.SIM_IDX] <= n_test_group].reset_index(drop=True)
+        logger.info(
+            f"Splitting data into {n_training_group} training and {n_test_group} test groups..."
+        )
+        training_data = data_in[data_in[constants.SIM_IDX] > n_test_group].reset_index(
+            drop=True
+        )
+        test_data = data_in[data_in[constants.SIM_IDX] <= n_test_group].reset_index(
+            drop=True
+        )
         stats = data_in.describe(include="all")
         return training_data, test_data, stats, n_training_group
 
@@ -370,7 +404,9 @@ class BayesianDigitalTwin:
                     lat,
                     lon,
                 )
-                for lat, lon in zip(prediction_frame_template.loc_y, prediction_frame_template.loc_x)
+                for lat, lon in zip(
+                    prediction_frame_template.loc_y, prediction_frame_template.loc_x
+                )
             ]
 
             prediction_df[constants.RELATIVE_BEARING] = [
@@ -381,7 +417,9 @@ class BayesianDigitalTwin:
                     lat,
                     lon,
                 )
-                for lat, lon in zip(prediction_frame_template.loc_y, prediction_frame_template.loc_x)
+                for lat, lon in zip(
+                    prediction_frame_template.loc_y, prediction_frame_template.loc_x
+                )
             ]
 
             prediction_df[constants.ANTENNA_GAIN] = GISTools.get_antenna_gain(
@@ -413,7 +451,9 @@ class BayesianDigitalTwin:
         if load_model:
             # Check that model path and name are both provided
             if not model_path or not model_name:
-                raise RuntimeError("Exception loading model: model_path and model_name must be provided")
+                raise RuntimeError(
+                    "Exception loading model: model_path and model_name must be provided"
+                )
             logger.info("Now loading GP model (this should be quick...)")
             state_dict = torch.load(model_path + model_name)
             self.model.load_state_dict(state_dict)
@@ -423,7 +463,9 @@ class BayesianDigitalTwin:
         else:
             self.model.train()
             # "Loss" for GPs - the marginal log likelihood
-            mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.model.likelihood, self.model)
+            mll = gpytorch.mlls.ExactMarginalLogLikelihood(
+                self.model.likelihood, self.model
+            )
             optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
 
             train_X, train_Y = (
@@ -449,7 +491,10 @@ class BayesianDigitalTwin:
                 loss_vs_iter[i] = this_loss
                 delta = this_loss - last_loss
                 last_loss = this_loss
-                logger.info("Iter %d/%d - Loss: %.3f (delta=%.6f)" % (i + 1, maxiter, this_loss, delta))
+                logger.info(
+                    "Iter %d/%d - Loss: %.3f (delta=%.6f)"
+                    % (i + 1, maxiter, this_loss, delta)
+                )
                 if abs(delta) < stopping_threshold:
                     logger.info("Stopping criteria met...exiting.")
                     break
@@ -458,7 +503,9 @@ class BayesianDigitalTwin:
         if save_model:
             # Check that model path and name are both provided
             if not model_path or not model_name:
-                raise RuntimeError("Exception saving model: model_path and model_name must be provided")
+                raise RuntimeError(
+                    "Exception saving model: model_path and model_name must be provided"
+                )
             if not os.path.exists(model_path):
                 os.makedirs(model_path)
             torch.save(self.model.state_dict(), model_path + model_name)
@@ -516,15 +563,23 @@ class BayesianDigitalTwin:
         num_locations = prediction_dfs[0].shape[0]
         pred_means = torch.zeros([num_locations, self.num_cells], dtype=torch.float32)
         pred_stds = torch.zeros([num_locations, self.num_cells], dtype=torch.float32)
-        predict_X = torch.zeros([self.num_cells, num_locations, self.num_features], dtype=torch.float32)
+        predict_X = torch.zeros(
+            [self.num_cells, num_locations, self.num_features], dtype=torch.float32
+        )
 
         for m in range(self.num_cells):
             if self.norm_method == NormMethod.MINMAX:
-                predict_x_cell = (prediction_dfs[m][self.x_columns] - self.xmin[m]) / (self.xmax[m] - self.xmin[m])
+                predict_x_cell = (prediction_dfs[m][self.x_columns] - self.xmin[m]) / (
+                    self.xmax[m] - self.xmin[m]
+                )
             elif self.norm_method == NormMethod.ZSCORE:
-                predict_x_cell = (prediction_dfs[m][self.x_columns] - self.xmeans[m]) / self.xstds[m]
+                predict_x_cell = (
+                    prediction_dfs[m][self.x_columns] - self.xmeans[m]
+                ) / self.xstds[m]
 
-            predict_X_cell = torch.tensor(predict_x_cell.iloc[:, :].values, dtype=torch.float32)
+            predict_X_cell = torch.tensor(
+                predict_x_cell.iloc[:, :].values, dtype=torch.float32
+            )
             predict_X[m] = predict_X_cell.reshape(shape=(1, -1, self.num_features))
 
         if self.is_cuda:

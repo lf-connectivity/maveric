@@ -48,12 +48,14 @@ def perform_attachment(
     """
 
     # initiate a dictionary to store power-by-layer dictionaries on a per-pixel basis
-    rx_powers_by_layer_by_loc: Dict[Tuple[float, float], Dict[float, List[Tuple[Any, float]]]] = defaultdict(
-        lambda: defaultdict(list)
-    )
+    rx_powers_by_layer_by_loc: Dict[
+        Tuple[float, float], Dict[float, List[Tuple[Any, float]]]
+    ] = defaultdict(lambda: defaultdict(list))
 
     # pull per-cell frequencies for faster lookup
-    cell_id_to_freq = {row.cell_id: row.cell_carrier_freq_mhz for _, row in topology.iterrows()}
+    cell_id_to_freq = {
+        row.cell_id: row.cell_carrier_freq_mhz for _, row in topology.iterrows()
+    }
 
     # iterate over ue_prediction_data, to
     # build rx_powers_by_layer_by_loc map
@@ -68,19 +70,25 @@ def perform_attachment(
             raise Exception("loc_x or loc_y cannot be found in the dataset")
 
         # add (cell_id, rxpower) tuple on a per-row, per-freq basis
-        rx_powers_by_layer_by_loc[(loc_x, loc_y)][cell_carrier_freq_mhz].append((row.cell_id, row.rxpower_dbm))
+        rx_powers_by_layer_by_loc[(loc_x, loc_y)][cell_carrier_freq_mhz].append(
+            (row.cell_id, row.rxpower_dbm)
+        )
 
     # perform cell selection per location
     rf_dataframe_dict = defaultdict(list)
 
     for loc, rx_powers_by_layer in rx_powers_by_layer_by_loc.items():
         # compute strongest server, interference and SINR
-        rsrp_dbm_by_layer, sinr_db_by_layer = get_rsrp_dbm_sinr_db_by_layer(rx_powers_by_layer)
+        rsrp_dbm_by_layer, sinr_db_by_layer = get_rsrp_dbm_sinr_db_by_layer(
+            rx_powers_by_layer
+        )
 
         # pull sinr_db, cell_id and rsrp_dbm based on highest SINR
         max_sinr_db_item = max(sinr_db_by_layer.items(), key=lambda k: k[1][1])
         max_sinr_db_cell_id, max_sinr_db = max_sinr_db_item[1]
-        rsrp_dbm = next(v[1] for v in rsrp_dbm_by_layer.values() if v[0] == max_sinr_db_cell_id)
+        rsrp_dbm = next(
+            v[1] for v in rsrp_dbm_by_layer.values() if v[0] == max_sinr_db_cell_id
+        )
 
         # update rf_dataframe output
         rf_dataframe_dict[constants.LOC_X].append(loc[0])

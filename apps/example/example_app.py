@@ -136,9 +136,7 @@ else:
     train_response = radp_client.train(
         model_id=MODEL_ID,
         params=TRAINING_PARAMS,
-        ue_training_data=pd.concat(
-            [pd.read_csv(file) for file in TRAINING_DATA_FILES]
-        ),
+        ue_training_data=pd.concat([pd.read_csv(file) for file in TRAINING_DATA_FILES]),
         topology=pd.read_csv(TOPOLOGY_FILE),
     )
 
@@ -164,9 +162,7 @@ else:
 # run simulation on cumulative data passed to model
 simulation_response = radp_client.simulation(
     simulation_event=simulation_event,
-    ue_data=pd.concat(
-        [pd.read_csv(file) for file in PREDICTION_DATA_FILES]
-    ),
+    ue_data=pd.concat([pd.read_csv(file) for file in PREDICTION_DATA_FILES]),
     config=pd.read_csv(PREDICTION_CONFIG),
 )
 simulation_id = simulation_response["simulation_id"]
