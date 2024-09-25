@@ -5,3 +5,4 @@ pyarrow==13.0.0
 scikit-learn==1.2.1
 torch==2.0.0
 torchvision==0.15.1
+scipy

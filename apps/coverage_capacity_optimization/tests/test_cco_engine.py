@@ -14,7 +14,9 @@ from radp.digital_twin.utils.constants import CELL_ID, LOC_X, LOC_Y  # noqa: E40
 class TestCCO(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.dummy_df = pd.DataFrame(data={CELL_ID: [1, 2, 73], LOC_X: [3, 4, 89], LOC_Y: [7, 8, 10]})
+        cls.dummy_df = pd.DataFrame(
+            data={CELL_ID: [1, 2, 73], LOC_X: [3, 4, 89], LOC_Y: [7, 8, 10]}
+        )
 
     def test_invalid_lambda(self):
         self.dummy_df["rsrp_dbm"] = [98, 92, 86]
@@ -37,7 +39,8 @@ class TestCCO(unittest.TestCase):
             self.dummy_df, weak_coverage_threshold=-100, over_coverage_threshold=0
         )
         self.assertEqual(
-            returned_df["weakly_covered"][returned_df["weakly_covered"] == 1].count() == 1,
+            returned_df["weakly_covered"][returned_df["weakly_covered"] == 1].count()
+            == 1,
             True,
         )
 
@@ -58,7 +61,8 @@ class TestCCO(unittest.TestCase):
             self.dummy_df, weak_coverage_threshold=-100, over_coverage_threshold=0
         )
         self.assertEqual(
-            returned_df["overly_covered"][returned_df["overly_covered"] == 0].count() == 1,
+            returned_df["overly_covered"][returned_df["overly_covered"] == 0].count()
+            == 1,
             True,
         )
 
@@ -81,11 +85,13 @@ class TestCCO(unittest.TestCase):
             True,
         )
         self.assertEqual(
-            returned_df["weakly_covered"][returned_df["weakly_covered"] == 1].count() == 1,
+            returned_df["weakly_covered"][returned_df["weakly_covered"] == 1].count()
+            == 1,
             True,
         )
         self.assertEqual(
-            returned_df["overly_covered"][returned_df["overly_covered"] == 1].count() == 1,
+            returned_df["overly_covered"][returned_df["overly_covered"] == 1].count()
+            == 1,
             True,
         )
 
@@ -168,11 +174,14 @@ class TestCCO(unittest.TestCase):
         )
         # asserting the multiplied version of network_coverage_utility
         self.assertTrue(
-            coverage_df["network_coverage_utility"][0] == 0.24 and coverage_df["network_coverage_utility"][1] == 0.24
+            coverage_df["network_coverage_utility"][0] == 0.24
+            and coverage_df["network_coverage_utility"][1] == 0.24
         )
 
         # asserting the average of network_coverage_utility
-        self.assertTrue(0.24 == coverage_df["network_coverage_utility"].sum() / len(coverage_df))
+        self.assertTrue(
+            0.24 == coverage_df["network_coverage_utility"].sum() / len(coverage_df)
+        )
 
         # asserting the returned cco_objective_value
         expected_value = 0.24

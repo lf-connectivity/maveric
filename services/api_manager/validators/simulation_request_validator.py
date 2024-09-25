@@ -100,7 +100,8 @@ class RICSimulationRequestValidator:
         """
 
         if ("ue_tracks" not in request) or (
-            ("ue_tracks_generation" not in request["ue_tracks"]) and ("ue_data_id" not in request["ue_tracks"])
+            ("ue_tracks_generation" not in request["ue_tracks"])
+            and ("ue_data_id" not in request["ue_tracks"])
         ):
             raise InvalidParameterException(
                 "Must provide ue_tracks section with either provide `ue_tracks_generation` "
@@ -108,6 +109,8 @@ class RICSimulationRequestValidator:
             )
 
         if "rf_prediction" not in request:
-            raise InvalidParameterException("Missing rf_prediction key in RIC Simulation Request spec!")
+            raise InvalidParameterException(
+                "Missing rf_prediction key in RIC Simulation Request spec!"
+            )
 
         return None

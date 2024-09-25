@@ -147,7 +147,9 @@ def augment_ue_data(ue_data_df: pd.DataFrame, site_configs_df: pd.DataFrame):
     """
 
     for i in ue_data_df.index:
-        site_config = site_configs_df[site_configs_df.cell_id == ue_data_df.at[i, "cell_id"]]
+        site_config = site_configs_df[
+            site_configs_df.cell_id == ue_data_df.at[i, "cell_id"]
+        ]
         ue_data_df.at[i, "cell_id"] = site_config.cell_id.values[0]
         ue_data_df.at[i, "loc_x"] = ue_data_df.at[i, "lon"]
         ue_data_df.at[i, "loc_y"] = ue_data_df.at[i, "lat"]
@@ -155,7 +157,9 @@ def augment_ue_data(ue_data_df: pd.DataFrame, site_configs_df: pd.DataFrame):
         ue_data_df.at[i, "cell_lon"] = site_config.cell_lon.values[0]
         ue_data_df.at[i, "cell_az_deg"] = site_config.cell_az_deg.values[0]
         ue_data_df.at[i, "cell_el_deg"] = site_config.cell_el_deg.values[0]
-        ue_data_df.at[i, "cell_carrier_freq_mhz"] = site_config.cell_carrier_freq_mhz.values[0]
+        ue_data_df.at[
+            i, "cell_carrier_freq_mhz"
+        ] = site_config.cell_carrier_freq_mhz.values[0]
 
         ue_data_df.at[i, "log_distance"] = GISTools.get_log_distance(
             ue_data_df.at[i, "cell_lat"],
@@ -210,20 +214,22 @@ class TestBayesianDigitalTwin(unittest.TestCase):
         logging.info(ue_data_df)
 
         # split into training/test
-        cls.cell_id_training_data_map, cls.cell_id_test_data_map = split_training_and_test_data(ue_data_df, 0.2)
+        (
+            cls.cell_id_training_data_map,
+            cls.cell_id_test_data_map,
+        ) = split_training_and_test_data(ue_data_df, 0.2)
 
         # Generate test data expected_loss_vs_iter, expected_mae and expected_mape with seed_everything(1)
         cls.expected_loss_vs_iter = {}
         cls.expected_mae = {}
         cls.expected_mape = {}
 
-
     def produce_results_rf_bayesian_digital_twin(self):
         # train
         bayesian_digital_twin_map = {}
 
         x_max, x_min = get_x_max_and_x_min()
-        
+
         for cell_id, training_data in self.cell_id_training_data_map.items():
             bayesian_digital_twin_map[cell_id] = BayesianDigitalTwin(
                 data_in=[training_data],
@@ -250,19 +256,24 @@ class TestBayesianDigitalTwin(unittest.TestCase):
 
         # predict/test
         for cell_id, testing_data in self.cell_id_test_data_map.items():
-            (pred_means, _) = bayesian_digital_twin_map[cell_id].predict_distributed_gpmodel(
-                prediction_dfs=[testing_data]
-            )
+            (pred_means, _) = bayesian_digital_twin_map[
+                cell_id
+            ].predict_distributed_gpmodel(prediction_dfs=[testing_data])
             MAE = abs(testing_data.avg_rsrp - pred_means[0]).mean()
             # mean absolute percentage error
-            MAPE = 100 * abs((testing_data.avg_rsrp - pred_means[0]) / testing_data.avg_rsrp).mean()
+            MAPE = (
+                100
+                * abs(
+                    (testing_data.avg_rsrp - pred_means[0]) / testing_data.avg_rsrp
+                ).mean()
+            )
             logging.info(
                 f"cell_id = {cell_id}, MAE = {MAE:0.5f} dB, MAPE = {MAPE:0.5f} %,"
                 "# test points = {len(testing_data.avg_rsrp)}"
             )
             self.expected_mae[cell_id] = MAE
             self.expected_mape[cell_id] = MAPE
-    
+
     def test_reproducibility_of_results_for_bayesian_digital_twin(self):
         # produce results and re_run to verify reproducibility of result using seed(1)
         self.produce_results_rf_bayesian_digital_twin()
@@ -270,7 +281,7 @@ class TestBayesianDigitalTwin(unittest.TestCase):
         bayesian_digital_twin_map = {}
 
         x_max, x_min = get_x_max_and_x_min()
-        
+
         for cell_id, training_data in self.cell_id_training_data_map.items():
             bayesian_digital_twin_map[cell_id] = BayesianDigitalTwin(
                 data_in=[training_data],
@@ -297,16 +308,20 @@ class TestBayesianDigitalTwin(unittest.TestCase):
 
         # predict/test
         for cell_id, testing_data in self.cell_id_test_data_map.items():
-            (pred_means, _) = bayesian_digital_twin_map[cell_id].predict_distributed_gpmodel(
-                prediction_dfs=[testing_data]
-            )
+            (pred_means, _) = bayesian_digital_twin_map[
+                cell_id
+            ].predict_distributed_gpmodel(prediction_dfs=[testing_data])
             MAE = abs(testing_data.avg_rsrp - pred_means[0]).mean()
             # mean absolute percentage error
-            MAPE = 100 * abs((testing_data.avg_rsrp - pred_means[0]) / testing_data.avg_rsrp).mean()
+            MAPE = (
+                100
+                * abs(
+                    (testing_data.avg_rsrp - pred_means[0]) / testing_data.avg_rsrp
+                ).mean()
+            )
             logging.info(
                 f"cell_id = {cell_id}, MAE = {MAE:0.5f} dB, MAPE = {MAPE:0.5f} %,"
                 "# test points = {len(testing_data.avg_rsrp)}"
             )
             self.assertEqual(self.expected_mae[cell_id], MAE)
             self.assertEqual(self.expected_mape[cell_id], MAPE)
-            

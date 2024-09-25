@@ -57,7 +57,9 @@ class TestTrainHandler(TestCase):
     ):
         mock_producer_instance = MagicMock
         mock_producer.return_value = mock_producer_instance
-        mock_file_system_helper.gen_model_file_path.return_value = "dummy_model_file_path"
+        mock_file_system_helper.gen_model_file_path.return_value = (
+            "dummy_model_file_path"
+        )
 
         mock_produce.return_value = "dummy_job_id"
 
@@ -75,13 +77,19 @@ class TestTrainHandler(TestCase):
             "topology_file_path": "dummy_topology_file_path",
         }
 
-        assert TrainHandler().handle_train_request(valid_train_request_1, files=dummy_files) == {
+        assert TrainHandler().handle_train_request(
+            valid_train_request_1, files=dummy_files
+        ) == {
             "job_id": "dummy_job_id",
             "model_id": "dummy_model",
         }
 
-        mock_file_system_helper.gen_model_file_path.assert_called_once_with("dummy_model")
+        mock_file_system_helper.gen_model_file_path.assert_called_once_with(
+            "dummy_model"
+        )
         mock_file_system_helper.save_model_metadata.assert_called_once()
         mock_file_system_helper.gen_model_topology_file_path.assert_called_once()
 
-        mock_produce.assert_called_once_with(producer=mock_producer_instance, topic="jobs", value=expected_job)
+        mock_produce.assert_called_once_with(
+            producer=mock_producer_instance, topic="jobs", value=expected_job
+        )

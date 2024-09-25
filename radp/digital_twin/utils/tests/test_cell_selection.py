@@ -24,7 +24,10 @@ from typing import Dict, List, Tuple
 import pandas as pd
 
 from radp.digital_twin.utils import constants
-from radp.digital_twin.utils.cell_selection import get_rsrp_dbm_sinr_db_by_layer, perform_attachment
+from radp.digital_twin.utils.cell_selection import (
+    get_rsrp_dbm_sinr_db_by_layer,
+    perform_attachment,
+)
 
 
 class TestCellSelection(unittest.TestCase):
@@ -33,8 +36,12 @@ class TestCellSelection(unittest.TestCase):
         freq = 2100
 
         # 1. 1 layer, 2 equal powered cells
-        rx_powers_by_layer: Dict[float, List[Tuple[str, float]]] = {freq: [("A", rx_dbm), ("B", rx_dbm)]}
-        rsrp_dbm_by_layer, sinr_db_by_layer = get_rsrp_dbm_sinr_db_by_layer(rx_powers_by_layer)
+        rx_powers_by_layer: Dict[float, List[Tuple[str, float]]] = {
+            freq: [("A", rx_dbm), ("B", rx_dbm)]
+        }
+        rsrp_dbm_by_layer, sinr_db_by_layer = get_rsrp_dbm_sinr_db_by_layer(
+            rx_powers_by_layer
+        )
         self.assertEqual(len(rsrp_dbm_by_layer), 1)  # 1 layer
         self.assertEqual(len(sinr_db_by_layer), 1)  # 1 layer
         self.assertTrue(freq in rsrp_dbm_by_layer)  # layer unchanged
@@ -43,8 +50,12 @@ class TestCellSelection(unittest.TestCase):
         self.assertAlmostEqual(sinr_db_by_layer[freq][1], 0)  # SINR is very close to 0
 
         # 2. 1 layer, one cell is twice the other in dbm scale
-        rx_powers_by_layer: Dict[float, List[Tuple[str, float]]] = {freq: [("A", rx_dbm), ("B", 2 * rx_dbm)]}
-        rsrp_dbm_by_layer, sinr_db_by_layer = get_rsrp_dbm_sinr_db_by_layer(rx_powers_by_layer)
+        rx_powers_by_layer: Dict[float, List[Tuple[str, float]]] = {
+            freq: [("A", rx_dbm), ("B", 2 * rx_dbm)]
+        }
+        rsrp_dbm_by_layer, sinr_db_by_layer = get_rsrp_dbm_sinr_db_by_layer(
+            rx_powers_by_layer
+        )
         self.assertEqual(len(rsrp_dbm_by_layer), 1)  # 1 layer
         self.assertEqual(len(sinr_db_by_layer), 1)  # 1 layer
         self.assertTrue(freq in rsrp_dbm_by_layer)  # layer unchanged
@@ -52,14 +63,18 @@ class TestCellSelection(unittest.TestCase):
         self.assertEqual(rsrp_dbm_by_layer[freq][0], "B")  # bigger one wins
         self.assertEqual(rsrp_dbm_by_layer[freq][1], 2 * rx_dbm)  # bigger one wins
         self.assertAlmostEqual(sinr_db_by_layer[freq][0], "B")  # SINR winner is same
-        self.assertAlmostEqual(sinr_db_by_layer[freq][1], rx_dbm)  # SINR is difference between bigger and smaller
+        self.assertAlmostEqual(
+            sinr_db_by_layer[freq][1], rx_dbm
+        )  # SINR is difference between bigger and smaller
 
         # 3. 2 layers, second cell 3x stronger for layer 1, first cell 3x stronger for layer 2
         rx_powers_by_layer: Dict[float, List[Tuple[str, float]]] = {
             freq: [("A", rx_dbm), ("B", 3 * rx_dbm)],
             freq * 2: [("A2", 3 * rx_dbm), ("B2", rx_dbm)],
         }
-        rsrp_dbm_by_layer, sinr_db_by_layer = get_rsrp_dbm_sinr_db_by_layer(rx_powers_by_layer)
+        rsrp_dbm_by_layer, sinr_db_by_layer = get_rsrp_dbm_sinr_db_by_layer(
+            rx_powers_by_layer
+        )
         self.assertEqual(len(rsrp_dbm_by_layer), 2)  # 2 layers
         self.assertEqual(len(sinr_db_by_layer), 2)  # 2 layers
         # layers unchanged
@@ -69,7 +84,9 @@ class TestCellSelection(unittest.TestCase):
         )
         self.assertEqual(rsrp_dbm_by_layer[freq][0], "B")  # bigger one wins
         self.assertEqual(rsrp_dbm_by_layer[freq][1], 3 * rx_dbm)  # bigger one wins
-        self.assertAlmostEqual(sinr_db_by_layer[freq][1], 2 * rx_dbm)  # SINR is difference between bigger and smaller
+        self.assertAlmostEqual(
+            sinr_db_by_layer[freq][1], 2 * rx_dbm
+        )  # SINR is difference between bigger and smaller
         self.assertAlmostEqual(rsrp_dbm_by_layer[freq * 2][0], "A2")  # bigger one wins
         self.assertEqual(rsrp_dbm_by_layer[freq * 2][1], 3 * rx_dbm)  # bigger one wins
         self.assertAlmostEqual(

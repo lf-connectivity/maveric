@@ -4,11 +4,15 @@
 # LICENSE file in the root directory of this source tree.
 
 from enum import Enum
-from typing import Dict, Generator, List
+from typing import Dict, Generator, List, Any
+import itertools
 
 import numpy as np
+import pandas as pd
 
 from radp.digital_twin.mobility.mobility import gauss_markov
+from radp.common import constants
+from radp.digital_twin.utils.gis_tools import GISTools
 
 
 class MobilityClass(Enum):
@@ -94,7 +98,10 @@ class UETracksGenerator:
         self.mobility_class_velocity_variances = mobility_class_velocity_variances
 
         self.sampled_users_per_mobility_class = self.rng.choice(
-            [mobility_class.value for mobility_class in list(self.mobility_class_distribution.keys())],
+            [
+                mobility_class.value
+                for mobility_class in list(self.mobility_class_distribution.keys())
+            ],
             size=(self.num_UEs),
             replace=True,
             p=list(self.mobility_class_distribution.values()),
@@ -107,9 +114,17 @@ class UETracksGenerator:
         # mapping the count of users and the velocity ranges
         # across for different mobility classes
         for k in self.mobility_class_distribution.keys():
-            self.num_users_per_mobility_class[k] = np.count_nonzero(self.sampled_users_per_mobility_class == k.value)
-            low = self.mobility_class_velocities[k] - self.mobility_class_velocity_variances[k]
-            high = self.mobility_class_velocities[k] + self.mobility_class_velocity_variances[k]
+            self.num_users_per_mobility_class[k] = np.count_nonzero(
+                self.sampled_users_per_mobility_class == k.value
+            )
+            low = (
+                self.mobility_class_velocities[k]
+                - self.mobility_class_velocity_variances[k]
+            )
+            high = (
+                self.mobility_class_velocities[k]
+                + self.mobility_class_velocity_variances[k]
+            )
             self.velocity_range[k] = [low, high]
 
         # mapping the gauss_markov models to their respective mobility classes
@@ -156,3 +171,103 @@ class UETracksGenerator:
     def close(self):
         for k in self.gauss_markov_models.keys():
             self.gauss_markov_models[k].close()
+
+    @staticmethod
+    def generate_as_lon_lat_points(
+        rng_seed: int,
+        lon_x_dims: int,
+        lon_y_dims: int,
+        num_ticks: int,
+        num_batches: int,
+        num_UEs: int,
+        alpha: int,
+        variance: int,
+        min_lat: float,
+        max_lat: float,
+        min_lon: float,
+        max_lon: float,
+        mobility_class_distribution: Dict[MobilityClass, float],
+        mobility_class_velocities: Dict[MobilityClass, float],
+        mobility_class_velocity_variances: Dict[MobilityClass, float],
+    ) -> pd.DataFrame:
+        """
+        The mobility data generation method takes in all the parameters required to generate UE tracks
+        for a specified number of batches
+
+        The UETracksGenerator uses the Gauss-Markov Mobility Model to yields batch of tracks for UEs,
+        corresponding to `num_ticks` number of simulation ticks, and the number of UEs
+        the user wants to simulate.
+
+        Using the UETracksGenerator, the UE tracks are returned in form of a dataframe
+        The Dataframe is arranged as follows:
+
+        +------------+------------+-----------+------+
+        | mock_ue_id | lon        | lat       | tick |
+        +============+============+===========+======+
+        |   0        | 102.219377 | 33.674572 |   0  |
+        |   1        | 102.415954 | 33.855534 |   0  |
+        |   2        | 102.545935 | 33.878075 |   0  |
+        |   0        | 102.297766 | 33.575942 |   1  |
+        |   1        | 102.362725 | 33.916477 |   1  |
+        |   2        | 102.080675 | 33.832793 |   1  |
+        +------------+------------+-----------+------+
+        """
+
+        ue_tracks_generator = UETracksGenerator(
+            rng=np.random.default_rng(rng_seed),
+            lon_x_dims=lon_x_dims,
+            lon_y_dims=lon_y_dims,
+            num_ticks=num_ticks,
+            num_UEs=num_UEs,
+            alpha=alpha,
+            variance=variance,
+            min_lat=min_lat,
+            max_lat=max_lat,
+            min_lon=min_lon,
+            max_lon=max_lon,
+            mobility_class_distribution=mobility_class_distribution,
+            mobility_class_velocities=mobility_class_velocities,
+            mobility_class_velocity_variances=mobility_class_velocity_variances,
+        )
+
+        for _num_batches, xy_batches in enumerate(ue_tracks_generator.generate()):
+            ue_tracks_dataframe_dict: Dict[Any, Any] = {}
+
+            # Extract the xy (lon, lat) points from each batch to use it in the mobility dataframe
+            # mock_ue_id, tick, lat, lon
+            mock_ue_id = []
+            ticks = []
+            lon: List[float] = []
+            lat: List[float] = []
+
+            tick = 0
+            for xy_batch in xy_batches:
+                lon_lat_pairs = GISTools.converting_xy_points_into_lonlat_pairs(
+                    xy_points=xy_batch,
+                    x_dim=lon_x_dims,
+                    y_dim=lon_y_dims,
+                    min_longitude=min_lon,
+                    max_longitude=max_lon,
+                    min_latitude=min_lat,
+                    max_latitude=max_lat,
+                )
+
+                # Build list for each column/row for the UE Tracks dataframe
+                lon.extend(xy_points[0] for xy_points in lon_lat_pairs)
+                lat.extend(xy_points[1] for xy_points in lon_lat_pairs)
+                mock_ue_id.extend([i for i in range(num_UEs)])
+                ticks.extend(list(itertools.repeat(tick, num_UEs)))
+                tick += 1
+
+            # Build dict for each column/row for the UE Tracks dataframe
+            ue_tracks_dataframe_dict[constants.MOCK_UE_ID] = mock_ue_id
+            ue_tracks_dataframe_dict[constants.LONGITUDE] = lon
+            ue_tracks_dataframe_dict[constants.LATITUDE] = lat
+            ue_tracks_dataframe_dict[constants.TICK] = ticks
+
+            # Yield each batch as a dataframe
+            yield pd.DataFrame(ue_tracks_dataframe_dict)
+
+            num_batches -= 1
+            if num_batches == 0:
+                break

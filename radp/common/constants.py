@@ -118,7 +118,9 @@ VARIANCE = "variance"
 RNG_SEED = "rng_seed"
 LON_X_DIMS = "lon_x_dims"
 LON_Y_DIMS = "lon_y_dims"
-UE_TRACK_GENERATION_OUTPUTS_FOLDER = "/srv/radp/simulation_data/outputs/ue_tracks_generation"
+UE_TRACK_GENERATION_OUTPUTS_FOLDER = (
+    "/srv/radp/simulation_data/outputs/ue_tracks_generation"
+)
 GAUSS_MARKOV_PARAMS = "gauss_markov_params"
 
 # Protocol Emulation related

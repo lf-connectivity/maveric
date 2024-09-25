@@ -137,7 +137,11 @@ class DgpcoCCO:
             """Single step of DGPCO."""
 
             # calculate new metric
-            (current_rf_dataframe, current_coverage_dataframe, current_cco_objective,) = self._calc_metric(
+            (
+                current_rf_dataframe,
+                current_coverage_dataframe,
+                current_cco_objective,
+            ) = self._calc_metric(
                 lambda_=lambda_,
                 weak_coverage_threshold=weak_coverage_threshold,
                 over_coverage_threshold=over_coverage_threshold,
@@ -151,8 +155,12 @@ class DgpcoCCO:
             # pull the cell config index
             cell_config_index = self.config.index[self.config["cell_id"] == cell_id][0]
 
-            orig_el_idx = self.valid_configuration_values[constants.CELL_EL_DEG].index(orig_el_deg)
-            cur_el_idx = self.valid_configuration_values[constants.CELL_EL_DEG].index(cur_el_deg)
+            orig_el_idx = self.valid_configuration_values[constants.CELL_EL_DEG].index(
+                orig_el_deg
+            )
+            cur_el_idx = self.valid_configuration_values[constants.CELL_EL_DEG].index(
+                cur_el_deg
+            )
 
             for d in opt_delta:
                 new_el_idx = orig_el_idx + d
@@ -161,11 +169,15 @@ class DgpcoCCO:
                     # we do not want to check current value
                     continue
 
-                if new_el_idx < 0 or new_el_idx >= len(self.valid_configuration_values[constants.CELL_EL_DEG]):
+                if new_el_idx < 0 or new_el_idx >= len(
+                    self.valid_configuration_values[constants.CELL_EL_DEG]
+                ):
                     # we do not want to wrap around, since that would not be a neighboring tilt
                     continue
 
-                new_el = self.valid_configuration_values[constants.CELL_EL_DEG][new_el_idx]
+                new_el = self.valid_configuration_values[constants.CELL_EL_DEG][
+                    new_el_idx
+                ]
 
                 # update the cell config el_degree
                 self.config.loc[cell_config_index, constants.CELL_EL_DEG] = new_el
@@ -258,7 +270,12 @@ class DgpcoCCO:
             logging.info(f"\nIn epoch: {epoch:02}/{num_epochs}...")
 
             # Perform one step of DGPCO
-            (new_opt_el, new_rf_dataframe, new_coverage_dataframe, new_cco_objective_value,) = _single_step(
+            (
+                new_opt_el,
+                new_rf_dataframe,
+                new_coverage_dataframe,
+                new_cco_objective_value,
+            ) = _single_step(
                 cell_id=cell_id,
                 orig_el_deg=orig_el_deg,
                 cur_el_deg=cur_el_deg,

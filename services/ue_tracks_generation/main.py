@@ -6,7 +6,9 @@
 import signal
 import sys
 
-from ue_tracks_generation.ue_tracks_generation_consumer import UETracksGenerationConsumer
+from ue_tracks_generation.ue_tracks_generation_consumer import (
+    UETracksGenerationConsumer,
+)
 
 
 # define a sigterm handler to allow docker to gracefully exit

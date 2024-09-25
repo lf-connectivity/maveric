@@ -45,15 +45,22 @@ class RFPredictionConsumer:
                     logger.debug("Waiting...")
                     continue
                 if message.error():
-                    logger.exception(f"Error consuming from {constants.KAFKA_JOBS_TOPIC_NAME} topic: {message.error()}")
+                    logger.exception(
+                        f"Error consuming from {constants.KAFKA_JOBS_TOPIC_NAME} topic: {message.error()}"
+                    )
                     continue
 
                 # Extract the (optional) key and value, and print.
-                logger.debug(f"Consumed message value = {message.value().decode('utf-8')}")
+                logger.debug(
+                    f"Consumed message value = {message.value().decode('utf-8')}"
+                )
                 job_data = json.loads(message.value().decode("utf-8"))
 
                 # ignore non-RF Prediction related jobs
-                if job_data[constants.KAFKA_JOB_TYPE] != constants.JOB_TYPE_RF_PREDICTION:
+                if (
+                    job_data[constants.KAFKA_JOB_TYPE]
+                    != constants.JOB_TYPE_RF_PREDICTION
+                ):
                     continue
 
                 # execute RF prediction
@@ -62,7 +69,9 @@ class RFPredictionConsumer:
                     logger.info("Successfully ran RF Prediction on model")
                 except Exception as e:
                     # TODO: add output event failure handling here
-                    logger.exception(f"Exception occurred while handling RF Prediction job: {job_data}\n{e}")
+                    logger.exception(
+                        f"Exception occurred while handling RF Prediction job: {job_data}\n{e}"
+                    )
         except KeyboardInterrupt:
             pass
         finally:
