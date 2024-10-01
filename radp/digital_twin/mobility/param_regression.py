@@ -21,7 +21,7 @@ def initialize(
     rng = np.random.default_rng(seed=41)
 
     # Data
-    f = np.poly1d([5, 1])
+    f = np.poly1d([8,7,5, 1])
     v_t_full = v_t_full_data
     v_t = v_t_full[:-1]
     v_t_next = v_t_full[1:]
