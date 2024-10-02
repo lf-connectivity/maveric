@@ -34,7 +34,13 @@ class TestParameterFunctions(unittest.TestCase):
         self.df = pd.DataFrame(data)
 
         # Initialize the test data
-        self.t_array, self.t_next_array, _, _ = initialize(self.df)
+        (
+            self.t_array,
+            self.t_next_array,
+            self.velocity_mean,
+            self.variance,
+            self.rng,
+        ) = initialize(self.df)
         self.alpha0 = 0.5
 
     def test_initialize(self):
@@ -49,7 +55,9 @@ class TestParameterFunctions(unittest.TestCase):
     def test_next(self):
         # Test if the next function returns correct shape of results
         alpha = 0.5
-        result = next(alpha, self.t_array, 0, 1)  # Passing arbitrary mean and variance
+        result = next(
+            alpha, self.t_array, 0, 1, self.rng
+        )  # Passing arbitrary mean and variance
 
         # Check if result has the correct shape
         self.assertEqual(result.shape[0], 2)
@@ -62,7 +70,7 @@ class TestParameterFunctions(unittest.TestCase):
         # Test if the residuals are calculated correctly
         alpha = 0.5
         residuals = residual_vector(
-            alpha, self.t_array, self.t_next_array, 0, 1
+            alpha, self.t_array, self.t_next_array, 0, 1, self.rng
         )  # Passing arbitrary mean and variance
 
         # Check if residuals are a flat array
@@ -72,7 +80,7 @@ class TestParameterFunctions(unittest.TestCase):
     def test_optimize_alpha(self):
         # Test the optimization process for alpha
         popt, pcov = optimize_alpha(
-            self.alpha0, self.t_array, self.t_next_array, 0, 1
+            self.alpha0, self.t_array, self.t_next_array, 0, 1, self.rng
         )  # Passing arbitrary mean and variance
 
         # Check if popt is a numpy array and pcov is None (leastsq returns None for covariance)
