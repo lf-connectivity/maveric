@@ -1166,12 +1166,12 @@ def preprocess_ue_data(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def get_predicted_alpha(data: pd.DataFrame, alpha0: float) -> float:
+def get_predicted_alpha(data: pd.DataFrame, alpha0: float,seed: int) -> float:
     # Extract the data after preprocessing
     velocity = preprocess_ue_data(data)
 
     # Initialize and unpack all outputs from the initialize function
-    t_array, t_next_array, velocity_mean, variance, rng = initialize(velocity,42)
+    t_array, t_next_array, velocity_mean, variance, rng = initialize(velocity,seed)
 
     # Optimize alpha using the unpacked values
     popt, pcov = optimize_alpha(
