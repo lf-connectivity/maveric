@@ -5,7 +5,7 @@ from typing import Tuple, List, Any
 
 
 def initialize(
-    df: pd.DataFrame,
+    df: pd.DataFrame, seed: int
 ) -> Tuple[np.ndarray, np.ndarray, float, float, np.random.Generator]:
     """
     Initializes and preprocesses data from a DataFrame for mobility modeling.
@@ -18,10 +18,10 @@ def initialize(
 
     # CONSTANTS
     num_users = df["mock_ue_id"].nunique()
-    rng = np.random.default_rng(seed=41)
+    rng = np.random.default_rng(seed)
 
     # Data
-    f = np.poly1d([8,7,5, 1])
+    f = np.poly1d([8, 7, 5, 1])
     v_t_full = v_t_full_data
     v_t = v_t_full[:-1]
     v_t_next = v_t_full[1:]
@@ -39,7 +39,7 @@ def initialize(
     return t_array, t_next_array, velocity_mean, variance, rng
 
 
-def next(
+def _next(
     alpha: float,
     x: np.ndarray,
     velocity_mean: float,
@@ -66,7 +66,7 @@ def next(
     return np.array([v_t_next, theta_t_next])
 
 
-def residual_vector(
+def _residual_vector(
     alpha: float,
     t: np.ndarray,
     t_next: np.ndarray,
@@ -86,7 +86,7 @@ def residual_vector(
     rng (np.random.Generator): Random number generator for noise.
 
     """
-    predicted = next(alpha, t, velocity_mean, variance, rng)
+    predicted = _next(alpha, t, velocity_mean, variance, rng)
     return (predicted - t_next).flatten()
 
 
@@ -111,7 +111,7 @@ def optimize_alpha(
 
     """
     popt, pcov = optimize.leastsq(
-        residual_vector,
+        _residual_vector,
         alpha0,
         args=(t_array, t_next_array, velocity_mean, variance, rng),
     )

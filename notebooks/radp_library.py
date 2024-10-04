@@ -28,7 +28,7 @@ from radp.digital_twin.rf.bayesian.bayesian_engine import (
 from radp.digital_twin.utils.gis_tools import GISTools
 from radp.digital_twin.mobility.ue_tracks import UETracksGenerator
 from radp.digital_twin.mobility.ue_tracks_params import UETracksGenerationParams
-from radp.digital_twin.mobility.param_regression import initialize, next, optimize_alpha
+from radp.digital_twin.mobility.param_regression import initialize, optimize_alpha
 
 
 Boundary = Union[geometry.Polygon, geometry.MultiPolygon]
@@ -999,7 +999,7 @@ def get_ue_data(params: dict) -> pd.DataFrame:
     return ue_tracks_generation
 
 
-def plot_ue_tracks(df) -> None:
+def plot_ue_tracks(df: pd.DataFrame) -> None:
     """
     Plots the movement tracks of unique UE IDs on a grid of subplots.
     """
@@ -1078,7 +1078,7 @@ def plot_ue_tracks(df) -> None:
         start_idx = end_idx
 
 
-def plot_ue_tracks_side_by_side(df1, df2):
+def plot_ue_tracks_side_by_side(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
     """
     Plots the movement tracks of unique UE IDs from two DataFrames side by side.
     """
@@ -1096,7 +1096,7 @@ def plot_ue_tracks_side_by_side(df1, df2):
     plt.show()
 
 
-def plot_ue_tracks_on_axis(df, ax, title):
+def plot_ue_tracks_on_axis(df: pd.DataFrame, ax, title: str) -> None:
     """
     Helper function to plot UE tracks on a given axis.
     """
@@ -1136,7 +1136,7 @@ def plot_ue_tracks_on_axis(df, ax, title):
     ax.legend()
 
 
-def calculate_distances_and_velocities(group):
+def calculate_distances_and_velocities(group: pd.DataFrame) -> pd.DataFrame:
     """Calculating distances and velocities for each UE based on sorted data by ticks."""
     group["prev_longitude"] = group["lon"].shift(1)
     group["prev_latitude"] = group["lat"].shift(1)
@@ -1155,7 +1155,7 @@ def calculate_distances_and_velocities(group):
     return group
 
 
-def preprocess_ue_data(df):
+def preprocess_ue_data(df: pd.DataFrame) -> pd.DataFrame:
     """Preprocess the UE data by calculating distances and velocities."""
     df.sort_values(by=["mock_ue_id", "tick"], inplace=True)
 
@@ -1166,12 +1166,12 @@ def preprocess_ue_data(df):
     return df
 
 
-def get_predicted_alpha(data, alpha0):
+def get_predicted_alpha(data: pd.DataFrame, alpha0: float) -> float:
     # Extract the data after preprocessing
     velocity = preprocess_ue_data(data)
 
     # Initialize and unpack all outputs from the initialize function
-    t_array, t_next_array, velocity_mean, variance, rng = initialize(velocity)
+    t_array, t_next_array, velocity_mean, variance, rng = initialize(velocity,42)
 
     # Optimize alpha using the unpacked values
     popt, pcov = optimize_alpha(

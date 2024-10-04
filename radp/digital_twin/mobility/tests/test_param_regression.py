@@ -4,8 +4,8 @@ import pandas as pd
 from scipy import optimize
 from radp.digital_twin.mobility.param_regression import (
     initialize,
-    next,
-    residual_vector,
+    _next,
+    _residual_vector,
     optimize_alpha,
 )
 
@@ -40,7 +40,7 @@ class TestParameterFunctions(unittest.TestCase):
             self.velocity_mean,
             self.variance,
             self.rng,
-        ) = initialize(self.df)
+        ) = initialize(self.df, 42)
         self.alpha0 = 0.5
 
     def test_initialize(self):
@@ -55,7 +55,7 @@ class TestParameterFunctions(unittest.TestCase):
     def test_next(self):
         # Test if the next function returns correct shape of results
         alpha = 0.5
-        result = next(
+        result = _next(
             alpha, self.t_array, 0, 1, self.rng
         )  # Passing arbitrary mean and variance
 
@@ -69,7 +69,7 @@ class TestParameterFunctions(unittest.TestCase):
     def test_residual_vector(self):
         # Test if the residuals are calculated correctly
         alpha = 0.5
-        residuals = residual_vector(
+        residuals = _residual_vector(
             alpha, self.t_array, self.t_next_array, 0, 1, self.rng
         )  # Passing arbitrary mean and variance
 
@@ -86,6 +86,5 @@ class TestParameterFunctions(unittest.TestCase):
         # Check if popt is a numpy array and pcov is None (leastsq returns None for covariance)
         self.assertIsInstance(popt, np.ndarray)
 
-        # Check that optimized alpha is within a reasonable range (between 0 and 1 for this test case)
-        self.assertGreaterEqual(popt[0], 0)
-        self.assertLessEqual(popt[0], 1)
+        # Check that optimized alpha is within a reasonable range of the calculated alpha
+        self.assertTrue(np.allclose(popt[0], 0.49999419))
