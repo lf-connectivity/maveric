@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from scipy import optimize
 from radp.digital_twin.mobility.param_regression import (
-    initialize,
+    _initialize,
     _next,
     _residual_vector,
     optimize_alpha,
@@ -40,7 +40,7 @@ class TestParameterFunctions(unittest.TestCase):
             self.velocity_mean,
             self.variance,
             self.rng,
-        ) = initialize(self.df, 42)
+        ) = _initialize(self.df, 42)
         self.alpha0 = 0.5
 
     def test_initialize(self):
