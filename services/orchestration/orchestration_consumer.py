@@ -47,11 +47,15 @@ class OrchestrationConsumer:
                     logger.debug("Waiting...")
                     continue
                 if message.error():
-                    logger.exception(f"Error consuming from {constants.KAFKA_JOBS_TOPIC_NAME} topic: {message.error()}")
+                    logger.exception(
+                        f"Error consuming from {constants.KAFKA_JOBS_TOPIC_NAME} topic: {message.error()}"
+                    )
                     continue
 
                 # Extract the (optional) key and value, and print.
-                logger.debug(f"Consumed message value = {message.value().decode('utf-8')}")
+                logger.debug(
+                    f"Consumed message value = {message.value().decode('utf-8')}"
+                )
 
                 # pull event object from message
                 event = json.loads(message.value().decode("utf-8"))
@@ -60,12 +64,19 @@ class OrchestrationConsumer:
                 try:
                     # check which topic message is from
                     if message.topic() == constants.KAFKA_JOBS_TOPIC_NAME:
-                        if event[constants.KAFKA_JOB_TYPE] != constants.JOB_TYPE_ORCHESTRATION:
+                        if (
+                            event[constants.KAFKA_JOB_TYPE]
+                            != constants.JOB_TYPE_ORCHESTRATION
+                        ):
                             # skip non-orchestration jobs
-                            logger.debug(f"Consumed non-orchestration job: {event}... skipping")
+                            logger.debug(
+                                f"Consumed non-orchestration job: {event}... skipping"
+                            )
                         else:
                             # handle orchestration job
-                            logger.info(f"Consumed orchestration job: {event}... handling")
+                            logger.info(
+                                f"Consumed orchestration job: {event}... handling"
+                            )
                             self.orchestrator.handle_orchestration_job(event)
                         continue
                     else:

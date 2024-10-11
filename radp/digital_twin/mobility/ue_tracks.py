@@ -98,7 +98,10 @@ class UETracksGenerator:
         self.mobility_class_velocity_variances = mobility_class_velocity_variances
 
         self.sampled_users_per_mobility_class = self.rng.choice(
-            [mobility_class.value for mobility_class in list(self.mobility_class_distribution.keys())],
+            [
+                mobility_class.value
+                for mobility_class in list(self.mobility_class_distribution.keys())
+            ],
             size=(self.num_UEs),
             replace=True,
             p=list(self.mobility_class_distribution.values()),
@@ -111,9 +114,17 @@ class UETracksGenerator:
         # mapping the count of users and the velocity ranges
         # across for different mobility classes
         for k in self.mobility_class_distribution.keys():
-            self.num_users_per_mobility_class[k] = np.count_nonzero(self.sampled_users_per_mobility_class == k.value)
-            low = self.mobility_class_velocities[k] - self.mobility_class_velocity_variances[k]
-            high = self.mobility_class_velocities[k] + self.mobility_class_velocity_variances[k]
+            self.num_users_per_mobility_class[k] = np.count_nonzero(
+                self.sampled_users_per_mobility_class == k.value
+            )
+            low = (
+                self.mobility_class_velocities[k]
+                - self.mobility_class_velocity_variances[k]
+            )
+            high = (
+                self.mobility_class_velocities[k]
+                + self.mobility_class_velocity_variances[k]
+            )
             self.velocity_range[k] = [low, high]
 
         # mapping the gauss_markov models to their respective mobility classes

@@ -75,7 +75,7 @@ class RFPredictionDriver:
 
         # pull the model
         model_id, model_file_path = RFPredictionHelper.get_model_parameters(job_data)
-        
+
         job_id = job_data[constants.JOB_ID]
 
         logger.info(f"Running RF prediction using model: {model_id}")
@@ -102,11 +102,17 @@ class RFPredictionDriver:
         )
 
         # load model map
-        bayesian_digital_twin_map = BayesianDigitalTwin.load_model_map_from_pickle(model_file_path=model_file_path)
-        logger.debug(f"Loaded bayesian digital twin model {model_id} from '{model_file_path}'")
+        bayesian_digital_twin_map = BayesianDigitalTwin.load_model_map_from_pickle(
+            model_file_path=model_file_path
+        )
+        logger.debug(
+            f"Loaded bayesian digital twin model {model_id} from '{model_file_path}'"
+        )
 
         # run per-cell prediction
-        prediction_output_map = self._run_inference_per_cell(cell_id_ue_data_map, bayesian_digital_twin_map)
+        prediction_output_map = self._run_inference_per_cell(
+            cell_id_ue_data_map, bayesian_digital_twin_map
+        )
 
         # attach per-cell rxpower_dbm to ue_data_df
         rx_powers = []
@@ -116,7 +122,9 @@ class RFPredictionDriver:
 
         # get the expected RF Prediction output data
         # TODO: Reorder to first pull then insert rx_powers
-        ue_data_df.insert(loc=len(ue_data_df.columns), column=constants.RXPOWER_DBM, value=rx_powers)
+        ue_data_df.insert(
+            loc=len(ue_data_df.columns), column=constants.RXPOWER_DBM, value=rx_powers
+        )
         rf_prediction_output = ue_data_df.loc[
             :,
             [
@@ -129,7 +137,9 @@ class RFPredictionDriver:
 
         # if mock_ue_id provided, append to output
         if constants.MOCK_UE_ID in ue_data_df:
-            rf_prediction_output[constants.MOCK_UE_ID] = ue_data_df[constants.MOCK_UE_ID]
+            rf_prediction_output[constants.MOCK_UE_ID] = ue_data_df[
+                constants.MOCK_UE_ID
+            ]
 
         # if tick provided, append to output
         if constants.TICK in ue_data_df:
@@ -151,7 +161,9 @@ class RFPredictionDriver:
             constants.BATCH: batch,
             constants.STATUS: OutputStatus.SUCCESS.value,
         }
-        produce_object_to_kafka_topic(self.producer, topic=constants.OUTPUTS, value=output_event)
+        produce_object_to_kafka_topic(
+            self.producer, topic=constants.OUTPUTS, value=output_event
+        )
         logger.info(f"Produced successful output event to topic: {output_event}")
 
     def _preprocess_ue_data(
@@ -176,7 +188,9 @@ class RFPredictionDriver:
 
         # perform cross replication if required
         if cross_replications_required:
-            logger.info("No cell_id column found in UE data, running cross replication...")
+            logger.info(
+                "No cell_id column found in UE data, running cross replication..."
+            )
 
             cell_ids = pd.DataFrame(config_df[constants.CELL_ID])
             ue_data_df = cross_replicate(ue_data_df, cell_ids)
@@ -184,7 +198,9 @@ class RFPredictionDriver:
             logger.info("Finished running cross replication!")
 
         # run Bayesian digital twin preprocessing
-        cell_id_ue_data_map: Dict[str, pd.DataFrame] = BayesianDigitalTwin.preprocess_ue_prediction_data(
+        cell_id_ue_data_map: Dict[
+            str, pd.DataFrame
+        ] = BayesianDigitalTwin.preprocess_ue_prediction_data(
             ue_data_df=ue_data_df,
             config_df=config_df,
             topology_df=topology_df,
@@ -205,9 +221,9 @@ class RFPredictionDriver:
         for cell_id, ue_prediction_data in cell_id_ue_data_map.items():
             logger.info(f"Running inference for cell_id: {cell_id}...")
             # run prediction
-            pred_means, pred_std = bayesian_digital_twin_map[cell_id].predict_distributed_gpmodel(
-                prediction_dfs=[ue_prediction_data]
-            )
+            pred_means, pred_std = bayesian_digital_twin_map[
+                cell_id
+            ].predict_distributed_gpmodel(prediction_dfs=[ue_prediction_data])
 
             # store to output map
             prediction_output_map[cell_id] = (pred_means, pred_std, ue_prediction_data)

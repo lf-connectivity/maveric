@@ -14,7 +14,9 @@ import logging
 import os
 
 from api_manager.exceptions.invalid_parameter_exception import InvalidParameterException
-from api_manager.exceptions.simulation_output_not_found_exception import SimulationOutputNotFoundException
+from api_manager.exceptions.simulation_output_not_found_exception import (
+    SimulationOutputNotFoundException,
+)
 
 from radp.common.helpers.file_system_helper import RADPFileSystemHelper
 
@@ -31,10 +33,14 @@ class ConsumeSimulationOutputHandler:
         self._validate_request(simulation_id)
 
         # get simulation output zipfile
-        output_zip_file_path = RADPFileSystemHelper.gen_sim_output_zip_file_path(simulation_id)
+        output_zip_file_path = RADPFileSystemHelper.gen_sim_output_zip_file_path(
+            simulation_id
+        )
 
         if not os.path.exists(output_zip_file_path):
-            logger.warning(f"Unable to find simulation output for simulation: {simulation_id}")
+            logger.warning(
+                f"Unable to find simulation output for simulation: {simulation_id}"
+            )
             raise SimulationOutputNotFoundException(simulation_id)
 
         logger.info(f"Found output zip file at '{output_zip_file_path}'")

@@ -52,7 +52,9 @@ class GISTools:
     def get_tile_side_length_meters(bing_tile_zoom: int) -> float:
         """Returns equatorial ground length (in meters) for the specified
         Bing Tile zoom level."""
-        assert bing_tile_zoom <= 20, "Only Bing Tile Zoom Level 20 and coarser are supported!"
+        assert (
+            bing_tile_zoom <= 20
+        ), "Only Bing Tile Zoom Level 20 and coarser are supported!"
         return GISTools.bing_tile_zoom_to_ground_resolution_meters_dict[bing_tile_zoom]
 
     @staticmethod
@@ -61,19 +63,27 @@ class GISTools:
         Given a latitude and zoom level, return the side length of a Bing tile
         at that zoom level.
         """
-        return float(math.cos(lat * math.pi / 180) * 2 * math.pi * GISTools.R / (2**zoom))
+        return float(
+            math.cos(lat * math.pi / 180) * 2 * math.pi * GISTools.R / (2**zoom)
+        )
 
     @staticmethod
-    def isclose(A: Tuple[float, float], B: Tuple[float, float], abs_tol: float = 0.0002) -> bool:
+    def isclose(
+        A: Tuple[float, float], B: Tuple[float, float], abs_tol: float = 0.0002
+    ) -> bool:
         try:
-            return math.isclose(A[0], B[0], abs_tol=abs_tol) and math.isclose(A[1], B[1], abs_tol=abs_tol)
-        except AttributeError:
-            return abs(A[0] - B[0]) <= max(1e-9 * max(abs(A[0]), abs(B[0])), abs_tol) and abs(A[1] - B[1]) <= max(
-                1e-9 * max(abs(A[1]), abs(B[1])), abs_tol
+            return math.isclose(A[0], B[0], abs_tol=abs_tol) and math.isclose(
+                A[1], B[1], abs_tol=abs_tol
             )
+        except AttributeError:
+            return abs(A[0] - B[0]) <= max(
+                1e-9 * max(abs(A[0]), abs(B[0])), abs_tol
+            ) and abs(A[1] - B[1]) <= max(1e-9 * max(abs(A[1]), abs(B[1])), abs_tol)
 
     @staticmethod
-    def dist(l1: Tuple[float, float], l2: Tuple[float, float], abs_tol: float = 0.0002) -> float:
+    def dist(
+        l1: Tuple[float, float], l2: Tuple[float, float], abs_tol: float = 0.0002
+    ) -> float:
         """Returns distance (in kms) between two points on the earth.
 
         Utlizes haversine formula (https://en.wikipedia.org/wiki/Haversine_formula)
@@ -117,12 +127,16 @@ class GISTools:
         [phi1, lam1] = [math.radians(l1[0]), math.radians(l1[1])]
         [phi2, lam2] = [math.radians(l2[0]), math.radians(l2[1])]
         y = math.sin(lam2 - lam1) * math.cos(phi2)
-        x = math.cos(phi1) * math.sin(phi2) - math.sin(phi1) * math.cos(phi2) * math.cos(lam2 - lam1)
+        x = math.cos(phi1) * math.sin(phi2) - math.sin(phi1) * math.cos(
+            phi2
+        ) * math.cos(lam2 - lam1)
         return math.degrees(math.atan2(y, x))
 
     @staticmethod
     def get_destination(
-        origin: Union[List[int], List[float], Tuple[Union[int, float], Union[int, float]]],
+        origin: Union[
+            List[int], List[float], Tuple[Union[int, float], Union[int, float]]
+        ],
         brng: float,
         d: float,
     ) -> Tuple[float, float]:
@@ -136,7 +150,10 @@ class GISTools:
         R = GISTools.R
         brng_r = math.radians(brng)
         [phi1, lam1] = [math.radians(origin[0]), math.radians(origin[1])]
-        phi2 = math.asin(math.sin(phi1) * math.cos(d / R) + math.cos(phi1) * math.sin(d / R) * math.cos(brng_r))
+        phi2 = math.asin(
+            math.sin(phi1) * math.cos(d / R)
+            + math.cos(phi1) * math.sin(d / R) * math.cos(brng_r)
+        )
         lam2 = lam1 + math.atan2(
             math.sin(brng_r) * math.sin(d / R) * math.cos(phi1),
             math.cos(d / R) - (math.sin(phi1) * math.sin(phi2)),
@@ -195,7 +212,9 @@ class GISTools:
         return (random_lon, random_lat)
 
     @staticmethod
-    def snap_align_lower_left(pt: Tuple[float, float], tile_discretization_resolution: int) -> Tuple[float, float]:
+    def snap_align_lower_left(
+        pt: Tuple[float, float], tile_discretization_resolution: int
+    ) -> Tuple[float, float]:
         lat = int(pt[0])
         lon = int(pt[1])
         inc = float(1 / float(tile_discretization_resolution - 1))
@@ -282,7 +301,9 @@ class GISTools:
         """Create aligned and adjusted grid params"""
         inc = 1.0 / float(tile_discretization_resolution - 1)
         SW = GISTools.snap_align_lower_left(SW, tile_discretization_resolution)
-        NE = GISTools.snap_align_lower_left((NE[0] + inc, NE[1] + inc), tile_discretization_resolution)
+        NE = GISTools.snap_align_lower_left(
+            (NE[0] + inc, NE[1] + inc), tile_discretization_resolution
+        )
         inc *= coarse_factor
         num_rows = int(math.ceil((NE[0] - SW[0]) / inc)) + 1
         num_cols = int(math.ceil((NE[1] - SW[1]) / inc)) + 1
@@ -298,7 +319,9 @@ class GISTools:
         num_cols: int,
         tile_discretization_resolution: int,
     ) -> Tuple[Tuple[float, float], Tuple[float, float]]:
-        aligned = GISTools.snap_align_lower_left((lat, lon), tile_discretization_resolution)
+        aligned = GISTools.snap_align_lower_left(
+            (lat, lon), tile_discretization_resolution
+        )
         idx = GISTools.get_grid_idx(aligned, SW, tile_discretization_resolution)
         box_radius = math.floor(radius / 30.0)
         if math.isclose(box_radius, 0):
@@ -335,7 +358,12 @@ class GISTools:
                     mantissa_decimal = mantissa.split(".")[1]
                 trailing_zeros_to_add = "0" * (16 - len(mantissa_decimal))
                 return (
-                    mantissa.split(".")[0] + "." + mantissa_decimal + trailing_zeros_to_add + "e" + str_coord_parts[1]
+                    mantissa.split(".")[0]
+                    + "."
+                    + mantissa_decimal
+                    + trailing_zeros_to_add
+                    + "e"
+                    + str_coord_parts[1]
                 )
             else:  # normal case
                 return (precision_str_format % coord).rstrip("0").rstrip(".")
@@ -345,7 +373,9 @@ class GISTools:
         return "POINT (" + lon_str + " " + lat_str + ")"
 
     @staticmethod
-    def get_bbox_km_around_point(lat: float, lon: float, d: float) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+    def get_bbox_km_around_point(
+        lat: float, lon: float, d: float
+    ) -> Tuple[Tuple[float, float], Tuple[float, float]]:
         """
         Given a latlon point and a distance d (in km), return the SW and NE corners
         of a box whose side lengths are 2d with lat, lon as the center.
@@ -385,7 +415,9 @@ class GISTools:
         return (minlat - s_deg, minlon - w_deg), (maxlat + n_deg, maxlon + e_deg)
 
     @staticmethod
-    def lon_lat_to_bing_tile(longitude: float, latitude: float, level: int = 18) -> Tuple[int, int]:
+    def lon_lat_to_bing_tile(
+        longitude: float, latitude: float, level: int = 18
+    ) -> Tuple[int, int]:
         """Convert the given pair of longitude and latitude to Bing tile, at specified resolution.
 
         Technical Outline:- https://docs.microsoft.com/en-us/bingmaps/articles/bing-maps-tile-system
@@ -439,7 +471,9 @@ class GISTools:
                 tuple of tile_x(loc_x="longitude") and tile_y(loc_y="latitude")
         """
 
-        tile_x, tile_y = GISTools.lon_lat_to_bing_tile(lon_lat_tuple[0], lon_lat_tuple[1], level=level)
+        tile_x, tile_y = GISTools.lon_lat_to_bing_tile(
+            lon_lat_tuple[0], lon_lat_tuple[1], level=level
+        )
         return (tile_x, tile_y)
 
     @staticmethod
@@ -528,7 +562,9 @@ class GISTools:
         tilt_deg: downtilt
         theta_3db=3dB bandwidth of Tx antenna
         """
-        relative_tilt = np.degrees(np.arctan((hTx - hRx) / np.exp(log_distance))) - tilt_deg
+        relative_tilt = (
+            np.degrees(np.arctan((hTx - hRx) / np.exp(log_distance))) - tilt_deg
+        )
         G_db = -12 * np.power(relative_tilt / theta_3db, 2)
         return G_db
 

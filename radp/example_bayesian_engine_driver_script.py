@@ -15,7 +15,11 @@ from sklearn.model_selection import train_test_split
 
 from radp.digital_twin import logger
 from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin
-from radp.digital_twin.utils.constants import CELL_EL_DEG, LOG_DISTANCE, RELATIVE_BEARING
+from radp.digital_twin.utils.constants import (
+    CELL_EL_DEG,
+    LOG_DISTANCE,
+    RELATIVE_BEARING,
+)
 from radp.digital_twin.utils.gis_tools import GISTools
 
 
@@ -116,7 +120,9 @@ def augment_ue_data(ue_data_df: pd.DataFrame, site_configs_df: pd.DataFrame):
     """
 
     for i in ue_data_df.index:
-        site_config = site_configs_df[site_configs_df.cell_id == ue_data_df.at[i, "cell_id"]]
+        site_config = site_configs_df[
+            site_configs_df.cell_id == ue_data_df.at[i, "cell_id"]
+        ]
         ue_data_df.at[i, "cell_id"] = site_config.cell_id.values[0]
         ue_data_df.at[i, "loc_x"] = ue_data_df.at[i, "lon"]
         ue_data_df.at[i, "loc_y"] = ue_data_df.at[i, "lat"]
@@ -124,7 +130,9 @@ def augment_ue_data(ue_data_df: pd.DataFrame, site_configs_df: pd.DataFrame):
         ue_data_df.at[i, "cell_lon"] = site_config.cell_lon.values[0]
         ue_data_df.at[i, "cell_az_deg"] = site_config.cell_az_deg.values[0]
         ue_data_df.at[i, "cell_el_deg"] = site_config.cell_el_deg.values[0]
-        ue_data_df.at[i, "cell_carrier_freq_mhz"] = site_config.cell_carrier_freq_mhz.values[0]
+        ue_data_df.at[
+            i, "cell_carrier_freq_mhz"
+        ] = site_config.cell_carrier_freq_mhz.values[0]
 
         ue_data_df.at[i, "log_distance"] = GISTools.get_log_distance(
             ue_data_df.at[i, "cell_lat"],
@@ -196,7 +204,9 @@ if __name__ == "__main__":
     site_configs_df, ue_data_df = get_sample_site_config_and_ue_data()
 
     site_configs_df.reset_index(drop=True, inplace=True)
-    idx_cell_id_mapping = dict(zip(site_configs_df.index.values, site_configs_df.cell_id))
+    idx_cell_id_mapping = dict(
+        zip(site_configs_df.index.values, site_configs_df.cell_id)
+    )
 
     # feature engineering -- add relative bearing and distance
     augment_ue_data(ue_data_df, site_configs_df)
@@ -204,7 +214,9 @@ if __name__ == "__main__":
     logger.info(ue_data_df)
 
     # split into training/test
-    cell_id_training_data_map, cell_id_test_data_map = split_training_and_test_data(ue_data_df, 0.2)
+    cell_id_training_data_map, cell_id_test_data_map = split_training_and_test_data(
+        ue_data_df, 0.2
+    )
 
     # train
     bayesian_digital_twin_map = {}
@@ -233,10 +245,17 @@ if __name__ == "__main__":
     # predict/test
 
     for cell_id, testing_data in cell_id_test_data_map.items():
-        (pred_means, _) = bayesian_digital_twin_map[cell_id].predict_distributed_gpmodel(prediction_dfs=[testing_data])
+        (pred_means, _) = bayesian_digital_twin_map[
+            cell_id
+        ].predict_distributed_gpmodel(prediction_dfs=[testing_data])
         MAE = abs(testing_data.avg_rsrp - pred_means[0]).mean()
         # mean absolute percentage error
-        MAPE = 100 * abs((testing_data.avg_rsrp - pred_means[0]) / testing_data.avg_rsrp).mean()
+        MAPE = (
+            100
+            * abs(
+                (testing_data.avg_rsrp - pred_means[0]) / testing_data.avg_rsrp
+            ).mean()
+        )
         logger.info(
             f"cell_id = {cell_id}, MAE = {MAE:0.5f} dB, MAPE = {MAPE:0.5f} %, "
             f"# test points = {len(testing_data.avg_rsrp)}"

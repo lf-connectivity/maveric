@@ -142,7 +142,9 @@ class Orchestrator:
             # input data must be in cache if the first non-cached stage is not the first present stage
             input_data_is_cached = first_present_stage != first_non_cached_stage
 
-            logger.info(f"Running first non-cached stage: {first_non_cached_stage.name}")
+            logger.info(
+                f"Running first non-cached stage: {first_non_cached_stage.name}"
+            )
             self._run_first_non_cached_stage(
                 sim_metadata,
                 simulation_id,
@@ -151,7 +153,9 @@ class Orchestrator:
             )
 
         sim_metadata[constants.JOB_ID] = job_id
-        sim_metadata[constants.JOB_FINISHED_DATETIME] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        sim_metadata[constants.JOB_FINISHED_DATETIME] = datetime.datetime.now(
+            datetime.timezone.utc
+        ).isoformat()
 
         # save state after orchestration
         RADPFileSystemHelper.save_simulation_metadata(sim_metadata, simulation_id)
@@ -169,11 +173,15 @@ class Orchestrator:
         output_service = output_event[constants.SERVICE]
 
         if output_service == SimulationStage.UE_TRACKS_GENERATION.value:
-            self._handle_ue_tracks_generation_output(sim_metadata, output_event, simulation_id)
+            self._handle_ue_tracks_generation_output(
+                sim_metadata, output_event, simulation_id
+            )
         elif output_service == SimulationStage.RF_PREDICTION.value:
             self._handle_rf_prediction_output(sim_metadata, output_event, simulation_id)
         else:
-            self._handle_protocol_emulation_output(sim_metadata, output_event, simulation_id)
+            self._handle_protocol_emulation_output(
+                sim_metadata, output_event, simulation_id
+            )
 
         # save state after handling output
         RADPFileSystemHelper.save_simulation_metadata(sim_metadata, simulation_id)
@@ -213,7 +221,10 @@ class Orchestrator:
         if first_non_cached_stage == SimulationStage.UE_TRACKS_GENERATION:
             # stage is UE Tracks Generation --> no input data, data is generated
             return self._start_ue_tracks_generation(sim_metadata, simulation_id)
-        elif first_non_cached_stage == SimulationStage.RF_PREDICTION and input_data_is_cached:
+        elif (
+            first_non_cached_stage == SimulationStage.RF_PREDICTION
+            and input_data_is_cached
+        ):
             # stage is RF Prediction + input data is cached
             # --> start all jobs (which pulls from cache)
             return self._start_all_rf_prediction_jobs(sim_metadata, simulation_id)
@@ -223,7 +234,10 @@ class Orchestrator:
             return self._start_single_rf_prediction_job(
                 sim_metadata, simulation_id, batch=1, data_source=DataSource.USER_INPUT
             )
-        elif first_non_cached_stage == SimulationStage.PROTOCOL_EMULATION and input_data_is_cached:
+        elif (
+            first_non_cached_stage == SimulationStage.PROTOCOL_EMULATION
+            and input_data_is_cached
+        ):
             # stage is RF Prediction + input data is cached
             # --> start all jobs (which pulls from cache)
             return self._start_all_protocol_emulation_jobs(sim_metadata, simulation_id)
@@ -269,7 +283,9 @@ class Orchestrator:
         # pull the job parameters from the simulation metadata
         ue_tracks_params = {}
         ue_tracks_params.update(
-            OrchestrationHelper.get_stage_params(sim_metadata, stage=SimulationStage.UE_TRACKS_GENERATION)
+            OrchestrationHelper.get_stage_params(
+                sim_metadata, stage=SimulationStage.UE_TRACKS_GENERATION
+            )
         )
 
         # pull the interval
@@ -279,7 +295,9 @@ class Orchestrator:
         num_ticks, num_batches = OrchestrationHelper.get_batching_params(sim_metadata)
 
         # pull hash_val and build output file prefix
-        hash_val = OrchestrationHelper.get_stage_hash_val(sim_metadata, stage=SimulationStage.UE_TRACKS_GENERATION)
+        hash_val = OrchestrationHelper.get_stage_hash_val(
+            sim_metadata, stage=SimulationStage.UE_TRACKS_GENERATION
+        )
         output_file_prefix = f"{SimulationStage.UE_TRACKS_GENERATION.value}-{hash_val}"
 
         # build the ue tracks generation job event
@@ -288,7 +306,9 @@ class Orchestrator:
         ue_tracks_params[constants.NUM_BATCHES] = num_batches
 
         # generate the kafka job frame
-        ue_tracks_job = OrchestrationHelper.generate_job_event_frame(sim_metadata, SimulationStage.UE_TRACKS_GENERATION)
+        ue_tracks_job = OrchestrationHelper.generate_job_event_frame(
+            sim_metadata, SimulationStage.UE_TRACKS_GENERATION
+        )
 
         # supply stage-specific fields
         ue_tracks_job[SimulationStage.UE_TRACKS_GENERATION.value].update(
@@ -299,11 +319,17 @@ class Orchestrator:
         )
 
         # produce ue_tracks_generation job to jobs topic
-        produce_object_to_kafka_topic(self.producer, topic=constants.KAFKA_JOBS_TOPIC_NAME, value=ue_tracks_job)
-        logger.info(f"Produced UE tracks generation job for simulation: {simulation_id}")
+        produce_object_to_kafka_topic(
+            self.producer, topic=constants.KAFKA_JOBS_TOPIC_NAME, value=ue_tracks_job
+        )
+        logger.info(
+            f"Produced UE tracks generation job for simulation: {simulation_id}"
+        )
 
         # Update state to show UE tracks generation has started
-        ue_tracks_state = sim_metadata[SimulationStage.UE_TRACKS_GENERATION.value][constants.STATE]
+        ue_tracks_state = sim_metadata[SimulationStage.UE_TRACKS_GENERATION.value][
+            constants.STATE
+        ]
         ue_tracks_state[constants.STATUS] = WorkflowStatus.IN_PROGRESS.value
 
     def _start_all_rf_prediction_jobs(self, sim_metadata: Dict, simulation_id: str):
@@ -311,9 +337,13 @@ class Orchestrator:
         # pull number of batches to start
         _, num_batches = OrchestrationHelper.get_batching_params(sim_metadata)
 
-        logger.info(f"Starting all {num_batches} RF Prediction jobs for simulation: {simulation_id}")
+        logger.info(
+            f"Starting all {num_batches} RF Prediction jobs for simulation: {simulation_id}"
+        )
         for i in range(1, num_batches + 1):
-            self._start_single_rf_prediction_job(sim_metadata, simulation_id, batch=i, data_source=DataSource.CACHE)
+            self._start_single_rf_prediction_job(
+                sim_metadata, simulation_id, batch=i, data_source=DataSource.CACHE
+            )
 
     def _start_single_rf_prediction_job(
         self,
@@ -345,7 +375,9 @@ class Orchestrator:
         # check if input is from simulation folder or UE tracks generation output layer
         if data_source == DataSource.USER_INPUT:
             # input is in simulation folder, get its path
-            ue_data_file_path = RADPFileSystemHelper.gen_simulation_ue_data_file_path(simulation_id)
+            ue_data_file_path = RADPFileSystemHelper.gen_simulation_ue_data_file_path(
+                simulation_id
+            )
         else:
             # input is cached in UE tracks generation output layer, get its path using its hash
             ue_tracks_hash_val = OrchestrationHelper.get_stage_hash_val(
@@ -358,7 +390,9 @@ class Orchestrator:
             )
 
         # get output file path using the RF Prediction hash
-        rf_prediction_hash_val = OrchestrationHelper.get_stage_hash_val(sim_metadata, SimulationStage.RF_PREDICTION)
+        rf_prediction_hash_val = OrchestrationHelper.get_stage_hash_val(
+            sim_metadata, SimulationStage.RF_PREDICTION
+        )
         output_file_path = RADPFileSystemHelper.gen_stage_output_file_path(
             stage=SimulationStage.RF_PREDICTION,
             hash_val=rf_prediction_hash_val,
@@ -370,11 +404,15 @@ class Orchestrator:
         model_file_path = RADPFileSystemHelper.gen_model_file_path(model_id)
 
         # get the config and topology file paths
-        config_file_path = RADPFileSystemHelper.gen_simulation_cell_config_file_path(simulation_id)
+        config_file_path = RADPFileSystemHelper.gen_simulation_cell_config_file_path(
+            simulation_id
+        )
         topology_file_path = RADPFileSystemHelper.gen_model_topology_file_path(model_id)
 
         # get the RF prediction params
-        rf_prediction_params = OrchestrationHelper.get_stage_params(sim_metadata, stage=SimulationStage.RF_PREDICTION)
+        rf_prediction_params = OrchestrationHelper.get_stage_params(
+            sim_metadata, stage=SimulationStage.RF_PREDICTION
+        )
 
         # build the rf prediction job
         rf_prediction_job = OrchestrationHelper.generate_job_event_frame(
@@ -398,11 +436,15 @@ class Orchestrator:
             topic=constants.KAFKA_JOBS_TOPIC_NAME,
             value=rf_prediction_job,
         )
-        logger.info(f"Produced RF Prediction job batch {batch} for simulation: {simulation_id}")
+        logger.info(
+            f"Produced RF Prediction job batch {batch} for simulation: {simulation_id}"
+        )
 
         # Update state to show RF Prediction has started
         if batch == 1:
-            rf_prediction_state = sim_metadata[SimulationStage.RF_PREDICTION.value][constants.STATE]
+            rf_prediction_state = sim_metadata[SimulationStage.RF_PREDICTION.value][
+                constants.STATE
+            ]
             rf_prediction_state[constants.STATUS] = WorkflowStatus.IN_PROGRESS.value
 
     def _start_all_protocol_emulation_jobs(
@@ -425,28 +467,42 @@ class Orchestrator:
         # TODO: implement this once protocol emulation service is implemented
         pass
 
-    def _handle_ue_tracks_generation_output(self, sim_metadata: Dict, ue_tracks_output: Dict, simulation_id: str):
+    def _handle_ue_tracks_generation_output(
+        self, sim_metadata: Dict, ue_tracks_output: Dict, simulation_id: str
+    ):
         """Handle a UE tracks generation output"""
         # TODO: handle a failed job.  We'll probably want to add the original job event to the output object
         # to make retry easier
         if ue_tracks_output[constants.STATUS] == OutputStatus.FAILURE.value:
-            logger.exception(f"Simulation {simulation_id} failed in UE tracks generation stage: {ue_tracks_output}")
-            raise Exception(f"Simulation {simulation_id} failed in UE tracks generation stage: {ue_tracks_output}")
+            logger.exception(
+                f"Simulation {simulation_id} failed in UE tracks generation stage: {ue_tracks_output}"
+            )
+            raise Exception(
+                f"Simulation {simulation_id} failed in UE tracks generation stage: {ue_tracks_output}"
+            )
 
         # pull state and batch
-        ue_tracks_state = sim_metadata[SimulationStage.UE_TRACKS_GENERATION.value][constants.STATE]
+        ue_tracks_state = sim_metadata[SimulationStage.UE_TRACKS_GENERATION.value][
+            constants.STATE
+        ]
         batch = ue_tracks_output[constants.BATCH]
 
         # update the outputted batches field
         ue_tracks_state[constants.BATCHES_OUTPUTTED] = batch
 
         # check if the stage has completed, update stage status if so
-        stage_completed = OrchestrationHelper.stage_has_completed(sim_metadata, SimulationStage.UE_TRACKS_GENERATION)
+        stage_completed = OrchestrationHelper.stage_has_completed(
+            sim_metadata, SimulationStage.UE_TRACKS_GENERATION
+        )
         if stage_completed:
             ue_tracks_state[constants.STATUS] = WorkflowStatus.FINISHED.value
 
-        if OrchestrationHelper.has_stage(sim_metadata, stage=SimulationStage.RF_PREDICTION):
-            self._start_single_rf_prediction_job(sim_metadata, simulation_id, batch, data_source=DataSource.CACHE)
+        if OrchestrationHelper.has_stage(
+            sim_metadata, stage=SimulationStage.RF_PREDICTION
+        ):
+            self._start_single_rf_prediction_job(
+                sim_metadata, simulation_id, batch, data_source=DataSource.CACHE
+            )
         elif stage_completed:
             # this was the last stage, move to wrap up
             self._wrap_up_simulation(sim_metadata, simulation_id)
@@ -455,16 +511,24 @@ class Orchestrator:
             # save simulation metadata and exit
             pass
 
-    def _handle_rf_prediction_output(self, sim_metadata: Dict, rf_prediction_output: Dict, simulation_id: str):
+    def _handle_rf_prediction_output(
+        self, sim_metadata: Dict, rf_prediction_output: Dict, simulation_id: str
+    ):
         """Handle an RF prediction output"""
         # TODO: handle a failed job.  We'll probably want to add the original job event to the output object
         # to make retry easier
         if rf_prediction_output[constants.STATUS] == OutputStatus.FAILURE.value:
-            logger.exception(f"Simulation {simulation_id} failed in RF Prediction stage: {rf_prediction_output}")
-            raise Exception(f"Simulation {simulation_id} failed in RF Prediction stage: {rf_prediction_output}")
+            logger.exception(
+                f"Simulation {simulation_id} failed in RF Prediction stage: {rf_prediction_output}"
+            )
+            raise Exception(
+                f"Simulation {simulation_id} failed in RF Prediction stage: {rf_prediction_output}"
+            )
 
         # pull state and batch
-        rf_prediction_state = sim_metadata[SimulationStage.RF_PREDICTION.value][constants.STATE]
+        rf_prediction_state = sim_metadata[SimulationStage.RF_PREDICTION.value][
+            constants.STATE
+        ]
         batch = rf_prediction_output[constants.BATCH]
 
         # TODO: update this to account for past failures once
@@ -474,11 +538,15 @@ class Orchestrator:
         rf_prediction_state[constants.LATEST_BATCH_TO_SUCCEED] = batch
 
         # check if the stage has completed, update stage status if so
-        stage_completed = OrchestrationHelper.stage_has_completed(sim_metadata, SimulationStage.RF_PREDICTION)
+        stage_completed = OrchestrationHelper.stage_has_completed(
+            sim_metadata, SimulationStage.RF_PREDICTION
+        )
         if stage_completed:
             rf_prediction_state[constants.STATUS] = WorkflowStatus.FINISHED.value
 
-        if OrchestrationHelper.has_stage(sim_metadata, stage=SimulationStage.PROTOCOL_EMULATION):
+        if OrchestrationHelper.has_stage(
+            sim_metadata, stage=SimulationStage.PROTOCOL_EMULATION
+        ):
             self._start_single_protocol_emulation_job(
                 sim_metadata,
                 simulation_id,
@@ -526,17 +594,23 @@ class Orchestrator:
         sim_metadata[constants.SIMULATION_STATUS] = WorkflowStatus.FINISHED.value
         logger.info(f"Successfully completed simulation: {simulation_id}")
 
-    def _copy_simulation_output_to_consume_folder(self, sim_metadata: Dict, simulation_id: str):
+    def _copy_simulation_output_to_consume_folder(
+        self, sim_metadata: Dict, simulation_id: str
+    ):
         """Copy simulation output to consumable zip file
 
         Consumable zip file will allow the user to download data
         and system will delete afterwords.
         """
-        logger.debug(f"Copying output from simulation: {simulation_id} to consumable zip file")
+        logger.debug(
+            f"Copying output from simulation: {simulation_id} to consumable zip file"
+        )
 
         # get the output stage
         simulation_output_stage = OrchestrationHelper.get_output_stage(sim_metadata)
-        hash_val = OrchestrationHelper.get_stage_hash_val(sim_metadata, stage=simulation_output_stage)
+        hash_val = OrchestrationHelper.get_stage_hash_val(
+            sim_metadata, stage=simulation_output_stage
+        )
 
         # pull number of batches to zip
         _, num_batches = OrchestrationHelper.get_batching_params(sim_metadata)
@@ -551,11 +625,17 @@ class Orchestrator:
 
     def _clean_unused_output_data(self, sim_metadata: Dict, simulation_id: str):
         """Clean unused output data"""
-        logger.info(f"Removing all outputs not used in recent simulation: {simulation_id}")
+        logger.info(
+            f"Removing all outputs not used in recent simulation: {simulation_id}"
+        )
 
-        if OrchestrationHelper.has_stage(sim_metadata, stage=SimulationStage.UE_TRACKS_GENERATION):
+        if OrchestrationHelper.has_stage(
+            sim_metadata, stage=SimulationStage.UE_TRACKS_GENERATION
+        ):
             # clean UE Tracks Generation outputs
-            ue_tracks_generation_hash_val: Optional[str] = OrchestrationHelper.get_stage_hash_val(
+            ue_tracks_generation_hash_val: Optional[
+                str
+            ] = OrchestrationHelper.get_stage_hash_val(
                 sim_metadata,
                 stage=SimulationStage.UE_TRACKS_GENERATION,
             )
@@ -564,9 +644,13 @@ class Orchestrator:
                 save_hash_val=ue_tracks_generation_hash_val,
             )
 
-        if OrchestrationHelper.has_stage(sim_metadata, stage=SimulationStage.RF_PREDICTION):
+        if OrchestrationHelper.has_stage(
+            sim_metadata, stage=SimulationStage.RF_PREDICTION
+        ):
             # clean RF Prediction outputs
-            rf_prediction_hash_val: Optional[str] = OrchestrationHelper.get_stage_hash_val(
+            rf_prediction_hash_val: Optional[
+                str
+            ] = OrchestrationHelper.get_stage_hash_val(
                 sim_metadata,
                 stage=SimulationStage.RF_PREDICTION,
             )
@@ -575,9 +659,13 @@ class Orchestrator:
                 save_hash_val=rf_prediction_hash_val,
             )
 
-        if OrchestrationHelper.has_stage(sim_metadata, stage=SimulationStage.PROTOCOL_EMULATION):
+        if OrchestrationHelper.has_stage(
+            sim_metadata, stage=SimulationStage.PROTOCOL_EMULATION
+        ):
             # clean Protocol Emulation outputs
-            protocol_emulation_hash_val: Optional[str] = OrchestrationHelper.get_stage_hash_val(
+            protocol_emulation_hash_val: Optional[
+                str
+            ] = OrchestrationHelper.get_stage_hash_val(
                 sim_metadata,
                 stage=SimulationStage.PROTOCOL_EMULATION,
             )
@@ -585,4 +673,6 @@ class Orchestrator:
                 stage=SimulationStage.PROTOCOL_EMULATION,
                 save_hash_val=protocol_emulation_hash_val,
             )
-        logger.info(f"Successfully removed all unused outputs for simulation: {simulation_id}")
+        logger.info(
+            f"Successfully removed all unused outputs for simulation: {simulation_id}"
+        )

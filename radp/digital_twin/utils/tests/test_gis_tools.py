@@ -119,7 +119,6 @@ class GISToolsTests(unittest.TestCase):
         self.assertEqual(rand_lon_2_seed1, rand_lon_2_seed1_again)
 
     def test_bearing_utils(self) -> None:
-
         # for get_bearing, the first parameter in the tuples corresponds to lat (y axis)
 
         self.assertEqual(
@@ -226,7 +225,6 @@ class GISToolsTests(unittest.TestCase):
         self.assertTrue(tiles == expected)
 
     def test_converting_xy_points_into_lonlat_pairs(self):
-
         s = [
             np.array([85.8649796, 9.34373949]),
             np.array([69.74819822, 97.51281031]),

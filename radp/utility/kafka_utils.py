@@ -56,15 +56,23 @@ def safe_subscribe(consumer: kafka.Consumer, topics: List[str]):
     while not all([topic_name in topics_found for topic_name in topics]):
         current_attempt += 1
         if current_attempt >= MAX_ATTEMPTS:
-            logger.exception(f"Timed out while attempting to subscribe consumer '{consumer}' to topics: {topics}")
-            raise Exception(f"Timed out while attempting to subscribe consumer '{consumer}' to topics: {topics}")
+            logger.exception(
+                f"Timed out while attempting to subscribe consumer '{consumer}' to topics: {topics}"
+            )
+            raise Exception(
+                f"Timed out while attempting to subscribe consumer '{consumer}' to topics: {topics}"
+            )
 
         time.sleep(SLEEP_INTERVAL)
-        topics_found = [topic_metadata for topic_metadata in consumer.list_topics().topics]
+        topics_found = [
+            topic_metadata for topic_metadata in consumer.list_topics().topics
+        ]
 
     # all topics exist, subscribe to them
     try:
         consumer.subscribe(topics)
     except Exception as e:
-        logger.exception(f"Exception occurred while attempting to subscribe to topics: {e}")
+        logger.exception(
+            f"Exception occurred while attempting to subscribe to topics: {e}"
+        )
         raise e
