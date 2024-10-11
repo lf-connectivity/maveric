@@ -148,7 +148,6 @@ def preprocess_ue_data(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-
 def get_predicted_alpha(data: pd.DataFrame, alpha0: float, seed: int) -> float:
     """
     Get the predicted alpha value for the given UE (User Equipment) data.
@@ -186,3 +185,4 @@ def get_predicted_alpha(data: pd.DataFrame, alpha0: float, seed: int) -> float:
 
     # Return the optimized alpha value
     return popt[0]
+
