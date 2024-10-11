@@ -28,7 +28,6 @@ from radp.digital_twin.rf.bayesian.bayesian_engine import (
 from radp.digital_twin.utils.gis_tools import GISTools
 from radp.digital_twin.mobility.ue_tracks import UETracksGenerator
 from radp.digital_twin.mobility.ue_tracks_params import UETracksGenerationParams
-from radp.digital_twin.mobility.param_regression import initialize, optimize_alpha
 
 
 Boundary = Union[geometry.Polygon, geometry.MultiPolygon]
@@ -1134,49 +1133,3 @@ def plot_ue_tracks_on_axis(df: pd.DataFrame, ax, title: str) -> None:
 
     ax.set_title(title)
     ax.legend()
-
-
-def calculate_distances_and_velocities(group: pd.DataFrame) -> pd.DataFrame:
-    """Calculating distances and velocities for each UE based on sorted data by ticks."""
-    group["prev_longitude"] = group["lon"].shift(1)
-    group["prev_latitude"] = group["lat"].shift(1)
-    group["distance"] = group.apply(
-        lambda row: GISTools.get_log_distance(
-            row["prev_latitude"], row["prev_longitude"], row["lat"], row["lon"]
-        )
-        if not pd.isna(row["prev_longitude"])
-        else 0,
-        axis=1,
-    )
-    # Assuming time interval between ticks is 1 unit, adjust below if different
-    group["velocity"] = (
-        group["distance"] / 1
-    )  # Convert to m/s by dividing by the seconds per tick, here assumed to be 1s
-    return group
-
-
-def preprocess_ue_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Preprocess the UE data by calculating distances and velocities."""
-    df.sort_values(by=["mock_ue_id", "tick"], inplace=True)
-
-    df = df.groupby("mock_ue_id").apply(calculate_distances_and_velocities)
-    # Drop the temporary columns
-    df.drop(["prev_longitude", "prev_latitude"], axis=1, inplace=True)
-
-    return df
-
-
-def get_predicted_alpha(data: pd.DataFrame, alpha0: float,seed: int) -> float:
-    # Extract the data after preprocessing
-    velocity = preprocess_ue_data(data)
-
-    # Initialize and unpack all outputs from the initialize function
-    t_array, t_next_array, velocity_mean, variance, rng = initialize(velocity,seed)
-
-    # Optimize alpha using the unpacked values
-    popt, pcov = optimize_alpha(
-        alpha0, t_array, t_next_array, velocity_mean, variance, rng
-    )
-
-    # Return the optimized alpha value
-    return popt[0]

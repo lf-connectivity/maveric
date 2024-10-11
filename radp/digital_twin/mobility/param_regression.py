@@ -2,9 +2,10 @@ import numpy as np
 import pandas as pd
 from scipy import optimize
 from typing import Tuple, List, Any
+from radp.digital_twin.utils.gis_tools import GISTools
 
 
-def initialize(
+def _initialize(
     df: pd.DataFrame, seed: int
 ) -> Tuple[np.ndarray, np.ndarray, float, float, np.random.Generator]:
     """
@@ -116,3 +117,73 @@ def optimize_alpha(
         args=(t_array, t_next_array, velocity_mean, variance, rng),
     )
     return popt, pcov
+
+
+def calculate_distances_and_velocities(group: pd.DataFrame) -> pd.DataFrame:
+    """Calculating distances and velocities for each UE based on sorted data by ticks."""
+    group["prev_longitude"] = group["lon"].shift(1)
+    group["prev_latitude"] = group["lat"].shift(1)
+    group["distance"] = group.apply(
+        lambda row: GISTools.get_log_distance(
+            row["prev_latitude"], row["prev_longitude"], row["lat"], row["lon"]
+        )
+        if not pd.isna(row["prev_longitude"])
+        else 0,
+        axis=1,
+    )
+    # Assuming time interval between ticks is 1 unit, adjust below if different
+    group["velocity"] = (
+        group["distance"] / 1
+    )  # Convert to m/s by dividing by the seconds per tick, here assumed to be 1s
+    return group
+
+
+def preprocess_ue_data(df: pd.DataFrame) -> pd.DataFrame:
+    """Preprocess the UE data by calculating distances and velocities."""
+    df.sort_values(by=["mock_ue_id", "tick"], inplace=True)
+
+    df = df.groupby("mock_ue_id").apply(calculate_distances_and_velocities)
+    # Drop the temporary columns
+    df.drop(["prev_longitude", "prev_latitude"], axis=1, inplace=True)
+
+    return df
+
+
+def get_predicted_alpha(data: pd.DataFrame, alpha0: float,seed: int) -> float:
+    """
+    Get the predicted alpha value for the given UE (User Equipment) data.
+
+    This function serves as the main API entry point for predicting the alpha parameter, 
+    which represents a key aspect of mobility behavior derived from UE tracks.  
+
+    Alpha is predicted based on the movement patterns observed in the UE tracks, 
+    which are represented by the following columns in the input DataFrame:
+
+    Parameters:
+    - data (DataFrame): The input data containing UE tracks, structured as follows:
+  
+        +------------+------------+-----------+------+
+        | mock_ue_id | lon        | lat       | tick |
+        +============+============+===========+======+
+        |     0      | 102.219377 | 33.674572 |   0  |
+        |     1      | 102.415954 | 33.855534 |   0  |
+        |     2      | 102.545935 | 33.878075 |   0  |
+        |     0      | 102.297766 | 33.575942 |   1  |
+        |     1      | 102.362725 | 33.916477 |   1  |
+        |     2      | 102.080675 | 33.832793 |   1  |
+        +------------+------------+-----------+------+
+
+"""
+    # Extract the data after preprocessing
+    velocity = preprocess_ue_data(data)
+
+    # Initialize and unpack all outputs from the initialize function
+    t_array, t_next_array, velocity_mean, variance, rng = _initialize(velocity,seed)
+
+    # Optimize alpha using the unpacked values
+    popt, pcov = optimize_alpha(
+        alpha0, t_array, t_next_array, velocity_mean, variance, rng
+    )
+
+    # Return the optimized alpha value
+    return popt[0]
