@@ -39,7 +39,6 @@ class CcoEngine:
         over_coverage_threshold: float = 0,
         growth_rate: float = 1,
     ) -> pd.DataFrame:
-
         if lambda_ <= 0 or lambda_ >= 1:
             raise ValueError("lambda_ must be between 0 and 1 (noninclusive)")
 
@@ -65,13 +64,20 @@ class CcoEngine:
         coverage_dataframe["weak_coverage"] = np.minimum(0, h)
         coverage_dataframe["overly_covered"] = (h > 0) & (g <= 0)
         coverage_dataframe["over_coverage"] = np.minimum(0, g)
-        coverage_dataframe["covered"] = ~coverage_dataframe["weakly_covered"] & ~coverage_dataframe["overly_covered"]
+        coverage_dataframe["covered"] = (
+            ~coverage_dataframe["weakly_covered"]
+            & ~coverage_dataframe["overly_covered"]
+        )
 
         # TODO : deprecate the below notion
         # soft_weak_coverage = sigmoid(h, growth_rate)
         # soft_over_coverage = sigmoid(g, growth_rate)
-        coverage_dataframe["soft_weak_coverage"] = 1000 * np.tanh(0.05 * growth_rate * h)
-        coverage_dataframe["soft_over_coverage"] = 1000 * np.tanh(0.05 * growth_rate * g)
+        coverage_dataframe["soft_weak_coverage"] = 1000 * np.tanh(
+            0.05 * growth_rate * h
+        )
+        coverage_dataframe["soft_over_coverage"] = 1000 * np.tanh(
+            0.05 * growth_rate * g
+        )
         coverage_dataframe["network_coverage_utility"] = (
             lambda_ * coverage_dataframe["soft_weak_coverage"]
             + (1 - lambda_) * coverage_dataframe["soft_over_coverage"]
@@ -83,8 +89,12 @@ class CcoEngine:
         coverage_dataframe: pd.DataFrame,
     ) -> Tuple[float, float]:
         n_points = len(coverage_dataframe.index)
-        weak_coverage_percent = 100 * coverage_dataframe["weakly_covered"].sum() / n_points
-        over_coverage_percent = 100 * coverage_dataframe["overly_covered"].sum() / n_points
+        weak_coverage_percent = (
+            100 * coverage_dataframe["weakly_covered"].sum() / n_points
+        )
+        over_coverage_percent = (
+            100 * coverage_dataframe["overly_covered"].sum() / n_points
+        )
         return weak_coverage_percent, over_coverage_percent
 
     @staticmethod
@@ -122,18 +132,26 @@ class CcoEngine:
                     coverage_dataframe,
                 )
             )
-            augmented_coverage_df_with_normalized_traffic_model["network_coverage_utility"] = (
-                augmented_coverage_df_with_normalized_traffic_model["normalized_traffic_statistic"]
+            augmented_coverage_df_with_normalized_traffic_model[
+                "network_coverage_utility"
+            ] = (
+                augmented_coverage_df_with_normalized_traffic_model[
+                    "normalized_traffic_statistic"
+                ]
                 * coverage_dataframe["network_coverage_utility"]
             )
-            coverage_dataframe["network_coverage_utility"] = augmented_coverage_df_with_normalized_traffic_model[
+            coverage_dataframe[
+                "network_coverage_utility"
+            ] = augmented_coverage_df_with_normalized_traffic_model[
                 "network_coverage_utility"
             ]
 
         if active_ids_list is None:
             return -math.inf
 
-        active_df = coverage_dataframe[coverage_dataframe[id_field].isin(active_ids_list)]
+        active_df = coverage_dataframe[
+            coverage_dataframe[id_field].isin(active_ids_list)
+        ]
         active_sector_metric = active_df.groupby(id_field)["network_coverage_utility"]
 
         if cco_metric == CcoMetric.PIXEL:
@@ -161,7 +179,9 @@ class CcoEngine:
             Dataframe with tile_x and tile_y columns appended
 
         """
-        tile_coords = list(zip(coverage_dataframe[loc_x_field], coverage_dataframe[loc_y_field]))
+        tile_coords = list(
+            zip(coverage_dataframe[loc_x_field], coverage_dataframe[loc_y_field])
+        )
 
         coverage_dataframe["tile_x"], coverage_dataframe["tile_y"] = zip(
             *map(
@@ -200,11 +220,16 @@ class CcoEngine:
                 "over_coverage",
         """
 
-        sum_of_desired_traffic_statistic_across_all_tiles = traffic_model_df[desired_traffic_statistic_col].sum()
+        sum_of_desired_traffic_statistic_across_all_tiles = traffic_model_df[
+            desired_traffic_statistic_col
+        ].sum()
         traffic_model_df["normalized_traffic_statistic"] = (
-            traffic_model_df[desired_traffic_statistic_col] / sum_of_desired_traffic_statistic_across_all_tiles
+            traffic_model_df[desired_traffic_statistic_col]
+            / sum_of_desired_traffic_statistic_across_all_tiles
         )
-        coverage_dataframe_with_bing_tiles = CcoEngine.add_tile_x_and_tile_y(coverage_df)
+        coverage_dataframe_with_bing_tiles = CcoEngine.add_tile_x_and_tile_y(
+            coverage_df
+        )
         augmented_coverage_df_with_normalized_traffic_model = pd.merge(
             traffic_model_df,
             coverage_dataframe_with_bing_tiles,
@@ -235,6 +260,8 @@ class CcoEngine:
         # only one of weak_coverage and over_coverage can be simultaneously 1
         # so, the logic below does not double count
         return (
-            coverage_dataframe["normalized_traffic_statistic"] * coverage_dataframe["weak_coverage"]
-            + coverage_dataframe["normalized_traffic_statistic"] * coverage_dataframe["over_coverage"]
+            coverage_dataframe["normalized_traffic_statistic"]
+            * coverage_dataframe["weak_coverage"]
+            + coverage_dataframe["normalized_traffic_statistic"]
+            * coverage_dataframe["over_coverage"]
         ).sum()

@@ -52,7 +52,9 @@ train_response = radp_client.train(
 )
 
 # resolve the model status -- this blocking call ensures training is done and model is available for use
-model_status: ModelStatus = radp_helper.resolve_model_status(MODEL_ID, wait_interval=3, max_attempts=10, verbose=True)
+model_status: ModelStatus = radp_helper.resolve_model_status(
+    MODEL_ID, wait_interval=3, max_attempts=10, verbose=True
+)
 
 # handle an exception if one occurred
 if not model_status.success:

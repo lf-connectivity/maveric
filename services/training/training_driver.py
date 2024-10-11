@@ -57,12 +57,16 @@ class TrainingDriver:
                 ue_training_data_df = pd.read_csv(ue_training_data_file)
                 topology_df = pd.read_csv(topology_file)
         except Exception as e:
-            logger.exception(f"Exception occurred while loading digital twin training data: {e}")
+            logger.exception(
+                f"Exception occurred while loading digital twin training data: {e}"
+            )
             raise Exception
 
         # Preprocess training data
         logger.info("Preprocessing training data...")
-        cell_id_ue_data_map = BayesianDigitalTwin.preprocess_ue_training_data(ue_training_data_df, topology_df)
+        cell_id_ue_data_map = BayesianDigitalTwin.preprocess_ue_training_data(
+            ue_training_data_df, topology_df
+        )
         logger.info("Finished preprocessing training data...")
         logger.info("Starting model training...")
 
@@ -101,9 +105,7 @@ class TrainingDriver:
             # prime the model cache by calling a mock prediction on it
             # using the first set of training data
             # so that it is ready for further updates or operations
-            model_map[cell_id].predict_distributed_gpmodel(
-                [training_data.head(1)]
-            )
+            model_map[cell_id].predict_distributed_gpmodel([training_data.head(1)])
 
         # save the serialized model map object to file
         BayesianDigitalTwin.save_model_map_to_pickle(
@@ -116,7 +118,9 @@ class TrainingDriver:
 
         model_metadata[constants.STATUS] = ModelStatus.TRAINED.value
         model_metadata[constants.JOB_ID] = job_id
-        model_metadata[constants.JOB_FINISHED_DATETIME] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        model_metadata[constants.JOB_FINISHED_DATETIME] = datetime.datetime.now(
+            datetime.timezone.utc
+        ).isoformat()
 
         RADPFileSystemHelper.save_model_metadata(
             model_id=model_id,
@@ -147,7 +151,7 @@ class TrainingDriver:
         training_params: Dict,
     ) -> BayesianDigitalTwin:
         """Train a model per each cell of data"""
-        
+
         # this class init method fully prepares the model to be trained
         #   but stops just short of actually calling train() on it
         model = BayesianDigitalTwin(

@@ -20,8 +20,12 @@ class TestRADPFileSystemHelper(TestCase):
         "/dummy_simulation_data_folder_path",
     )
     def test_gen_simulation_directory(self):
-        simulation_directory = RADPFileSystemHelper.gen_simulation_directory(simulation_id="dummy_simulation")
-        self.assertEqual(simulation_directory, "/dummy_simulation_data_folder_path/dummy_simulation")
+        simulation_directory = RADPFileSystemHelper.gen_simulation_directory(
+            simulation_id="dummy_simulation"
+        )
+        self.assertEqual(
+            simulation_directory, "/dummy_simulation_data_folder_path/dummy_simulation"
+        )
 
     @patch(
         "radp.common.helpers.file_system_helper.constants.SIMULATION_DATA_FOLDER",
@@ -58,8 +62,10 @@ class TestRADPFileSystemHelper(TestCase):
         "dummy_df_file_extension",
     )
     def test_gen_simulation_ue_data_file_path(self):
-        simulation_ue_data_file_path = RADPFileSystemHelper.gen_simulation_ue_data_file_path(
-            simulation_id="dummy_simulation"
+        simulation_ue_data_file_path = (
+            RADPFileSystemHelper.gen_simulation_ue_data_file_path(
+                simulation_id="dummy_simulation"
+            )
         )
         self.assertEqual(
             simulation_ue_data_file_path,
@@ -79,8 +85,10 @@ class TestRADPFileSystemHelper(TestCase):
         "dummy_df_file_extension",
     )
     def test_gen_simulation_cell_config_file_path(self):
-        simulation_cell_config_file_path = RADPFileSystemHelper.gen_simulation_cell_config_file_path(
-            simulation_id="dummy_simulation"
+        simulation_cell_config_file_path = (
+            RADPFileSystemHelper.gen_simulation_cell_config_file_path(
+                simulation_id="dummy_simulation"
+            )
         )
         self.assertEqual(
             simulation_cell_config_file_path,
@@ -89,7 +97,9 @@ class TestRADPFileSystemHelper(TestCase):
 
     # replace builtins.open with a mocked open operation
     @patch("builtins.open", mock_open(read_data=json_mocked_sim_data))
-    @patch("radp.common.helpers.file_system_helper.RADPFileSystemHelper.gen_simulation_metadata_file_path")
+    @patch(
+        "radp.common.helpers.file_system_helper.RADPFileSystemHelper.gen_simulation_metadata_file_path"
+    )
     def test_load_simulation_metadata(self, mocked_metadata_file_path):
         mocked_metadata_file_path.return_value = "dummy_sim_data_file_path"
         self.assertEqual(
@@ -102,7 +112,9 @@ class TestRADPFileSystemHelper(TestCase):
         )
 
     @patch("builtins.open", mock_open(read_data=json_mocked_sim_data))
-    @patch("radp.common.helpers.file_system_helper.RADPFileSystemHelper.gen_simulation_metadata_file_path")
+    @patch(
+        "radp.common.helpers.file_system_helper.RADPFileSystemHelper.gen_simulation_metadata_file_path"
+    )
     def test_load_simulation_metadata_exception(self, mocked_metadata_file_path):
         mocked_metadata_file_path.side_effect = Exception("dummy exception!")
         with self.assertRaises(Exception) as e:
@@ -113,41 +125,61 @@ class TestRADPFileSystemHelper(TestCase):
     @patch("radp.common.helpers.file_system_helper.atomic_write")
     @patch("radp.common.helpers.file_system_helper.json")
     def test_save_simulation_metadata(self, mocked_json, mocked_atomic_write):
-        RADPFileSystemHelper.save_simulation_metadata(mocked_sim_data, "dummy_simulation")
+        RADPFileSystemHelper.save_simulation_metadata(
+            mocked_sim_data, "dummy_simulation"
+        )
         mocked_atomic_write.assert_called_once()
         mocked_json.dump.assert_called_once()
 
     @patch("builtins.open", mock_open(read_data=json_mocked_sim_data))
-    @patch("radp.common.helpers.file_system_helper.RADPFileSystemHelper.gen_simulation_metadata_file_path")
+    @patch(
+        "radp.common.helpers.file_system_helper.RADPFileSystemHelper.gen_simulation_metadata_file_path"
+    )
     def test_save_simulation_metadata_exception(self, mocked_metadata_file_path):
         mocked_metadata_file_path.side_effect = Exception("dummy exception!")
         with self.assertRaises(Exception) as e:
-            RADPFileSystemHelper.save_simulation_metadata(mocked_sim_data, "dummy_simulation")
+            RADPFileSystemHelper.save_simulation_metadata(
+                mocked_sim_data, "dummy_simulation"
+            )
         self.assertEqual(str(e.exception), "dummy exception!")
 
     @patch("builtins.open", mock_open(read_data=json_mocked_sim_data))
     @patch("radp.common.helpers.file_system_helper.pd.read_csv")
     @patch("radp.common.helpers.file_system_helper.write_feather_df")
-    def test_save_simulation_ue_data(self, mocked_pandas_read_csv, mocked_write_feather_df):
-        RADPFileSystemHelper.save_simulation_ue_data("dummy_simulation", "dummy_config_file_path")
+    def test_save_simulation_ue_data(
+        self, mocked_pandas_read_csv, mocked_write_feather_df
+    ):
+        RADPFileSystemHelper.save_simulation_ue_data(
+            "dummy_simulation", "dummy_config_file_path"
+        )
         mocked_pandas_read_csv.assert_called_once()
         mocked_write_feather_df.assert_called_once()
 
     @patch("builtins.open", mock_open(read_data=json_mocked_sim_data))
-    @patch("radp.common.helpers.file_system_helper.RADPFileSystemHelper.gen_simulation_ue_data_file_path")
+    @patch(
+        "radp.common.helpers.file_system_helper.RADPFileSystemHelper.gen_simulation_ue_data_file_path"
+    )
     @patch("radp.common.helpers.file_system_helper.write_feather_df")
-    def test_save_simulation_ue_data_exception(self, mocked_simulation_ue_data_file_path, mocked_write_feather_df):
+    def test_save_simulation_ue_data_exception(
+        self, mocked_simulation_ue_data_file_path, mocked_write_feather_df
+    ):
         mocked_simulation_ue_data_file_path.side_effect = Exception("dummy exception!")
         with self.assertRaises(Exception) as e:
-            RADPFileSystemHelper.save_simulation_ue_data("dummy_simulation", "dummy_config_file_path")
+            RADPFileSystemHelper.save_simulation_ue_data(
+                "dummy_simulation", "dummy_config_file_path"
+            )
         mocked_write_feather_df.assert_called_once()
         self.assertEqual(str(e.exception), "dummy exception!")
 
     @patch("builtins.open", mock_open(read_data=json_mocked_sim_data))
     @patch("radp.utility.pandas_utils.atomic_write")
     @patch("radp.common.helpers.file_system_helper.pd.read_csv")
-    def test_save_simulation_cell_config(self, mocked_pandas_read_csv, mocked_atomic_write):
-        RADPFileSystemHelper.save_simulation_cell_config("dummy_simulation", "dummy_config_file_path")
+    def test_save_simulation_cell_config(
+        self, mocked_pandas_read_csv, mocked_atomic_write
+    ):
+        RADPFileSystemHelper.save_simulation_cell_config(
+            "dummy_simulation", "dummy_config_file_path"
+        )
         mocked_atomic_write.assert_called_once()
         mocked_pandas_read_csv.assert_called_once()
 
@@ -156,10 +188,16 @@ class TestRADPFileSystemHelper(TestCase):
         """radp.common.helpers.file_system_helper.\
 RADPFileSystemHelper.gen_simulation_cell_config_file_path"""
     )
-    def test_save_simulation_cell_config_exception(self, mocked_simulation_cell_config_file_path):
-        mocked_simulation_cell_config_file_path.side_effect = Exception("dummy exception!")
+    def test_save_simulation_cell_config_exception(
+        self, mocked_simulation_cell_config_file_path
+    ):
+        mocked_simulation_cell_config_file_path.side_effect = Exception(
+            "dummy exception!"
+        )
         with self.assertRaises(Exception) as e:
-            RADPFileSystemHelper.save_simulation_cell_config("dummy_simulation", "dummy_config_file_path")
+            RADPFileSystemHelper.save_simulation_cell_config(
+                "dummy_simulation", "dummy_config_file_path"
+            )
         self.assertEqual(str(e.exception), "dummy exception!")
 
     @patch(
@@ -178,7 +216,11 @@ RADPFileSystemHelper.gen_simulation_cell_config_file_path"""
     def test_hash_val_found_in_output_folder(self, mocked_listdir):
         mocked_listdir.return_value = ["dummy_dir_1", "dummy_dir_2"]
         dummy_stage = SimulationStage.UE_TRACKS_GENERATION
-        self.assertTrue(RADPFileSystemHelper.hash_val_found_in_output_folder(dummy_stage, "dummy_dir"))
+        self.assertTrue(
+            RADPFileSystemHelper.hash_val_found_in_output_folder(
+                dummy_stage, "dummy_dir"
+            )
+        )
 
     @patch(
         "radp.common.helpers.file_system_helper.constants.SIMULATION_DATA_FOLDER",
@@ -200,7 +242,11 @@ RADPFileSystemHelper.gen_simulation_cell_config_file_path"""
     def test_hash_val_found_in_output_folder_neg(self, mocked_listdir):
         mocked_listdir.return_value = ["dummy_dir_1", "dummy_dir_2"]
         dummy_stage = SimulationStage.UE_TRACKS_GENERATION
-        self.assertFalse(RADPFileSystemHelper.hash_val_found_in_output_folder(dummy_stage, "dummy_other_str"))
+        self.assertFalse(
+            RADPFileSystemHelper.hash_val_found_in_output_folder(
+                dummy_stage, "dummy_other_str"
+            )
+        )
 
     @patch(
         "radp.common.helpers.file_system_helper.constants.SIMULATION_DATA_FOLDER",
@@ -219,7 +265,9 @@ RADPFileSystemHelper.gen_simulation_cell_config_file_path"""
         dummy_hash_val = "dummy_hash_val"
         dummy_batch = 1
         self.assertEqual(
-            RADPFileSystemHelper.gen_stage_output_file_path(dummy_stage, dummy_hash_val, dummy_batch),
+            RADPFileSystemHelper.gen_stage_output_file_path(
+                dummy_stage, dummy_hash_val, dummy_batch
+            ),
             "/dummy_simulation_data_folder_path/dummy_simulation_outputs_folder/"
             "ue_tracks_generation/ue_tracks_generation-dummy_hash_val-1.dummy_df_file_extension",
         )
@@ -253,7 +301,9 @@ RADPFileSystemHelper.gen_simulation_cell_config_file_path"""
     )
     def test_gen_sim_output_zip_file_path_neg(self):
         self.assertEqual(
-            RADPFileSystemHelper.gen_sim_output_zip_file_path("dummy_simulation", False),
+            RADPFileSystemHelper.gen_sim_output_zip_file_path(
+                "dummy_simulation", False
+            ),
             "/dummy_simulation_data_folder_path/dummy_simulation/dummy_simulation-dummy_output_file_suffix",
         )
 
@@ -305,7 +355,9 @@ RADPFileSystemHelper.gen_simulation_cell_config_file_path"""
 
     @patch("os.listdir")
     @patch("os.remove")
-    def test_clear_output_data_from_stage_no_save_hash_val(self, mocked_listdir, mocked_remove):
+    def test_clear_output_data_from_stage_no_save_hash_val(
+        self, mocked_listdir, mocked_remove
+    ):
         mocked_listdir.return_value = ["dummy_file_1"]
         dummy_stage = SimulationStage.START
         RADPFileSystemHelper.clear_output_data_from_stage(dummy_stage, None)
@@ -313,7 +365,9 @@ RADPFileSystemHelper.gen_simulation_cell_config_file_path"""
 
     @patch("os.listdir")
     @patch("os.remove")
-    def test_clear_output_data_from_stage_with_hash_val(self, mocked_listdir, mocked_remove):
+    def test_clear_output_data_from_stage_with_hash_val(
+        self, mocked_listdir, mocked_remove
+    ):
         mocked_listdir.return_value = ["dummy_file_1", "dummy_file_2"]
         dummy_stage = SimulationStage.START
         RADPFileSystemHelper.clear_output_data_from_stage(dummy_stage, "_2")
@@ -429,7 +483,9 @@ RADPFileSystemHelper.gen_simulation_cell_config_file_path"""
             "/dummy_models_folder/dummy_model_id/dummy_topology_file_name.dummy_df_file_extension",
         )
 
-    @patch("radp.common.helpers.file_system_helper.RADPFileSystemHelper.gen_model_metadata_file_path")
+    @patch(
+        "radp.common.helpers.file_system_helper.RADPFileSystemHelper.gen_model_metadata_file_path"
+    )
     @patch("builtins.open", mock_open(read_data=json_mocked_sim_data))
     def test_load_model_metadata(self, mocked_model_metadata_file_path):
         mocked_model_metadata_file_path.return_value = "dummy_model_metadata_file_path"
@@ -446,7 +502,9 @@ RADPFileSystemHelper.gen_simulation_cell_config_file_path"""
             mocked_sim_data,
         )
 
-    @patch("radp.common.helpers.file_system_helper.RADPFileSystemHelper.gen_model_metadata_file_path")
+    @patch(
+        "radp.common.helpers.file_system_helper.RADPFileSystemHelper.gen_model_metadata_file_path"
+    )
     @patch("builtins.open", mock_open(read_data=json_mocked_sim_data))
     def test_load_model_metadata_exception(self, mocked_model_metadata_file_path):
         mocked_model_metadata_file_path.side_effect = Exception("dummy exception!")
@@ -488,7 +546,9 @@ RADPFileSystemHelper.gen_simulation_cell_config_file_path"""
     #         "dummy exception!",
     #     )
 
-    @patch("radp.common.helpers.file_system_helper.RADPFileSystemHelper.gen_model_file_path")
+    @patch(
+        "radp.common.helpers.file_system_helper.RADPFileSystemHelper.gen_model_file_path"
+    )
     def test_check_model_exists(self, mocked_model_file_path):
         model_file_path = RADPFileSystemHelper.gen_model_file_path(
             "dummy_model_id",
@@ -500,7 +560,9 @@ RADPFileSystemHelper.gen_simulation_cell_config_file_path"""
             )
         )
 
-    @patch("radp.common.helpers.file_system_helper.RADPFileSystemHelper.gen_model_file_path")
+    @patch(
+        "radp.common.helpers.file_system_helper.RADPFileSystemHelper.gen_model_file_path"
+    )
     def test_check_model_exists_neg(self, mocked_model_file_path):
         mocked_model_file_path.side_effect = Exception("dummy exception!")
         with self.assertRaises(Exception) as e:
@@ -512,7 +574,9 @@ RADPFileSystemHelper.gen_simulation_cell_config_file_path"""
             "dummy exception!",
         )
 
-    @patch("radp.common.helpers.file_system_helper.RADPFileSystemHelper.load_model_metadata")
+    @patch(
+        "radp.common.helpers.file_system_helper.RADPFileSystemHelper.load_model_metadata"
+    )
     @patch(
         "radp.common.helpers.file_system_helper.constants.STATUS",
         "dummy_status",
@@ -526,7 +590,9 @@ RADPFileSystemHelper.gen_simulation_cell_config_file_path"""
             "trained",
         )
 
-    @patch("radp.common.helpers.file_system_helper.RADPFileSystemHelper.load_model_metadata")
+    @patch(
+        "radp.common.helpers.file_system_helper.RADPFileSystemHelper.load_model_metadata"
+    )
     @patch(
         "radp.common.helpers.file_system_helper.constants.MODEL_TYPE",
         "dummy_model_type",

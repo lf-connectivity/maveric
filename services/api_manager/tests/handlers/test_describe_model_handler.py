@@ -15,11 +15,17 @@ class TestDescribeModelHandler(TestCase):
     @patch("api_manager.handlers.describe_model_handler.RADPFileSystemHelper")
     def test_handle_describe_model_request(self, mock_file_system_helper: MagicMock):
         mock_file_system_helper.load_model_metadata.return_value = {"metadata": "dummy"}
-        assert DescribeModelHandler().handle_describe_model_request("dummy_model") == {"metadata": "dummy"}
-        mock_file_system_helper.load_model_metadata.assert_called_once_with(model_id="dummy_model")
+        assert DescribeModelHandler().handle_describe_model_request("dummy_model") == {
+            "metadata": "dummy"
+        }
+        mock_file_system_helper.load_model_metadata.assert_called_once_with(
+            model_id="dummy_model"
+        )
 
     @patch("api_manager.handlers.describe_model_handler.RADPFileSystemHelper")
-    def test_handle_describe_model_request__model_not_found(self, mock_file_system_helper: MagicMock):
+    def test_handle_describe_model_request__model_not_found(
+        self, mock_file_system_helper: MagicMock
+    ):
         mock_file_system_helper.side_effect
         mock_file_system_helper.load_model_metadata.side_effect = FileNotFoundError()
         with self.assertRaises(ModelNotFoundException):

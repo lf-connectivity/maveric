@@ -22,7 +22,9 @@ def get_utc_timestamp() -> str:
     return now_utc.strftime("%Y_%m_%d-%I_%M_%S_%p")
 
 
-def save_file_from_flask(file_storage: FileStorage, upload_folder: str, file_name: str) -> str:
+def save_file_from_flask(
+    file_storage: FileStorage, upload_folder: str, file_name: str
+) -> str:
     """Helper method to save a werkzeug FileStorage file to disk"""
     try:
         # create folder if it does not exist
@@ -66,12 +68,16 @@ def bootstrap_radp_filesystem():
             try:
                 os.makedirs(directory)
             except Exception as e:
-                logger.exception(f"Exception occurred creating directory '{directory}': {e}")
+                logger.exception(
+                    f"Exception occurred creating directory '{directory}': {e}"
+                )
                 raise e
 
     directories_output_string = "\n".join(SYSTEM_DIRECTORIES)
     logger.info(
-        "Successfully created the following directories:\n{directories}".format(directories=directories_output_string)
+        "Successfully created the following directories:\n{directories}".format(
+            directories=directories_output_string
+        )
     )
 
 

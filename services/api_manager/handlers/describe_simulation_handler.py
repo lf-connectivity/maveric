@@ -14,7 +14,9 @@ import logging
 from typing import Dict
 
 from api_manager.exceptions.invalid_parameter_exception import InvalidParameterException
-from api_manager.exceptions.simulation_not_found_exception import SimulationNotFoundException
+from api_manager.exceptions.simulation_not_found_exception import (
+    SimulationNotFoundException,
+)
 
 from radp.common.helpers.file_system_helper import RADPFileSystemHelper
 
@@ -34,7 +36,9 @@ class DescribeSimulationHandler:
         try:
             sim_metadata = RADPFileSystemHelper.load_simulation_metadata(simulation_id)
         except FileNotFoundError:
-            logger.exception(f"Exception describing simulation: simulation '{simulation_id}' not found")
+            logger.exception(
+                f"Exception describing simulation: simulation '{simulation_id}' not found"
+            )
             raise SimulationNotFoundException(simulation_id)
         # TODO: implement a response DTO to validate response content
         return sim_metadata

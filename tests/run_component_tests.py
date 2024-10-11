@@ -34,7 +34,9 @@ def get_top_level(relative_path):
 
 def get_package_roots(top_level_path):
     """Helper method to get root packages from relative path"""
-    root_paths = [os.path.join(top_level_path, path) for path in os.listdir(top_level_path)]
+    root_paths = [
+        os.path.join(top_level_path, path) for path in os.listdir(top_level_path)
+    ]
     return [path for path in root_paths if os.path.isdir(path)]
 
 
@@ -46,7 +48,9 @@ def run_tests(source_paths) -> Tuple[List[unittest.TestResult], int]:
     total_tests = 0
 
     for path in source_paths:
-        test_suite = loader.discover(start_dir=path, top_level_dir=path, pattern="test*.py")
+        test_suite = loader.discover(
+            start_dir=path, top_level_dir=path, pattern="test*.py"
+        )
         total_tests += test_suite.countTestCases()
 
         testRunner = unittest.runner.TextTestRunner()
@@ -74,13 +78,17 @@ if run_coverage:
     cov.start()
 
     # run tests
-    test_results, total_tests = run_tests([radp_top_level_path, services_top_level_path])
+    test_results, total_tests = run_tests(
+        [radp_top_level_path, services_top_level_path]
+    )
 
     # stop coverage tracking
     cov.stop()
 else:
     # run tests
-    test_results, total_tests = run_tests([radp_top_level_path, services_top_level_path])
+    test_results, total_tests = run_tests(
+        [radp_top_level_path, services_top_level_path]
+    )
 
 success = True
 failed: List[Tuple[unittest.TestResult, str]] = []
@@ -126,7 +134,9 @@ logger.info(f"{'FAILED:' : <20}{fail_count : >36}")
 logger.info(f"{'ERRORS:' : <20}{error_count : >36}")
 logger.info("--------------------------------------------------------")
 
-message = "SUCCESS" if success else "TESTS FAILED: Check test reports above to see failure(s)"
+message = (
+    "SUCCESS" if success else "TESTS FAILED: Check test reports above to see failure(s)"
+)
 logger.info(message)
 logger.info("--------------------------------------------------------")
 

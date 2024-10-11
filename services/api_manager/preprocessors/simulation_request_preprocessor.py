@@ -99,7 +99,11 @@ class RICSimulationRequestPreprocessor:
 
         # start chained hash from top-level simulation parameters
         chained_hash_val = deterministic_hash_dict(
-            {constants.SIMULATION_TIME_INTERVAL: request[constants.SIMULATION_TIME_INTERVAL]}
+            {
+                constants.SIMULATION_TIME_INTERVAL: request[
+                    constants.SIMULATION_TIME_INTERVAL
+                ]
+            }
         )
 
         # build processed request frame (this will become to simulation metadata object)
@@ -109,7 +113,9 @@ class RICSimulationRequestPreprocessor:
         processed_request[constants.SIMULATION_STATUS] = constants.STATUS_PLANNED
 
         # supply simulation interval value
-        processed_request[constants.SIMULATION_TIME_INTERVAL] = request[constants.SIMULATION_TIME_INTERVAL]
+        processed_request[constants.SIMULATION_TIME_INTERVAL] = request[
+            constants.SIMULATION_TIME_INTERVAL
+        ]
 
         # get the ue_tracks hash value
         chained_hash_val = deterministic_hash_dict(
@@ -124,27 +130,32 @@ class RICSimulationRequestPreprocessor:
         if constants.UE_TRACKS_GENERATION in request[constants.UE_TRACKS]:
             # supply UE tracks generation object to the processed request
             processed_request[constants.UE_TRACKS_GENERATION] = {}
-            processed_request[constants.UE_TRACKS_GENERATION][constants.PARAMS] = request[constants.UE_TRACKS][
-                constants.UE_TRACKS_GENERATION
-            ]
+            processed_request[constants.UE_TRACKS_GENERATION][
+                constants.PARAMS
+            ] = request[constants.UE_TRACKS][constants.UE_TRACKS_GENERATION]
 
             # get num_ticks using division of duration by time interval
-            simulation_duration = processed_request[constants.UE_TRACKS_GENERATION][constants.PARAMS][
-                constants.SIMULATION_DURATION
-            ]
+            simulation_duration = processed_request[constants.UE_TRACKS_GENERATION][
+                constants.PARAMS
+            ][constants.SIMULATION_DURATION]
             processed_request[constants.NUM_TICKS] = int(
-                simulation_duration / processed_request[constants.SIMULATION_TIME_INTERVAL]
+                simulation_duration
+                / processed_request[constants.SIMULATION_TIME_INTERVAL]
             )
 
             # set hash value in ue_tracks generation
-            processed_request[constants.UE_TRACKS_GENERATION][constants.HASH_VAL] = chained_hash_val
+            processed_request[constants.UE_TRACKS_GENERATION][
+                constants.HASH_VAL
+            ] = chained_hash_val
 
             # add state object to UE tracks generation object
             processed_request[constants.UE_TRACKS_GENERATION][constants.STATE] = {}
             processed_request[constants.UE_TRACKS_GENERATION][constants.STATE][
                 constants.STATUS
             ] = constants.STATUS_PLANNED
-            processed_request[constants.UE_TRACKS_GENERATION][constants.STATE][constants.BATCHES_OUTPUTTED] = 0
+            processed_request[constants.UE_TRACKS_GENERATION][constants.STATE][
+                constants.BATCHES_OUTPUTTED
+            ] = 0
 
         else:
             # TODO: get actual num_ticks value by scanning input file "tick" column
@@ -173,19 +184,29 @@ class RICSimulationRequestPreprocessor:
 
             # initial empty state
             processed_request[stage][constants.STATE] = {}
-            processed_request[stage][constants.STATE][constants.STATUS] = constants.STATUS_PLANNED
-            processed_request[stage][constants.STATE][constants.LATEST_BATCH_WITHOUT_FAILURE] = 0
-            processed_request[stage][constants.STATE][constants.LATEST_BATCH_TO_SUCCEED] = 0
+            processed_request[stage][constants.STATE][
+                constants.STATUS
+            ] = constants.STATUS_PLANNED
+            processed_request[stage][constants.STATE][
+                constants.LATEST_BATCH_WITHOUT_FAILURE
+            ] = 0
+            processed_request[stage][constants.STATE][
+                constants.LATEST_BATCH_TO_SUCCEED
+            ] = 0
             processed_request[stage][constants.STATE][constants.BATCHES_RETRYING] = []
             return chained_hash_val
 
         # RF Prediction
         if constants.RF_PREDICTION in request:
-            chained_hash_val = _preprocess_stage(stage=constants.RF_PREDICTION, chained_hash_val=chained_hash_val)
+            chained_hash_val = _preprocess_stage(
+                stage=constants.RF_PREDICTION, chained_hash_val=chained_hash_val
+            )
 
         # Protocol Emulation
         if constants.PROTOCOL_EMULATION in request:
-            chained_hash_val = _preprocess_stage(stage=constants.PROTOCOL_EMULATION, chained_hash_val=chained_hash_val)
+            chained_hash_val = _preprocess_stage(
+                stage=constants.PROTOCOL_EMULATION, chained_hash_val=chained_hash_val
+            )
 
         # Simulation ID
         def _create_simulation_id(
@@ -194,24 +215,28 @@ class RICSimulationRequestPreprocessor:
             """Create the simulation ID from hashing everything together"""
             # pull the non-stage-specific fields
             constituent_hashes = {
-                k: processed_request[k] for k in (constants.NUM_TICKS, constants.NUM_BATCHES) if k in processed_request
+                k: processed_request[k]
+                for k in (constants.NUM_TICKS, constants.NUM_BATCHES)
+                if k in processed_request
             }
 
             # pull all present stage hashes
             if constants.UE_TRACKS_GENERATION in processed_request:
-                constituent_hashes[constants.UE_TRACKS_GENERATION_HASH_VAL] = processed_request[
-                    constants.UE_TRACKS_GENERATION
-                ][constants.HASH_VAL]
-
-            if constants.RF_PREDICTION in processed_request:
-                constituent_hashes[constants.RF_PREDICTION_HASH_VAL] = processed_request[constants.RF_PREDICTION][
+                constituent_hashes[
+                    constants.UE_TRACKS_GENERATION_HASH_VAL
+                ] = processed_request[constants.UE_TRACKS_GENERATION][
                     constants.HASH_VAL
                 ]
 
+            if constants.RF_PREDICTION in processed_request:
+                constituent_hashes[
+                    constants.RF_PREDICTION_HASH_VAL
+                ] = processed_request[constants.RF_PREDICTION][constants.HASH_VAL]
+
             if constants.PROTOCOL_EMULATION in processed_request:
-                constituent_hashes[constants.PROTOCOL_EMULATION_HASH_VAL] = processed_request[
-                    constants.PROTOCOL_EMULATION
-                ][constants.HASH_VAL]
+                constituent_hashes[
+                    constants.PROTOCOL_EMULATION_HASH_VAL
+                ] = processed_request[constants.PROTOCOL_EMULATION][constants.HASH_VAL]
 
             # build the one hash
             # one hash to rule them all... throw it into the fire you fool!

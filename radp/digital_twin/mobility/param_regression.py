@@ -149,19 +149,19 @@ def preprocess_ue_data(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def get_predicted_alpha(data: pd.DataFrame, alpha0: float,seed: int) -> float:
+def get_predicted_alpha(data: pd.DataFrame, alpha0: float, seed: int) -> float:
     """
     Get the predicted alpha value for the given UE (User Equipment) data.
 
-    This function serves as the main API entry point for predicting the alpha parameter, 
-    which represents a key aspect of mobility behavior derived from UE tracks.  
+    This function serves as the main API entry point for predicting the alpha parameter,
+    which represents a key aspect of mobility behavior derived from UE tracks.
 
-    Alpha is predicted based on the movement patterns observed in the UE tracks, 
+    Alpha is predicted based on the movement patterns observed in the UE tracks,
     which are represented by the following columns in the input DataFrame:
 
     Parameters:
     - data (DataFrame): The input data containing UE tracks, structured as follows:
-  
+
         +------------+------------+-----------+------+
         | mock_ue_id | lon        | lat       | tick |
         +============+============+===========+======+
@@ -172,13 +172,12 @@ def get_predicted_alpha(data: pd.DataFrame, alpha0: float,seed: int) -> float:
         |     1      | 102.362725 | 33.916477 |   1  |
         |     2      | 102.080675 | 33.832793 |   1  |
         +------------+------------+-----------+------+
-
-"""
+    """
     # Extract the data after preprocessing
     velocity = preprocess_ue_data(data)
 
     # Initialize and unpack all outputs from the initialize function
-    t_array, t_next_array, velocity_mean, variance, rng = _initialize(velocity,seed)
+    t_array, t_next_array, velocity_mean, variance, rng = _initialize(velocity, seed)
 
     # Optimize alpha using the unpacked values
     popt, pcov = optimize_alpha(
