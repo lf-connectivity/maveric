@@ -70,7 +70,9 @@ class OrchestrationHelper:
     @staticmethod
     def get_rf_digital_twin_model_id(sim_metadata: Dict) -> str:
         """Get the RF digital twin model used in simulation"""
-        return sim_metadata[SimulationStage.RF_PREDICTION.value][constants.PARAMS][constants.MODEL_ID]
+        return sim_metadata[SimulationStage.RF_PREDICTION.value][constants.PARAMS][
+            constants.MODEL_ID
+        ]
 
     @staticmethod
     def has_stage(sim_metadata: Dict, stage: SimulationStage) -> bool:
@@ -90,7 +92,9 @@ class OrchestrationHelper:
         return sim_metadata[stage.value][constants.HASH_VAL]
 
     @staticmethod
-    def generate_job_event_frame(sim_metadata: Dict, stage: SimulationStage, batch=None) -> Dict:
+    def generate_job_event_frame(
+        sim_metadata: Dict, stage: SimulationStage, batch=None
+    ) -> Dict:
         """Generate a standard frame for job event given a stage"""
         job_frame: Dict[str, Any] = {}
 
@@ -110,16 +114,28 @@ class OrchestrationHelper:
         """Check if the stage has completed"""
         _, num_batches = OrchestrationHelper.get_batching_params(sim_metadata)
         if stage == SimulationStage.UE_TRACKS_GENERATION:
-            ue_tracks_state = sim_metadata[SimulationStage.UE_TRACKS_GENERATION.value][constants.STATE]
+            ue_tracks_state = sim_metadata[SimulationStage.UE_TRACKS_GENERATION.value][
+                constants.STATE
+            ]
             return ue_tracks_state[constants.BATCHES_OUTPUTTED] == num_batches
 
         if stage == SimulationStage.RF_PREDICTION:
-            rf_prediction_state = sim_metadata[SimulationStage.RF_PREDICTION.value][constants.STATE]
-            return rf_prediction_state[constants.LATEST_BATCH_WITHOUT_FAILURE] == num_batches
+            rf_prediction_state = sim_metadata[SimulationStage.RF_PREDICTION.value][
+                constants.STATE
+            ]
+            return (
+                rf_prediction_state[constants.LATEST_BATCH_WITHOUT_FAILURE]
+                == num_batches
+            )
 
         if stage == SimulationStage.PROTOCOL_EMULATION:
-            protocol_emulation_state = sim_metadata[SimulationStage.PROTOCOL_EMULATION.value][constants.STATE]
-            return protocol_emulation_state[constants.LATEST_BATCH_WITHOUT_FAILURE] == num_batches
+            protocol_emulation_state = sim_metadata[
+                SimulationStage.PROTOCOL_EMULATION.value
+            ][constants.STATE]
+            return (
+                protocol_emulation_state[constants.LATEST_BATCH_WITHOUT_FAILURE]
+                == num_batches
+            )
         else:
             logger.exception("Received unexpected stage: {stage.value}")
             raise ValueError("Received unexpected stage: {stage.value}")

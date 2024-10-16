@@ -10,7 +10,9 @@ from flask import Flask, jsonify, request, send_file
 
 from api_manager.exceptions.base_api_exception import APIException
 from api_manager.exceptions.invalid_parameter_exception import InvalidParameterException
-from api_manager.handlers.consume_simulation_output_handler import ConsumeSimulationOutputHandler
+from api_manager.handlers.consume_simulation_output_handler import (
+    ConsumeSimulationOutputHandler,
+)
 from api_manager.handlers.describe_model_handler import DescribeModelHandler
 from api_manager.handlers.describe_simulation_handler import DescribeSimulationHandler
 from api_manager.handlers.simulation_handler import SimulationHandler
@@ -58,13 +60,17 @@ def train():
 
     # verify request contains payload and csv files
     if constants.REQUEST_PAYLOAD_FILE_KEY not in request.files:
-        raise InvalidParameterException(f"Invalid request, missing file input '{constants.REQUEST_PAYLOAD_FILE_KEY}'")
+        raise InvalidParameterException(
+            f"Invalid request, missing file input '{constants.REQUEST_PAYLOAD_FILE_KEY}'"
+        )
     if constants.REQUEST_UE_TRAINING_DATA_FILE_KEY not in request.files:
         raise InvalidParameterException(
             f"Invalid request, missing file input '{constants.REQUEST_UE_TRAINING_DATA_FILE_KEY}'"
         )
     if constants.REQUEST_TOPOLOGY_FILE_KEY not in request.files:
-        raise InvalidParameterException(f"Invalid request, missing file input '{constants.REQUEST_TOPOLOGY_FILE_KEY}'")
+        raise InvalidParameterException(
+            f"Invalid request, missing file input '{constants.REQUEST_TOPOLOGY_FILE_KEY}'"
+        )
 
     payload = json.load(request.files[constants.REQUEST_PAYLOAD_FILE_KEY])
 
@@ -95,7 +101,9 @@ def simulation():
 
     # verify request contains json payload
     if constants.REQUEST_PAYLOAD_FILE_KEY not in request.files:
-        raise InvalidParameterException(f"Invalid request, missing file input '{constants.REQUEST_PAYLOAD_FILE_KEY}'")
+        raise InvalidParameterException(
+            f"Invalid request, missing file input '{constants.REQUEST_PAYLOAD_FILE_KEY}'"
+        )
     payload = json.load(request.files[constants.REQUEST_PAYLOAD_FILE_KEY])
 
     # store and pass whatever files are provided
@@ -118,11 +126,17 @@ def simulation():
 @app.route("/simulation/<simulation_id>", methods=["GET"])
 def describe_simulation(simulation_id: str):
     logger.info(f"Received API request to describe simulation: {simulation_id}")
-    return jsonify(DescribeSimulationHandler().handle_describe_simulation_request(simulation_id))
+    return jsonify(
+        DescribeSimulationHandler().handle_describe_simulation_request(simulation_id)
+    )
 
 
 @app.route("/simulation/<simulation_id>/download", methods=["GET"])
 def consume_simulation_output(simulation_id: str):
     logger.info(f"Received API request to consume simulation output: {simulation_id}")
-    output_zip_file_path = ConsumeSimulationOutputHandler().handle_consume_simulation_output_request(simulation_id)
+    output_zip_file_path = (
+        ConsumeSimulationOutputHandler().handle_consume_simulation_output_request(
+            simulation_id
+        )
+    )
     return send_file(output_zip_file_path)

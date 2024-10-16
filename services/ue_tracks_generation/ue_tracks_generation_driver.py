@@ -108,11 +108,19 @@ class UETracksGenerationDriver:
         logger.info(f"Handling UE Tracks generation job: {job_data}")
 
         # Extract all the required information from the job_data in order to generate UE tracks
-        ue_tracks_generation_params = UETracksGenerationHelper.get_ue_tracks_generation_parameters(job_data)
+        ue_tracks_generation_params = (
+            UETracksGenerationHelper.get_ue_tracks_generation_parameters(job_data)
+        )
 
-        simulation_time_interval = UETracksGenerationHelper.get_simulation_time_interval(ue_tracks_generation_params)
+        simulation_time_interval = (
+            UETracksGenerationHelper.get_simulation_time_interval(
+                ue_tracks_generation_params
+            )
+        )
         num_ticks = UETracksGenerationHelper.get_num_ticks(ue_tracks_generation_params)
-        num_batches = UETracksGenerationHelper.get_num_batches(ue_tracks_generation_params)
+        num_batches = UETracksGenerationHelper.get_num_batches(
+            ue_tracks_generation_params
+        )
 
         # Get the total number of UEs from the UE class distribution and add them up
         (
@@ -120,7 +128,9 @@ class UETracksGenerationDriver:
             pedestrian_count,
             cyclist_count,
             car_count,
-        ) = UETracksGenerationHelper.get_ue_class_distribution_count(ue_tracks_generation_params)
+        ) = UETracksGenerationHelper.get_ue_class_distribution_count(
+            ue_tracks_generation_params
+        )
 
         num_UEs = stationary_count + pedestrian_count + cyclist_count + car_count
 
@@ -188,11 +198,19 @@ class UETracksGenerationDriver:
         ) = UETracksGenerationHelper.get_lat_lon_boundaries(ue_tracks_generation_params)
 
         # Gauss Markov params
-        alpha = UETracksGenerationHelper.get_gauss_markov_alpha(ue_tracks_generation_params)
-        variance = UETracksGenerationHelper.get_gauss_markov_variance(ue_tracks_generation_params)
-        rng_seed = UETracksGenerationHelper.get_gauss_markov_rng_seed(ue_tracks_generation_params)
+        alpha = UETracksGenerationHelper.get_gauss_markov_alpha(
+            ue_tracks_generation_params
+        )
+        variance = UETracksGenerationHelper.get_gauss_markov_variance(
+            ue_tracks_generation_params
+        )
+        rng_seed = UETracksGenerationHelper.get_gauss_markov_rng_seed(
+            ue_tracks_generation_params
+        )
 
-        lon_x_dims, lon_y_dims = UETracksGenerationHelper.get_gauss_markov_xy_dims(ue_tracks_generation_params)
+        lon_x_dims, lon_y_dims = UETracksGenerationHelper.get_gauss_markov_xy_dims(
+            ue_tracks_generation_params
+        )
 
         # Use the above parameters extracted from the job data to generate mobility
         # Get each batch of mobility data in form of DataFrames
@@ -200,7 +218,9 @@ class UETracksGenerationDriver:
         simulation_id = UETracksGenerationHelper.get_simulation_id(job_data)
 
         current_batch = 1
-        for ue_tracks_generation_current_batch_df in UETracksGenerator.generate_as_lon_lat_points(
+        for (
+            ue_tracks_generation_current_batch_df
+        ) in UETracksGenerator.generate_as_lon_lat_points(
             rng_seed=rng_seed,
             lon_x_dims=lon_x_dims,
             lon_y_dims=lon_y_dims,
@@ -218,12 +238,20 @@ class UETracksGenerationDriver:
             mobility_class_velocity_variances=mobility_class_velocity_variances,
         ):
             # save output to file with format {output_file_prefix}-{batch}.fea
-            output_file_prefix = UETracksGenerationHelper.get_output_file_prefix(job_data)
-            output_file_name = f"{output_file_prefix}-{current_batch}.{constants.DF_FILE_EXTENSION}"
-            output_file_path = os.path.join(constants.UE_TRACK_GENERATION_OUTPUTS_FOLDER, output_file_name)
+            output_file_prefix = UETracksGenerationHelper.get_output_file_prefix(
+                job_data
+            )
+            output_file_name = (
+                f"{output_file_prefix}-{current_batch}.{constants.DF_FILE_EXTENSION}"
+            )
+            output_file_path = os.path.join(
+                constants.UE_TRACK_GENERATION_OUTPUTS_FOLDER, output_file_name
+            )
 
             write_feather_df(output_file_path, ue_tracks_generation_current_batch_df)
-            logger.info(f"Saved UE Tracks batch {current_batch} output DF to {output_file_path}")
+            logger.info(
+                f"Saved UE Tracks batch {current_batch} output DF to {output_file_path}"
+            )
 
             # Once each batch has been processed and written to the output file, we can indicate that the job
             # has done successfully and produce output event to outputs topic

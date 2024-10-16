@@ -6,7 +6,9 @@
 import unittest
 
 from api_manager.exceptions.invalid_parameter_exception import InvalidParameterException
-from api_manager.validators.simulation_request_validator import RICSimulationRequestValidator
+from api_manager.validators.simulation_request_validator import (
+    RICSimulationRequestValidator,
+)
 
 
 class TestRICSimulationRequestValidator(unittest.TestCase):
@@ -31,13 +33,17 @@ class TestRICSimulationRequestValidator(unittest.TestCase):
 
         # Missing rf_prediction (but ue_tracks present and valid)
         with self.assertRaises(InvalidParameterException) as ipe:
-            RICSimulationRequestValidator._validate_rf_prediction({"ue_tracks": {"ue_tracks_generation": {}}})
+            RICSimulationRequestValidator._validate_rf_prediction(
+                {"ue_tracks": {"ue_tracks_generation": {}}}
+            )
         self.assertEqual(
             str(ipe.exception),
             "Missing rf_prediction key in RIC Simulation Request spec!",
         )
         with self.assertRaises(InvalidParameterException) as ipe:
-            RICSimulationRequestValidator._validate_rf_prediction({"ue_tracks": {"ue_data_id": {}}})
+            RICSimulationRequestValidator._validate_rf_prediction(
+                {"ue_tracks": {"ue_data_id": {}}}
+            )
         self.assertEqual(
             str(ipe.exception),
             "Missing rf_prediction key in RIC Simulation Request spec!",

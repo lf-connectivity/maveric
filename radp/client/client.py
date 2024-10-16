@@ -62,7 +62,9 @@ class RADPClient(RequestsClient):
     # TODO: add error handling logic for when something goes wrong
     @retry(exceptions=RETRY_EXCEPTIONS, tries=3, delay=1, backoff=2)
     def describe_simulation(self, simulation_id: str) -> Dict:
-        logger.debug(f"Calling describe_simulation api with simulation: '{simulation_id}'")
+        logger.debug(
+            f"Calling describe_simulation api with simulation: '{simulation_id}'"
+        )
         path = f"{constants.DESCRIBE_SIMULATION_API_PATH}/{simulation_id}"
         response = self._send_get_request(path, {})
 
@@ -101,7 +103,9 @@ class RADPClient(RequestsClient):
         payload_file = json.dumps(payload)
 
         # open user provided training csv files
-        with open(ue_training_data, "r") as ue_training_data_file, open(topology, "r") as topology_file:
+        with open(ue_training_data, "r") as ue_training_data_file, open(
+            topology, "r"
+        ) as topology_file:
             # send a json body file as well as both csv files
             files: Set[Any] = {
                 (
@@ -166,7 +170,9 @@ class RADPClient(RequestsClient):
         }
 
         if not ue_data and not config:
-            return self._send_post_request(constants.SIMULATION_API_PATH, files=files).json()
+            return self._send_post_request(
+                constants.SIMULATION_API_PATH, files=files
+            ).json()
 
         if not config:
             with open(str(ue_data), "r") as ue_data_file:
@@ -180,7 +186,9 @@ class RADPClient(RequestsClient):
                         ),
                     )
                 )
-                return self._send_post_request(constants.SIMULATION_API_PATH, files=files).json()
+                return self._send_post_request(
+                    constants.SIMULATION_API_PATH, files=files
+                ).json()
 
         if not ue_data:
             with open(str(config), "r") as config_file:
@@ -194,7 +202,9 @@ class RADPClient(RequestsClient):
                         ),
                     )
                 )
-                return self._send_post_request(constants.SIMULATION_API_PATH, files=files).json()
+                return self._send_post_request(
+                    constants.SIMULATION_API_PATH, files=files
+                ).json()
 
         with open(ue_data, "r") as ue_data_file, open(config, "r") as config_file:
             files.add(
@@ -217,17 +227,23 @@ class RADPClient(RequestsClient):
                     ),
                 ),
             )
-            return self._send_post_request(constants.SIMULATION_API_PATH, files=files).json()
+            return self._send_post_request(
+                constants.SIMULATION_API_PATH, files=files
+            ).json()
 
     # TODO: add error handling logic for when something goes wrong
     @retry(exceptions=RETRY_EXCEPTIONS, tries=3, delay=1, backoff=2)
     def consume_simulation_output(self, simulation_id: str) -> pd.DataFrame:
-        logger.debug(f"Calling consume_simulation_output api with simulation: '{simulation_id}'")
+        logger.debug(
+            f"Calling consume_simulation_output api with simulation: '{simulation_id}'"
+        )
 
         path = f"{constants.CONSUME_SIMULATION_OUTPUT_API_PATH}/{simulation_id}/{constants.DOWNLOAD}"
         consume_simulation_output_url = self._get_request_url(path, {})
 
         # TODO: this only works for a single file in zipfile
         # we will need to update this once batching is supported
-        rf_dataframe = pd.read_csv(consume_simulation_output_url, compression=constants.ZIP_COMPRESSION)
+        rf_dataframe = pd.read_csv(
+            consume_simulation_output_url, compression=constants.ZIP_COMPRESSION
+        )
         return rf_dataframe

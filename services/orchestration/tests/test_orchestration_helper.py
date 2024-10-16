@@ -143,10 +143,16 @@ class TestOrchestrationHelper(TestCase):
         )
 
     def test_has_stage(self):
-        self.assertTrue(OrchestrationHelper.has_stage(dummy_sim_metadata, SimulationStage.RF_PREDICTION))
+        self.assertTrue(
+            OrchestrationHelper.has_stage(
+                dummy_sim_metadata, SimulationStage.RF_PREDICTION
+            )
+        )
 
     def test_stage_missing(self):
-        self.assertFalse(OrchestrationHelper.has_stage(dummy_sim_metadata, SimulationStage.START))
+        self.assertFalse(
+            OrchestrationHelper.has_stage(dummy_sim_metadata, SimulationStage.START)
+        )
 
     def test_has_hash(self):
         sim_metadata_hash = {"rf_prediction": {"hash_val": "val"}}
@@ -217,9 +223,21 @@ class TestOrchestrationHelper(TestCase):
         }
         num_ticks, num_batches = OrchestrationHelper.get_batching_params(dummy_sim_data)
 
-        self.assertTrue(OrchestrationHelper.stage_has_completed(dummy_sim_data, SimulationStage.UE_TRACKS_GENERATION))
-        self.assertTrue(OrchestrationHelper.stage_has_completed(dummy_sim_data, SimulationStage.RF_PREDICTION))
-        self.assertTrue(OrchestrationHelper.stage_has_completed(dummy_sim_data, SimulationStage.PROTOCOL_EMULATION))
+        self.assertTrue(
+            OrchestrationHelper.stage_has_completed(
+                dummy_sim_data, SimulationStage.UE_TRACKS_GENERATION
+            )
+        )
+        self.assertTrue(
+            OrchestrationHelper.stage_has_completed(
+                dummy_sim_data, SimulationStage.RF_PREDICTION
+            )
+        )
+        self.assertTrue(
+            OrchestrationHelper.stage_has_completed(
+                dummy_sim_data, SimulationStage.PROTOCOL_EMULATION
+            )
+        )
 
     def test_stage_has_completed_exception(self):
         dummy_sim_data = {
@@ -244,9 +262,21 @@ class TestOrchestrationHelper(TestCase):
                 }
             },
         }
-        self.assertFalse(OrchestrationHelper.stage_has_completed(dummy_sim_data, SimulationStage.UE_TRACKS_GENERATION))
-        self.assertFalse(OrchestrationHelper.stage_has_completed(dummy_sim_data, SimulationStage.RF_PREDICTION))
-        self.assertFalse(OrchestrationHelper.stage_has_completed(dummy_sim_data, SimulationStage.PROTOCOL_EMULATION))
+        self.assertFalse(
+            OrchestrationHelper.stage_has_completed(
+                dummy_sim_data, SimulationStage.UE_TRACKS_GENERATION
+            )
+        )
+        self.assertFalse(
+            OrchestrationHelper.stage_has_completed(
+                dummy_sim_data, SimulationStage.RF_PREDICTION
+            )
+        )
+        self.assertFalse(
+            OrchestrationHelper.stage_has_completed(
+                dummy_sim_data, SimulationStage.PROTOCOL_EMULATION
+            )
+        )
 
     def test_update_stage_state_to_finished(self):
         dummy_sim_data = {
@@ -259,10 +289,14 @@ class TestOrchestrationHelper(TestCase):
                 }
             },
             "rf_prediction": {"state": {"batches_outputted": "dummy_num_batches_val"}},
-            "protocol_emulation": {"state": {"batches_outputted": "dummy_num_batches_val"}},
+            "protocol_emulation": {
+                "state": {"batches_outputted": "dummy_num_batches_val"}
+            },
         }
         stage_ue_track_generation = SimulationStage.UE_TRACKS_GENERATION
-        OrchestrationHelper.update_stage_state_to_finished(dummy_sim_data, stage_ue_track_generation)
+        OrchestrationHelper.update_stage_state_to_finished(
+            dummy_sim_data, stage_ue_track_generation
+        )
         self.assertEqual(
             dummy_sim_data[stage_ue_track_generation.value]["state"],
             {

@@ -34,7 +34,9 @@ class DescribeModelHandler:
         try:
             model_metadata = RADPFileSystemHelper.load_model_metadata(model_id=model_id)
         except FileNotFoundError:
-            logger.exception(f"Exception describing model: model '{model_id}' not found")
+            logger.exception(
+                f"Exception describing model: model '{model_id}' not found"
+            )
             raise ModelNotFoundException(model_id)
         # TODO: implement a response DTO to validate response content
         return model_metadata
