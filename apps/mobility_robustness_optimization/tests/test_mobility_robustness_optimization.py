@@ -2,7 +2,7 @@ import unittest
 import pandas as pd
 import numpy as np
 import pytest
-from radp.digital_twin.mro.mro import MobilityRobustnessOptimization
+from apps.mobility_robustness_optimization.mobility_robustness_optimization import MobilityRobustnessOptimization
 
 
 class TestMobilityRobustnessOptimization(unittest.TestCase):
