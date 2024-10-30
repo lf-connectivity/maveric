@@ -124,13 +124,13 @@ def calculate_distances_and_velocities(group: pd.DataFrame) -> pd.DataFrame:
     group["prev_longitude"] = group["lon"].shift(1)
     group["prev_latitude"] = group["lat"].shift(1)
     group["distance"] = group.apply(
-        lambda row: GISTools.get_log_distance(
-            row["prev_latitude"], row["prev_longitude"], row["lat"], row["lon"]
-        )
-        if not pd.isna(row["prev_longitude"])
-        else 0,
-        axis=1,
-    )
+    lambda row: GISTools.dist(
+        (row["prev_latitude"], row["prev_longitude"]), (row["lat"], row["lon"])
+    ) * 1000  # Multiplying by 1000 to convert km to m
+    if not pd.isna(row["prev_longitude"]) else 0,
+    axis=1,
+)
+
     # Assuming time interval between ticks is 1 unit, adjust below if different
     group["velocity"] = (
         group["distance"] / 1
