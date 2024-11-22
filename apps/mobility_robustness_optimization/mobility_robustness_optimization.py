@@ -112,11 +112,9 @@ class MobilityRobustnessOptimization:
                to refine the decision process for UE cell attachment.
         """
         self.simulation_data = get_ue_data(self.mobility_params)
-        ue_data = self._preprocess_ue_simulation_data() 
-        ue_data = ue_data.rename(columns={"lat": "loc_y", "lon": "loc_x"})
-        topology = self.topology
-        topology["cell_id"] = topology["cell_id"].str.extract("(\d+)").astype(int)
-        topology = topology.rename(columns={"cell_lat" :"loc_y", "cell_lon": "loc_x"})
+        ue_data = self._preprocess_ue_simulation_data()
+
+        ue_data, topology = self._format_ue_data_and_topology(ue_data,topology)
     
         history = perform_attachment(ue_data,topology)
         
@@ -134,6 +132,13 @@ class MobilityRobustnessOptimization:
         )
 
         return mro_metric
+    
+    def _format_ue_data_and_topology(self, ue_data, topology):
+        ue_data = ue_data.rename(columns={"lat": "loc_y", "lon": "loc_x"})
+        topology = self.topology
+        topology["cell_id"] = topology["cell_id"].str.extract("(\d+)").astype(int)
+        topology = topology.rename(columns={"cell_lat" :"loc_y", "cell_lon": "loc_x"})
+        return ue_data, topology
 
     def _training(self, maxiter: int, train_data: pd.DataFrame) -> List[float]:
         """
