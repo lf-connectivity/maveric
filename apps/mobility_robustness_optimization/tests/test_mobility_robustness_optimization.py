@@ -94,7 +94,7 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         result = self.mro._prepare_all_UEs_from_all_cells_df()
         self.assertEqual(result.shape[0], 2 * 2)  # 2 UEs x 2 cells
 
-    def _calculate_received_power(self):
+    def test_calculate_received_power(self):
         dummy_distance = 1
         dummy_freq = 1800
         expected_fspl = 20 * np.log10(dummy_distance) + 20 * np.log10(dummy_freq) - 27.55
