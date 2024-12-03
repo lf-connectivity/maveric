@@ -1133,3 +1133,53 @@ def plot_ue_tracks_on_axis(df: pd.DataFrame, ax, title: str) -> None:
 
     ax.set_title(title)
     ax.legend()
+
+#MRO app helper functions
+
+# Scatter plot of the Cell towers and UE Locations
+
+def mro_plot_scatter(df, topology):
+    # Create a figure and axis
+    plt.figure(figsize=(10, 8))
+
+    plt.scatter([], [], color="grey", label="RLF")
+
+    # Define color mapping based on cell_id for both cells and UEs
+    color_map = {1: "red", 2: "green", 3: "blue"}
+
+    # Plot cell towers from the topology dataframe with 'X' markers and corresponding colors
+    for _, row in topology.iterrows():
+        color = color_map.get(
+            row["cell_id"], "black"
+        )  # Default to black if unknown cell_id
+        plt.scatter(
+            row["cell_lon"],
+            row["cell_lat"],
+            marker="x",
+            color=color,
+            s=200,
+            label=f"Cell {row['cell_id']}",
+        )
+
+    # Plot UEs from df without labels but with the same color coding
+    for _, row in df.iterrows():
+        color = color_map.get(
+            row["cell_id"], "black"
+        )  # Default to black if unknown cell_id
+        if row["sinr_db"] < -2.9:  # REMOVE COMMENT WHEN sinr_db IS FIXED
+            color = "grey"  # Change to grey if sinr_db < 2
+
+        plt.scatter(row["loc_x"], row["loc_y"], color=color)
+
+    # Add labels and title
+    plt.xlabel("Longitude (loc_x)")
+    plt.ylabel("Latitude (loc_y)")
+    plt.title("Cell Towers and UE Locations")
+
+    # Create a legend for the cells only
+    handles, labels = plt.gca().get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    plt.legend(by_label.values(), by_label.keys())
+
+    # Show the plot
+    plt.show()

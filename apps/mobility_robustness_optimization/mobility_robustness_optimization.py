@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
+import os
 from typing import Any, Dict, List, Tuple, Optional
 
 from radp.digital_twin.utils import constants
@@ -17,10 +18,7 @@ from notebooks.radp_library import get_ue_data
 
 class MobilityRobustnessOptimization:
     """
-    A class to perform Mobility Robustness Optimization (MRO) using Bayesian Digital Twins. This class integrates
-    user equipment (UE) data with cell topology to predict the received power at various UE locations and
-    determines the optimal cell attachment based on these predictions. The class uses Bayesian modeling to
-    accurately forecast signal strength, accounting for factors such as distance, frequency, and antenna characteristics.
+    A class that contains a prototypical proof-of-concept of an `Mobility Robustness Optimization (MRO)` RIC xApp.
     """
 
     def __init__(
@@ -40,7 +38,8 @@ class MobilityRobustnessOptimization:
 
     def update(self, new_data: pd.DataFrame):
         """
-        Updates or trains Bayesian Digital Twins for each cell with new data.
+        (Re-)train Bayesian Digital Twins for each cell.
+        TODO: Add expected := [lat, lon, cell_id, "rsrp_dbm"] and redefine the method.
         """
         try:
             if not isinstance(new_data, pd.DataFrame):
@@ -79,25 +78,31 @@ class MobilityRobustnessOptimization:
 
     def save(bayesian_digital_twins, file_loc):
         """
-        Saves the Bayesian Digital Twins to a pickle file.
+        Saves the Bayesian Digital Twins to a pickle file. Returns `True` if saving succeeds,
+        and `NotImplemented` if it fails.
+        
         """
         filename = f"{file_loc}/digital_twins.pkl"
         try:
             if not isinstance(bayesian_digital_twins, dict):
-                raise TypeError(
-                    "The input 'bayesian_digital_twins' must be a dictionary."
-                )
+                raise TypeError("The input 'bayesian_digital_twins' must be a dictionary.")
+
+            # Ensure the directory exists
+            os.makedirs(file_loc, exist_ok=True)
 
             with open(filename, "wb") as fp:
                 pickle.dump(bayesian_digital_twins, fp)
 
             print("Twins Saved Successfully as Pickle.")
+            return True  # Indicate successful save
         except TypeError as te:
             print(f"TypeError: {te}")
         except OSError as oe:
             print(f"OSError: {oe}")
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
+
+        return NotImplemented  # Return NotImplemented on failure
 
     def solve(self):
         """
@@ -114,12 +119,14 @@ class MobilityRobustnessOptimization:
         self.simulation_data = get_ue_data(self.mobility_params)
         ue_data = self._preprocess_ue_simulation_data()
 
-        ue_data, topology = self._format_ue_data_and_topology(ue_data,topology)
-    
-        history = perform_attachment(ue_data,topology)
-        
+        ue_data, topology = self._format_ue_data_and_topology(ue_data, topology)
+
+        history = perform_attachment(ue_data, topology)
+
         simulation_data = self.simulation_data.copy()
-        simulation_data = simulation_data.rename(columns={"lat": "loc_y", "lon": "loc_x"})
+        simulation_data = simulation_data.rename(
+            columns={"lat": "loc_y", "lon": "loc_x"}
+        )
 
         # Reattach the columns of the data found from the history of the simulation by using performing attachment data and the actual simulated data
         reattached_data = reattach_columns(history, simulation_data)
@@ -132,13 +139,6 @@ class MobilityRobustnessOptimization:
         )
 
         return mro_metric
-    
-    def _format_ue_data_and_topology(self, ue_data, topology):
-        ue_data = ue_data.rename(columns={"lat": "loc_y", "lon": "loc_x"})
-        topology = self.topology
-        topology["cell_id"] = topology["cell_id"].str.extract("(\d+)").astype(int)
-        topology = topology.rename(columns={"cell_lat" :"loc_y", "cell_lon": "loc_x"})
-        return ue_data, topology
 
     def _training(self, maxiter: int, train_data: pd.DataFrame) -> List[float]:
         """
@@ -211,7 +211,7 @@ class MobilityRobustnessOptimization:
 
         return predicted, full_prediction_df
 
-    def _connect_ue_to_all_cells(
+    def _prepare_all_UEs_from_all_cells_df(
         self, prediction: bool = False, simulation: bool = False, update: bool = False
     ) -> pd.DataFrame:
         """
@@ -256,7 +256,7 @@ class MobilityRobustnessOptimization:
         return received_power_dbm
 
     def _preprocess_ue_topology_data(self) -> pd.DataFrame:
-        full_data = self._connect_ue_to_all_cells()
+        full_data = self._prepare_all_UEs_from_all_cells_df()
         full_data["log_distance"] = full_data.apply(
             lambda row: GISTools.get_log_distance(
                 row["latitude"], row["longitude"], row["cell_lat"], row["cell_lon"]
@@ -272,9 +272,9 @@ class MobilityRobustnessOptimization:
         )
 
         return full_data
-    
+
     def _preprocess_ue_simulation_data(self) -> pd.DataFrame:
-        data = self._connect_ue_to_all_cells(simulation=True)
+        data = self._prepare_all_UEs_from_all_cells_df(simulation=True)
         data["log_distance"] = data.apply(
             lambda row: GISTools.get_log_distance(
                 row["lat"], row["lon"], row["cell_lat"], row["cell_lon"]
@@ -355,7 +355,7 @@ class MobilityRobustnessOptimization:
         return training_data
 
     def _preprocess_ue_update_data(self) -> pd.DataFrame:
-        data = self._connect_ue_to_all_cells(update=True)
+        data = self._prepare_all_UEs_from_all_cells_df(update=True)
         data["log_distance"] = data.apply(
             lambda row: GISTools.get_log_distance(
                 row["latitude"], row["longitude"], row["cell_lat"], row["cell_lon"]
@@ -430,7 +430,7 @@ class MobilityRobustnessOptimization:
         return update_data
 
     def _preprocess_prediction_data(self) -> pd.DataFrame:
-        data = self._connect_ue_to_all_cells(prediction=True)
+        data = self._prepare_all_UEs_from_all_cells_df(prediction=True)
 
         data["log_distance"] = data.apply(
             lambda row: GISTools.get_log_distance(
@@ -457,55 +457,12 @@ class MobilityRobustnessOptimization:
         )
         return data
 
-
-# Scatter plot of the Cell towers and UE Locations
-
-
-def mro_plot_scatter(df, topology):
-    # Create a figure and axis
-    plt.figure(figsize=(10, 8))
-
-    plt.scatter([], [], color="grey", label="RLF")
-
-    # Define color mapping based on cell_id for both cells and UEs
-    color_map = {1: "red", 2: "green", 3: "blue"}
-
-    # Plot cell towers from the topology dataframe with 'X' markers and corresponding colors
-    for _, row in topology.iterrows():
-        color = color_map.get(
-            row["cell_id"], "black"
-        )  # Default to black if unknown cell_id
-        plt.scatter(
-            row["cell_lon"],
-            row["cell_lat"],
-            marker="x",
-            color=color,
-            s=200,
-            label=f"Cell {row['cell_id']}",
-        )
-
-    # Plot UEs from df without labels but with the same color coding
-    for _, row in df.iterrows():
-        color = color_map.get(
-            row["cell_id"], "black"
-        )  # Default to black if unknown cell_id
-        if row["sinr_db"] < -2.9:  # REMOVE COMMENT WHEN sinr_db IS FIXED
-            color = "grey"  # Change to grey if sinr_db < 2
-
-        plt.scatter(row["loc_x"], row["loc_y"], color=color)
-
-    # Add labels and title
-    plt.xlabel("Longitude (loc_x)")
-    plt.ylabel("Latitude (loc_y)")
-    plt.title("Cell Towers and UE Locations")
-
-    # Create a legend for the cells only
-    handles, labels = plt.gca().get_legend_handles_labels()
-    by_label = dict(zip(labels, handles))
-    plt.legend(by_label.values(), by_label.keys())
-
-    # Show the plot
-    plt.show()
+    def _format_ue_data_and_topology(self, ue_data, topology):
+        ue_data = ue_data.rename(columns={"lat": "loc_y", "lon": "loc_x"})
+        topology = self.topology
+        topology["cell_id"] = topology["cell_id"].str.extract("(\d+)").astype(int)
+        topology = topology.rename(columns={"cell_lat": "loc_y", "cell_lon": "loc_x"})
+        return ue_data, topology
 
 
 # Functions for MRO metrics and Handover events
