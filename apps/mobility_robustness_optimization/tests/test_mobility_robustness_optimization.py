@@ -97,9 +97,8 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
     def test_calculate_received_power(self):
         dummy_distance = 1
         dummy_freq = 1800
-        expected_fspl = 20 * np.log10(dummy_distance) + 20 * np.log10(dummy_freq) - 27.55
-        expected_power = 23 - expected_fspl
-        power = MRO._calculate_received_power(dummy_distance,dummy_freq)
+        expected_power = -74.55545010206612
+        power = self.mro._calculate_received_power(distance_km=dummy_distance,frequency_mhz=dummy_freq)
         self.assertEqual(expected_power,power)
 
     def test_preprocess_ue_topology_data(self):
