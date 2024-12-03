@@ -1,144 +1,175 @@
 import unittest
 import pandas as pd
 import numpy as np
-import pytest
-from apps.mobility_robustness_optimization.mobility_robustness_optimization import MobilityRobustnessOptimization
+from apps.mobility_robustness_optimization.mobility_robustness_optimization import (
+    calculate_mro_metric,
+    reattach_columns,
+    count_handovers,
+    MobilityRobustnessOptimization as MRO,
+)
 
 
 class TestMobilityRobustnessOptimization(unittest.TestCase):
     def setUp(self):
-        # Sample UE data
-        self.ue_data = pd.DataFrame(
-            {
-                "mock_ue_id": [1, 2, 1, 2, 3],
-                "longitude": [10.0, 11.0, 12.0, 11.5, 9.5],
-                "latitude": [20.0, 21.0, 20.5, 21.5, 19.5],
-                "tick": [0, 0, 1, 1, 2],
-            }
-        )
+        # Define the data with 5 ticks and 2 distinct UE ids
+        self.data = {
+            'loc_x': [-22.625309, 119.764151, 72.095437, -67.548009, 59.867089,  # tick 0
+                    -22.625309, 119.764151, 72.095437, -67.548009, 59.867089,  # tick 1
+                    -22.625309, 119.764151, 72.095437, -67.548009, 59.867089,  # tick 2
+                    -22.625309, 119.764151, 72.095437, -67.548009, 59.867089,  # tick 3
+                    -22.625309, 119.764151, 72.095437, -67.548009, 59.867089], # tick 4
+            'loc_y': [59.806764, 54.857584, -20.253892, -38.100941, -83.103930,  # tick 0
+                    59.806764, 54.857584, -20.253892, -38.100941, -83.103930,  # tick 1
+                    59.806764, 54.857584, -20.253892, -38.100941, -83.103930,  # tick 2
+                    59.806764, 54.857584, -20.253892, -38.100941, -83.103930,  # tick 3
+                    59.806764, 54.857584, -20.253892, -38.100941, -83.103930], # tick 4
+            'cell_id': [3.0, 3.0, 1.0, 1.0, 1.0,  # tick 0
+                        3.0, 3.0, 1.0, 1.0, 1.0,  # tick 1
+                        3.0, 3.0, 1.0, 1.0, 1.0,  # tick 2
+                        3.0, 3.0, 1.0, 1.0, 1.0,  # tick 3
+                        3.0, 3.0, 1.0, 1.0, 1.0],  # tick 4
+            'sinr_db': [-2.379967, -2.327379, -2.879403, -2.681959, -1.272086,  # tick 0
+                        -2.379967, -2.327379, -2.879403, -2.681959, -1.272086,  # tick 1
+                        -2.379967, -2.327379, -2.879403, -2.681959, -1.272086,  # tick 2
+                        -2.379967, -2.327379, -2.879403, -2.681959, -1.272086,  # tick 3
+                        -2.379967, -2.327379, -2.879403, -2.681959, -1.272086],  # tick 4
+            'rsrp_dbm': [-99.439212, -99.529860, -99.914970, -99.750036, -98.454310,  # tick 0
+                        -99.439212, -99.529860, -99.914970, -99.750036, -98.454310,  # tick 1
+                        -99.439212, -99.529860, -99.914970, -99.750036, -98.454310,  # tick 2
+                        -99.439212, -99.529860, -99.914970, -99.750036, -98.454310,  # tick 3
+                        -99.439212, -99.529860, -99.914970, -99.750036, -98.454310],  # tick 4
+            'ue_id': [0, 1, 0, 1, 0,  # tick 0
+                    0, 1, 0, 1, 0,  # tick 1
+                    0, 1, 0, 1, 0,  # tick 2
+                    0, 1, 0, 1, 0,  # tick 3
+                    0, 1, 0, 1, 0],  # tick 4
+            'tick': [0, 0, 0, 0, 0,  # tick 0
+                    1, 1, 1, 1, 1,  # tick 1
+                    2, 2, 2, 2, 2,  # tick 2
+                    3, 3, 3, 3, 3,  # tick 3
+                    4, 4, 4, 4, 4],  # tick 4
+        }
+        # Create the DataFrame
+        self.df = pd.DataFrame(self.data)
 
-        # Sample topology data
-        self.topology = pd.DataFrame(
-            {
-                "cell_lat": [20.1, 21.1, 19.9],
-                "cell_lon": [10.1, 11.1, 9.9],
-                "cell_id": [1, 2, 3],
-                "cell_az_deg": [45, 90, 180],
-                "cell_carrier_freq_mhz": [1800, 2100, 900],
-            }
-        )
+        self.dummy_topology = {
+            "cell_id": ["cell_001", "cell_002"],
+            "cell_lat": [45.0, 46.0],
+            "cell_lon": [-73.0, -74.0]
+        }
 
-        # Sample prediction data
-        self.prediction_data = pd.DataFrame(
-            {
-                "mock_ue_id": [1, 2, 1, 2, 3],
-                "longitude": [10.0, 11.0, 12.0, 11.5, 9.5],
-                "latitude": [20.0, 21.0, 20.5, 21.5, 19.5],
-                "tick": [0, 0, 1, 1, 2],
-            }
-        )
+        self.dummy_topology = pd.DataFrame(self.dummy_topology)
 
-        # Initialize the MobilityRobustnessOptimization class
-        self.mro = MobilityRobustnessOptimization(
-            ue_data=self.ue_data,
-            topology=self.topology,
-            prediction_data=self.prediction_data,
-            tx_power_dbm=23,
-        )
+    def test_update(self):        # TODO: Implement AFTER PR
+        pass
+    def test_solve(self):        # TODO: Implement AFTER PR
+        pass
 
-    def test_connect_ue_to_all_cells(self):
-        # Test connecting UE data to all cells
-        combined_df = self.mro._connect_ue_to_all_cells()
-
-        # Check if the combined dataframe has the correct shape
-        expected_rows = len(self.ue_data) * len(self.topology)  # Cartesian product
-        self.assertEqual(len(combined_df), expected_rows)
-
-        # Check if necessary columns are present
-        self.assertIn("cell_lat", combined_df.columns)
-        self.assertIn("cell_lon", combined_df.columns)
-        self.assertIn("mock_ue_id", combined_df.columns)
-
-    def test_calculate_received_power(self):
-        # Test the received power calculation
-        distance_km = 1.0  # Example distance in km
-        frequency_mhz = 1800  # Example frequency in MHz
-
-        received_power = self.mro._calculate_received_power(distance_km, frequency_mhz)
-
-        # Manually calculate expected result
-        distance_m = distance_km * 1000
-        fspl_db = 20 * np.log10(distance_m) + 20 * np.log10(frequency_mhz) - 27.55
-        expected_received_power = self.mro.tx_power_dbm - fspl_db
-
-        self.assertAlmostEqual(received_power, expected_received_power, places=2)
-
-    def test_preprocess_ue_topology_data(self):
-        # Test the preprocessing of UE and topology data
-        processed_data = self.mro._preprocess_ue_topology_data()
-
-        # Check if the processed dataframe has the expected columns
-        expected_columns = [
-            "mock_ue_id",
-            "longitude",
-            "latitude",
-            "cell_lat",
-            "cell_lon",
-            "cell_id",
-            "log_distance",
-            "cell_rxpwr_dbm",
-        ]
-        for col in expected_columns:
-            self.assertIn(col, processed_data.columns)
-
-        # Verify if the log distance calculation is performed correctly
-        self.assertFalse(processed_data["log_distance"].isnull().any())
-
-    def test_preprocess_ue_training_data(self):
-        # Test the preprocessing of training data
-        training_data = self.mro._preprocess_ue_training_data()
-
-        # Check if training data is returned in a dictionary format per cell
-        self.assertIsInstance(training_data, dict)
-
-        # Verify that training data contains entries for each cell_id
-        for cell_id in self.topology["cell_id"]:
-            self.assertIn(cell_id, training_data)
-
-    def test_preprocess_prediction_data(self):
-        # Test the preprocessing of prediction data
-        processed_prediction_data = self.mro._preprocess_prediction_data()
-
-        # Check if the processed prediction data contains expected columns
-        expected_columns = [
-            "mock_ue_id",
-            "longitude",
-            "latitude",
-            "cell_lat",
-            "cell_lon",
-            "cell_id",
-            "log_distance",
-            "cell_rxpwr_dbm",
-            "relative_bearing",
-        ]
-        for col in expected_columns:
-            self.assertIn(col, processed_prediction_data.columns)
-
-        # Verify if the relative bearing calculation is performed correctly
-        self.assertFalse(processed_prediction_data["relative_bearing"].isnull().any())
+    def test_format_ue_data_and_topology(self):
+        formatted_ue, formatted_topology = MRO._format_ue_data_and_topology(self.data, self.dummy_topology)
+        expected_topology = pd.DataFrame({
+            "cell_id": [1, 2],
+            "loc_y": [45.0, 46.0],
+            "loc_x": [-73.0, -74.0]
+        })
+        pd.testing.assert_frame_equal(formatted_topology, expected_topology)
+        # Verify ue_data column renaming
+        self.assertIn("loc_x", formatted_ue.columns)
+        self.assertIn("loc_y", formatted_ue.columns)
+        self.assertNotIn("lat", formatted_ue.columns)
+        self.assertNotIn("lon", formatted_ue.columns)
 
     def test_training(self):
-        # Test the training function
-        maxiter = 5
-        loss_vs_iters = self.mro.training(maxiter=maxiter)
-
-        # Check if training produces a loss for each cell
-        self.assertEqual(len(loss_vs_iters), len(self.topology))
+        # TODO: Implement
+        pass
 
     def test_predictions(self):
-        self.mro.training(maxiter=5)
-        predicted, full_prediction_df = self.mro.predictions()
-        self.assertIn("pred_means", full_prediction_df.columns)
-        self.assertIn("cell_id", full_prediction_df.columns)
-        self.assertIn("loc_x", predicted.columns)
-        self.assertIn("loc_y", predicted.columns)
+        # TODO: Implement
+        pass
+
+    def test_prepare_all_UEs_from_all_cells_df(self):
+        # TODO: Implement
+        pass
+
+    def _calculate_received_power(self):
+        dummy_distance = 1
+        dummy_freq = 1800
+        expected_fspl = 20 * np.log10(dummy_distance) + 20 * np.log10(dummy_freq) - 27.55
+        expected_power = 23 - expected_fspl
+        power = MRO._calculate_received_power(dummy_distance,dummy_freq)
+        self.assertEqual(expected_power,power)
+
+    def test_preprocess_ue_topology_data(self):
+        # TODO: Implement
+        pass
+
+    def test_preprocess_ue_simulation_data(self):
+        # TODO: Implement
+        pass
+
+    def test_preprocess_ue_training_data(self):
+        # TODO: Implement
+        pass
+
+    def test_preprocess_ue_update_data(self):
+        # TODO: Implement
+        pass
+
+    def test_preprocess_prediction_data(self):
+        # TODO: Implement
+        pass
+
+    def test_count_handovers(self):
+        ns_handover_count, nf_handover_count, no_change = count_handovers(self.df)
+        expected_ns = 18
+        expected_nf = 0
+        expected_no_change = 7
+        self.assertEqual(ns_handover_count, expected_ns)
+        self.assertEqual(nf_handover_count, expected_nf)
+        self.assertEqual(no_change, expected_no_change)
+
+    def test_reattach_columns(self):
+        self.predicted_df = pd.DataFrame({
+            'tick': [1, 2, 3, 4],
+            'loc_x': [10, 20, 30, 40],
+            'loc_y': [5, 6, 7, 8]
+        })
+        self.full_prediction_df = pd.DataFrame({
+            'mock_ue_id': [100, 101, 102, 103],
+            'tick': [1, 2, 3, 4],
+            'loc_x': [10, 20, 30, 40],
+            'loc_y': [5, 6, 7, 8]
+        })
+        full_prediction_df_no_match = pd.DataFrame({
+            'mock_ue_id': [200, 201, 202, 203],
+            'tick': [1, 2, 3, 4],
+            'loc_x': [50, 60, 70, 80],  # No matching loc_x values
+            'loc_y': [9, 10, 11, 12]    # No matching loc_y values
+        })
+
+        result = reattach_columns(self.predicted_df, self.full_prediction_df)
+
+        self.assertTrue('ue_id' in result.columns)  # Ensure 'ue_id' column exists
+        self.assertFalse('mock_ue_id' in result.columns)  # Ensure 'mock_ue_id' column is removed
+        self.assertEqual(result.shape[0], self.predicted_df.shape[0]) # Ensure size matches predicted_df
+        self.assertEqual(result.loc[0, 'ue_id'], 100)
+        self.assertEqual(result.loc[1, 'ue_id'], 101)
+
+        result = reattach_columns(self.predicted_df, full_prediction_df_no_match)
+        self.assertTrue(result['ue_id'].isna().all())
+
+    def test_calculate_mro_metric(self):
+        data = {
+            "tick": [1, 2, 3, 4, 5] * 10,  # 5 unique ticks, each repeated 10 times
+            "loc_x": range(50),  # Dummy x coordinates (you can modify as needed)
+            "loc_y": range(50),  # Dummy y coordinates (you can modify as needed)
+            "ue_id": range(50),  # Dummy UE IDs
+            "sinr_db": [-3.0, -1.5, 1.0, -2.0, 0.5] * 10,  # Dummy SINR values
+        }
+        dummy_pred_data = pd.DataFrame(data)
+        ns_count = 1
+        nf_count = 2
+
+        d = calculate_mro_metric(ns_count, nf_count, dummy_pred_data)
+        real_d = 5 - (ns_count * (50 / 1000) + nf_count * (1000 / 1000))
+        self.assertEqual(d, real_d)

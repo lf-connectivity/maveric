@@ -459,7 +459,7 @@ class MobilityRobustnessOptimization:
 
     def _format_ue_data_and_topology(self, ue_data, topology):
         ue_data = ue_data.rename(columns={"lat": "loc_y", "lon": "loc_x"})
-        topology = self.topology
+        # topology = self.topology      PROBLEMATIC LINE
         topology["cell_id"] = topology["cell_id"].str.extract("(\d+)").astype(int)
         topology = topology.rename(columns={"cell_lat": "loc_y", "cell_lon": "loc_x"})
         return ue_data, topology
