@@ -129,7 +129,7 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
             self.assertEqual(loss_vs_iter[0].shape[0], n_iter)
 
     def test_predictions(self):
-        # bdt not passed
+        # without _training() --> model not available --> empty df response
         mro = MRO(mobility_params={}, topology=self.dummy_topology)
         prediction_data = self.prediction_data.copy()
         mro.prediction_data = prediction_data.rename(
@@ -139,7 +139,22 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         self.assertTrue(predicted.empty)
         self.assertTrue(full_prediction_df.empty)
 
-        # bdt passed
+        # with _training()
+        topology = self.dummy_topology.copy()
+        topology["cell_id"] = ["cell_1", "cell_2"]
+        mro = MRO(mobility_params=self.mobility_params, topology=topology)
+        train_data = self.training_data.copy()
+        train_data.rename(
+            columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True
+        )
+        mro._training(20, train_data)  # needed, otherwise model won't be available
+        prediction_data = self.prediction_data.copy()
+        prediction_data.rename(
+            columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True
+        )
+        predicted, full_prediction_df = mro._predictions(prediction_data)
+        self.assertEqual(predicted.shape, (2, 5))
+        self.assertEqual(full_prediction_df.shape, (4, 15))
 
     def test_prepare_all_UEs_from_all_cells_df(self):
         result = self.mro._prepare_all_UEs_from_all_cells_df()
@@ -169,7 +184,22 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         self.assertTrue(all(result["ue_id"].isin(self.update_data["ue_id"])))
 
     def test_preprocess_ue_simulation_data(self):  # FIXME: KeyError: cell_lat
+        # issue: inside _preprocess_ue_simulation_data(), _prepare_all_UEs_from_all_cells_df(simulation=True) is called
+        # it returns combined_df in the data variable with col name like cell_lat_x, cell_lat_y. but this is then passed
+        # into GISTools to calculate distance by calling for cell_lat. that's where the key error is coming from.
+
+        # fmt: off
         pass
+        """expected_columns = ["ue_id","tick", "latitude", "longitude", "cell_id", "cell_lat", "cell_lon",
+                            "cell_carrier_freq_mhz", "cell_az_deg", "log_distance", "cell_rxpwr_dbm", "relative_bearing",]
+        # fmt: on
+        data = self.mro._preprocess_ue_simulation_data()
+        self.assertIsInstance(data, pd.DataFrame)
+        self.assertEqual(
+            len(data), len(self.dummy_topology) * len(self.mro.simulation_data["ue_id"])
+        )
+        self.assertListEqual(list(data.columns), expected_columns)
+        self.assertTrue(all(data["ue_id"].isin(self.simulation_data["ue_id"])))"""
 
     def test_preprocess_ue_training_data(self):
         # fmt: off
@@ -191,10 +221,10 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         expected_columns = ["ue_id","tick", "latitude", "longitude", "cell_id", "cell_lat", "cell_lon",
                             "cell_carrier_freq_mhz", "cell_az_deg", "log_distance", "cell_rxpwr_dbm", "relative_bearing",]
         # fmt: on
-        self.mro.training_data.rename(
+        self.mro.update_data.rename(
             columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True
         )
-        update_data = self.mro._preprocess_ue_training_data()
+        update_data = self.mro._preprocess_ue_update_data()
         self.assertIsInstance(update_data, dict)
         self.assertEqual(len(update_data), len(self.dummy_topology))
         for df in update_data.values():
@@ -206,19 +236,20 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         expected_columns = ["ue_id","tick", "latitude", "longitude", "cell_id", "cell_lat", "cell_lon",
                             "cell_carrier_freq_mhz", "cell_az_deg", "log_distance", "cell_rxpwr_dbm", "relative_bearing",]
         # fmt: on
-        self.mro.training_data.rename(
+        self.mro.prediction_data.rename(
             columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True
         )
-        data = self.mro._preprocess_ue_training_data()
-        self.assertIsInstance(data, dict)
-        self.assertEqual(len(data), len(self.dummy_topology))
-        for df in data.values():
-            self.assertListEqual(list(df.columns), expected_columns)
-            self.assertTrue(all(df["ue_id"].isin(self.prediction_data["ue_id"])))
+        data = self.mro._preprocess_prediction_data()
+        self.assertIsInstance(data, pd.DataFrame)
+        self.assertEqual(
+            len(data), len(self.dummy_topology) * len(self.mro.prediction_data["ue_id"])
+        )
+        self.assertListEqual(list(data.columns), expected_columns)
+        self.assertTrue(all(data["ue_id"].isin(self.prediction_data["ue_id"])))
 
     def test_count_handovers(self):
         # Define the data with 5 ticks and 2 distinct UE ids
-        data = {
+        df = pd.DataFrame({
             "loc_x": [
                 -22.625309, 119.764151, 72.095437, -67.548009, 59.867089,
                 -22.625309, 119.764151, 72.095437, -67.548009, 59.867089,
@@ -262,11 +293,7 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
                 2, 2, 2, 2, 2, 3, 3, 3, 3, 3,
                 4, 4, 4, 4, 4,
             ],
-        }
-
-
-        # Create the DataFrame
-        df = pd.DataFrame(data)
+        })
 
         ns_handover_count, nf_handover_count, no_change = count_handovers(df)
         expected_ns = 18
