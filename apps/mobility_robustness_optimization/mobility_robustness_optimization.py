@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import pickle
 import os
 from typing import Any, Dict, List, Tuple, Optional
@@ -104,41 +103,53 @@ class MobilityRobustnessOptimization:
 
         return NotImplemented  # Return NotImplemented on failure
 
-    def solve(self):
+    def solve(self) -> Optional[Tuple[float]]:
         """
-         Processes the generation and simulation of new user equipment (UE) data, and performs
-         multiple operations to optimize network efficiency and ensure robust mobile connectivity.
+        Iteratively optimizes the cell attachment strategy to find the best MRO metric.
+        Currently, 'perform_attachment' has no parameters to optimize, so this function
+        will focus on evaluating its current implementation. This setup is ready to be
+        expanded for parameter optimization in future developments.
+        """
+        best_metric = None
 
-        This method carries out the following operations sequentially:
-            1. Generates and simulates new UE data to model real-world mobile connectivity scenarios.
-            2. Applies the 'perform_attachment' method to determine the optimal cell for each UE based on the simulated data.
-            3. Computes the Mobility Robustness Optimization (MRO) metrics to evaluate the effectiveness of the current network configuration.
-            4. Applies the 'perform_attachment' method again, this time incorporating hysteresis and time-to-trigger adjustments,
-               to refine the decision process for UE cell attachment.
+        # Example of a simple loop that could be adapted for parameter tuning
+        # Since perform_attachment has no parameters now, we simulate one configuration
+        # This loop can be adapted to iterate over parameter sets for perform_attachment
+        for _ in range(1):  # Single iteration for now, as there are no parameters to tune
+            mro_metric = self._calculate_metric()
+
+            # Initialize or update the best_metric
+            if best_metric is None or mro_metric > best_metric:
+                best_metric = mro_metric
+
+        return best_metric
+    
+    def _calculate_metric(self) -> float:
         """
+        Conducts the process of generating user equipment (UE) data, making predictions,
+        and computing Mobility Robustness Optimization (MRO) metrics.
+        """
+        # Ensure Bayesian Digital Twins are trained before proceeding
+        if not self.bayesian_digital_twins:
+            raise ValueError("Bayesian Digital Twins are not trained. Train the models before calculating metrics.")
+        
+        # Generate and preprocess simulation data
         self.simulation_data = get_ue_data(self.mobility_params)
-        ue_data = self._preprocess_ue_simulation_data()
+        self.simulation_data = self.simulation_data.rename(columns={"lat": "latitude", "lon": "longitude"})
 
-        ue_data, topology = self._format_ue_data_and_topology(ue_data, topology)
+        # Predict power and perform attachment
+        predictions, full_prediction_df = self._predictions(self.simulation_data)
 
-        history = perform_attachment(ue_data, topology)
-
-        simulation_data = self.simulation_data.copy()
-        simulation_data = simulation_data.rename(
-            columns={"lat": "loc_y", "lon": "loc_x"}
-        )
-
-        # Reattach the columns of the data found from the history of the simulation by using performing attachment data and the actual simulated data
-        reattached_data = reattach_columns(history, simulation_data)
-        # Count the number of handovers
+        # Reattach columns to combine original simulation data with the predictions
+        reattached_data = reattach_columns(predictions, full_prediction_df)
+        
+        # Count the number of successful and failed handovers
         ns_handovers, nf_handovers, no_change = count_handovers(reattached_data)
 
-        # Calculate the MRO Metric
-        mro_metric = calculate_mro_metric(
-            ns_handovers, nf_handovers, self.simulation_data
-        )
-
+        # Calculate and return the MRO Metric
+        mro_metric = calculate_mro_metric(ns_handovers, nf_handovers, self.simulation_data)
         return mro_metric
+
 
     def _training(self, maxiter: int, train_data: pd.DataFrame) -> List[float]:
         """
@@ -236,7 +247,7 @@ class MobilityRobustnessOptimization:
         ue_data_tmp["key"] = 1
         topology_tmp["key"] = 1
         combined_df = pd.merge(ue_data_tmp, topology_tmp, on="key").drop("key", axis=1)
-
+        print(combined_df)
         return combined_df
 
     def _calculate_received_power(
@@ -272,25 +283,8 @@ class MobilityRobustnessOptimization:
         )
 
         return full_data
-
-    def _preprocess_ue_simulation_data(self) -> pd.DataFrame:
-        data = self._prepare_all_UEs_from_all_cells_df(simulation=True)
-        data["log_distance"] = data.apply(
-            lambda row: GISTools.get_log_distance(
-                row["lat"], row["lon"], row["cell_lat"], row["cell_lon"]
-            ),
-            axis=1,
-        )
-
-        data["rxpower_dbm"] = data.apply(
-            lambda row: self._calculate_received_power(
-                row["log_distance"], row["cell_carrier_freq_mhz"]
-            ),
-            axis=1,
-        )
-
-        return data
-
+    
+    # Change the type hint from pd.Dataframe to Dict for _preprocess_ue_training_data and _preprocess_ue_update_data
     def _preprocess_ue_training_data(self) -> pd.DataFrame:
         data = self._preprocess_ue_topology_data()
         train_per_cell_df = [x for _, x in data.groupby("cell_id")]
@@ -456,12 +450,6 @@ class MobilityRobustnessOptimization:
             axis=1,
         )
         return data
-
-    def _format_ue_data_and_topology(self, ue_data, topology):
-        ue_data = ue_data.rename(columns={"lat": "loc_y", "lon": "loc_x"})
-        topology["cell_id"] = topology["cell_id"].str.extract("(\d+)").astype(int)
-        topology = topology.rename(columns={"cell_lat": "loc_y", "cell_lon": "loc_x"})
-        return ue_data, topology
 
 
 # Functions for MRO metrics and Handover events
