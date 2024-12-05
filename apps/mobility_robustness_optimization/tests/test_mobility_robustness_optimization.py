@@ -14,11 +14,6 @@ from unittest.mock import MagicMock
 
 class TestMobilityRobustnessOptimization(unittest.TestCase):
     def setUp(self):
-        # self.dummy_topology = pd.DataFrame({
-        #     "cell_id": ["cell_001", "cell_002"],
-        #     "cell_lat": [45.0, 46.0],
-        #     "cell_lon": [-73.0, -74.0]
-        # })
         self.dummy_topology = pd.DataFrame(
             {
                 "cell_id": ["cell_001", "cell_002"],
@@ -42,15 +37,15 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
             {
                 "ue_id": [0, 1],
                 "tick": [0, 1],
-                "lon": [15.0, 25.0],  # Longitude of the user equipment (UE)
-                "lat": [10.0, 11.0],  # Latitude of the user equipment (UE)
-                "cell_id": [1, 2],  # Example cell IDs
-                "cell_lat": [45.0, 46.0],  # Latitude of the cell tower
-                "cell_lon": [-73.0, -74.0],  # Longitude of the cell tower
+                "lon": [15.0, 25.0],
+                "lat": [10.0, 11.0],
+                "cell_id": [1, 2],
+                "cell_lat": [45.0, 46.0],
+                "cell_lon": [-73.0, -74.0],
                 "cell_carrier_freq_mhz": [
                     1800,
                     2100,
-                ],  # Carrier frequency of the cell tower in MHz
+                ],
             }
         )
         self.update_data = pd.DataFrame(
@@ -187,19 +182,7 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         # issue: inside _preprocess_ue_simulation_data(), _prepare_all_UEs_from_all_cells_df(simulation=True) is called
         # it returns combined_df in the data variable with col name like cell_lat_x, cell_lat_y. but this is then passed
         # into GISTools to calculate distance by calling for cell_lat. that's where the key error is coming from.
-
-        # fmt: off
         pass
-        """expected_columns = ["ue_id","tick", "latitude", "longitude", "cell_id", "cell_lat", "cell_lon",
-                            "cell_carrier_freq_mhz", "cell_az_deg", "log_distance", "cell_rxpwr_dbm", "relative_bearing",]
-        # fmt: on
-        data = self.mro._preprocess_ue_simulation_data()
-        self.assertIsInstance(data, pd.DataFrame)
-        self.assertEqual(
-            len(data), len(self.dummy_topology) * len(self.mro.simulation_data["ue_id"])
-        )
-        self.assertListEqual(list(data.columns), expected_columns)
-        self.assertTrue(all(data["ue_id"].isin(self.simulation_data["ue_id"])))"""
 
     def test_preprocess_ue_training_data(self):
         # fmt: off
