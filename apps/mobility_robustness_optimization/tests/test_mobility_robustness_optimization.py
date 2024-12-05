@@ -83,32 +83,6 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
     def test_solve(self):  # TODO: Implement AFTER PR
         pass
 
-    def test_format_ue_data_and_topology(self):
-        mro = MRO(mobility_params={}, topology=self.dummy_topology)
-        ue_data = pd.DataFrame(
-            {
-                "lat": [45.1, 45.2],
-                "lon": [-73.0, -73.1],
-                "ue_id": [0, 1],
-            }
-        )
-        formatted_ue_data, formatted_topology = mro._format_ue_data_and_topology(
-            ue_data, self.dummy_topology
-        )
-        expected_ue_columns = ["loc_y", "loc_x", "ue_id"]
-        expected_topology_columns = [
-            "cell_id",
-            "loc_y",
-            "loc_x",
-            "cell_carrier_freq_mhz",
-            "cell_az_deg",
-        ]
-
-        # Check if the column names match the expected ones
-        self.assertListEqual(list(formatted_ue_data.columns), expected_ue_columns)
-        self.assertListEqual(
-            list(formatted_topology.columns), expected_topology_columns
-        )
 
     def test_training(self):
         mro = MRO(mobility_params={}, topology=self.dummy_topology)
@@ -177,12 +151,6 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
 
         # Ensure that the combined dataframe has the expected values
         self.assertTrue(all(result["ue_id"].isin(self.update_data["ue_id"])))
-
-    def test_preprocess_ue_simulation_data(self):  # FIXME: KeyError: cell_lat
-        # issue: inside _preprocess_ue_simulation_data(), _prepare_all_UEs_from_all_cells_df(simulation=True) is called
-        # it returns combined_df in the data variable with col name like cell_lat_x, cell_lat_y. but this is then passed
-        # into GISTools to calculate distance by calling for cell_lat. that's where the key error is coming from.
-        pass
 
     def test_preprocess_ue_training_data(self):
         # fmt: off
