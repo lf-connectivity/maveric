@@ -38,13 +38,12 @@ class MobilityRobustnessOptimization:
     def update(self, new_data: pd.DataFrame):
         """
         (Re-)train Bayesian Digital Twins for each cell.
-        TODO: Add expected := [lat, lon, cell_id, "rsrp_dbm"] and redefine the method.
         """
         try:
             if not isinstance(new_data, pd.DataFrame):
                 raise TypeError("The input 'new_data' must be a pandas DataFrame.")
 
-            expected_columns = {"mock_ue_id", "longitude", "latitude", "tick"}
+            expected_columns = {"longitude", "latitude"}
             if not expected_columns.issubset(new_data.columns):
                 raise ValueError(
                     f"The input DataFrame must contain the following columns: {expected_columns}"
@@ -65,7 +64,7 @@ class MobilityRobustnessOptimization:
                 print(
                     "No Bayesian Digital Twins available for update. Training from scratch."
                 )
-                self.training(maxiter=100, train_data=new_data)
+                self._training(maxiter=100, train_data=new_data)
         except TypeError as te:
             print(f"TypeError: {te}")
         except ValueError as ve:
@@ -79,12 +78,14 @@ class MobilityRobustnessOptimization:
         """
         Saves the Bayesian Digital Twins to a pickle file. Returns `True` if saving succeeds,
         and `NotImplemented` if it fails.
-        
+
         """
         filename = f"{file_loc}/digital_twins.pkl"
         try:
             if not isinstance(bayesian_digital_twins, dict):
-                raise TypeError("The input 'bayesian_digital_twins' must be a dictionary.")
+                raise TypeError(
+                    "The input 'bayesian_digital_twins' must be a dictionary."
+                )
 
             # Ensure the directory exists
             os.makedirs(file_loc, exist_ok=True)
@@ -115,7 +116,8 @@ class MobilityRobustnessOptimization:
         # Example of a simple loop that could be adapted for parameter tuning
         # Since perform_attachment has no parameters now, we simulate one configuration
         # This loop can be adapted to iterate over parameter sets for perform_attachment
-        for _ in range(1):  # Single iteration for now, as there are no parameters to tune
+        for _ in range(
+        ):  # Single iteration for now, as there are no parameters to tune
             mro_metric = self._calculate_metric()
 
             # Initialize or update the best_metric
@@ -123,7 +125,7 @@ class MobilityRobustnessOptimization:
                 best_metric = mro_metric
 
         return best_metric
-    
+
     def _calculate_metric(self) -> float:
         """
         Conducts the process of generating user equipment (UE) data, making predictions,
@@ -131,25 +133,30 @@ class MobilityRobustnessOptimization:
         """
         # Ensure Bayesian Digital Twins are trained before proceeding
         if not self.bayesian_digital_twins:
-            raise ValueError("Bayesian Digital Twins are not trained. Train the models before calculating metrics.")
-        
+            raise ValueError(
+                "Bayesian Digital Twins are not trained. Train the models before calculating metrics."
+            )
+
         # Generate and preprocess simulation data
         self.simulation_data = get_ue_data(self.mobility_params)
-        self.simulation_data = self.simulation_data.rename(columns={"lat": "latitude", "lon": "longitude"})
+        self.simulation_data = self.simulation_data.rename(
+            columns={"lat": "latitude", "lon": "longitude"}
+        )
 
         # Predict power and perform attachment
         predictions, full_prediction_df = self._predictions(self.simulation_data)
 
         # Reattach columns to combine original simulation data with the predictions
         reattached_data = reattach_columns(predictions, full_prediction_df)
-        
+
         # Count the number of successful and failed handovers
         ns_handovers, nf_handovers, no_change = count_handovers(reattached_data)
 
         # Calculate and return the MRO Metric
-        mro_metric = calculate_mro_metric(ns_handovers, nf_handovers, self.simulation_data)
+        mro_metric = calculate_mro_metric(
+            ns_handovers, nf_handovers, self.simulation_data
+        )
         return mro_metric
-
 
     def _training(self, maxiter: int, train_data: pd.DataFrame) -> List[float]:
         """
@@ -164,7 +171,7 @@ class MobilityRobustnessOptimization:
             bayesian_digital_twins[train_cell_id] = BayesianDigitalTwin(
                 data_in=[training_data_idx],
                 x_columns=["log_distance", "relative_bearing"],
-                y_columns=["cell_rxpwr_dbm"],
+                y_columns=["cell_rxpower_dbm"],
                 norm_method=NormMethod.MINMAX,
             )
             self.bayesian_digital_twins[train_cell_id] = bayesian_digital_twins[
@@ -275,7 +282,7 @@ class MobilityRobustnessOptimization:
             axis=1,
         )
 
-        full_data["cell_rxpwr_dbm"] = full_data.apply(
+        full_data["cell_rxpower_dbm"] = full_data.apply(
             lambda row: self._calculate_received_power(
                 row["log_distance"], row["cell_carrier_freq_mhz"]
             ),
@@ -283,7 +290,7 @@ class MobilityRobustnessOptimization:
         )
 
         return full_data
-    
+
     # Change the type hint from pd.Dataframe to Dict for _preprocess_ue_training_data and _preprocess_ue_update_data
     def _preprocess_ue_training_data(self) -> pd.DataFrame:
         data = self._preprocess_ue_topology_data()
@@ -357,7 +364,7 @@ class MobilityRobustnessOptimization:
             axis=1,
         )
 
-        data["cell_rxpwr_dbm"] = data.apply(
+        data["cell_rxpower_dbm"] = data.apply(
             lambda row: self._calculate_received_power(
                 row["log_distance"], row["cell_carrier_freq_mhz"]
             ),
@@ -432,7 +439,7 @@ class MobilityRobustnessOptimization:
             ),
             axis=1,
         )
-        data["cell_rxpwr_dbm"] = data.apply(
+        data["cell_rxpower_dbm"] = data.apply(
             lambda row: self._calculate_received_power(
                 row["log_distance"], row["cell_carrier_freq_mhz"]
             ),
