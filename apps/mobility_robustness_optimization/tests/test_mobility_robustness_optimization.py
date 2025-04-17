@@ -155,7 +155,7 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
     def test_preprocess_ue_training_data(self):
         # fmt: off
         expected_columns = ["ue_id","tick", "latitude", "longitude", "cell_id", "cell_lat", "cell_lon",
-                            "cell_carrier_freq_mhz", "cell_az_deg", "log_distance", "cell_rxpwr_dbm", "relative_bearing",]
+                            "cell_carrier_freq_mhz", "cell_az_deg", "log_distance", "cell_rxpower_dbm", "relative_bearing",]
         # fmt: on
         self.mro.training_data.rename(
             columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True
@@ -170,7 +170,7 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
     def test_preprocess_ue_update_data(self):
         # fmt: off
         expected_columns = ["ue_id","tick", "latitude", "longitude", "cell_id", "cell_lat", "cell_lon",
-                            "cell_carrier_freq_mhz", "cell_az_deg", "log_distance", "cell_rxpwr_dbm", "relative_bearing",]
+                            "cell_carrier_freq_mhz", "cell_az_deg", "log_distance", "cell_rxpower_dbm", "relative_bearing",]
         # fmt: on
         self.mro.update_data.rename(
             columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True
@@ -185,7 +185,7 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
     def test_preprocess_prediction_data(self):
         # fmt: off
         expected_columns = ["ue_id","tick", "latitude", "longitude", "cell_id", "cell_lat", "cell_lon",
-                            "cell_carrier_freq_mhz", "cell_az_deg", "log_distance", "cell_rxpwr_dbm", "relative_bearing",]
+                            "cell_carrier_freq_mhz", "cell_az_deg", "log_distance", "cell_rxpower_dbm", "relative_bearing",]
         # fmt: on
         self.mro.prediction_data.rename(
             columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True
