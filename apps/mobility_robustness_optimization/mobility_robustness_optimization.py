@@ -171,7 +171,7 @@ class MobilityRobustnessOptimization:
             bayesian_digital_twins[train_cell_id] = BayesianDigitalTwin(
                 data_in=[training_data_idx],
                 x_columns=["log_distance", "relative_bearing"],
-                y_columns=["cell_rxpower_dbm"],
+                y_columns=["cell_rxpwr_dbm"],
                 norm_method=NormMethod.MINMAX,
             )
             self.bayesian_digital_twins[train_cell_id] = bayesian_digital_twins[
@@ -282,7 +282,7 @@ class MobilityRobustnessOptimization:
             axis=1,
         )
 
-        full_data["cell_rxpower_dbm"] = full_data.apply(
+        full_data["cell_rxpwr_dbm"] = full_data.apply(
             lambda row: self._calculate_received_power(
                 row["log_distance"], row["cell_carrier_freq_mhz"]
             ),
@@ -364,7 +364,7 @@ class MobilityRobustnessOptimization:
             axis=1,
         )
 
-        data["cell_rxpower_dbm"] = data.apply(
+        data["cell_rxpwr_dbm"] = data.apply(
             lambda row: self._calculate_received_power(
                 row["log_distance"], row["cell_carrier_freq_mhz"]
             ),
@@ -439,7 +439,7 @@ class MobilityRobustnessOptimization:
             ),
             axis=1,
         )
-        data["cell_rxpower_dbm"] = data.apply(
+        data["cell_rxpwr_dbm"] = data.apply(
             lambda row: self._calculate_received_power(
                 row["log_distance"], row["cell_carrier_freq_mhz"]
             ),
