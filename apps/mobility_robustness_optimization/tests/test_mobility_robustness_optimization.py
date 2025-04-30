@@ -7,13 +7,20 @@ from apps.mobility_robustness_optimization.mobility_robustness_optimization impo
     NormMethod,
     reattach_columns,
     calculate_mro_metric,
-    count_handovers,
+    _count_handovers,
 )
+from apps.mobility_robustness_optimization.simple_mro import SimpleMRO
 from unittest.mock import MagicMock
 
 
 class TestMobilityRobustnessOptimization(unittest.TestCase):
     def setUp(self):
+        data = {
+            "ue_id": [1, 1, 1, 1, 2, 2, 3, 3, 3],
+            "cell_id": ["A", "RLF", "RLF", "B", "A", "A", "X", "Y", "Z"],
+            "tick": [1, 2, 3, 4, 1, 2, 1, 2, 3],
+        }
+        self.df = pd.DataFrame(data)
         self.dummy_topology = pd.DataFrame(
             {
                 "cell_id": ["cell_001", "cell_002"],
@@ -69,7 +76,7 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         self.mock_bdt = MagicMock(spec=BayesianDigitalTwin)
 
         # Instantiate MRO object
-        self.mro = MRO(
+        self.mro = SimpleMRO(
             self.mobility_params, self.dummy_topology, bdt={"cell_001": self.mock_bdt}
         )
         self.mro.training_data = self.training_data
@@ -85,7 +92,7 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
 
 
     def test_training(self):
-        mro = MRO(mobility_params={}, topology=self.dummy_topology)
+        mro = SimpleMRO(mobility_params={}, topology=self.dummy_topology)
         train_data = self.training_data.copy()
         train_data.rename(
             columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True
@@ -99,7 +106,7 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
 
     def test_predictions(self):
         # without _training() --> model not available --> empty df response
-        mro = MRO(mobility_params={}, topology=self.dummy_topology)
+        mro = SimpleMRO(mobility_params={}, topology=self.dummy_topology)
         prediction_data = self.prediction_data.copy()
         mro.prediction_data = prediction_data.rename(
             columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True
@@ -111,7 +118,7 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         # with _training()
         topology = self.dummy_topology.copy()
         topology["cell_id"] = ["cell_1", "cell_2"]
-        mro = MRO(mobility_params=self.mobility_params, topology=topology)
+        mro = SimpleMRO(mobility_params=self.mobility_params, topology=topology)
         train_data = self.training_data.copy()
         train_data.rename(
             columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True
@@ -199,60 +206,8 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         self.assertTrue(all(data["ue_id"].isin(self.prediction_data["ue_id"])))
 
     def test_count_handovers(self):
-        # Define the data with 5 ticks and 2 distinct UE ids
-        df = pd.DataFrame({
-            "loc_x": [
-                -22.625309, 119.764151, 72.095437, -67.548009, 59.867089,
-                -22.625309, 119.764151, 72.095437, -67.548009, 59.867089,
-                -22.625309, 119.764151, 72.095437, -67.548009, 59.867089,
-                -22.625309, 119.764151, 72.095437, -67.548009, 59.867089,
-                -22.625309, 119.764151, 72.095437, -67.548009, 59.867089,
-            ],
-            "loc_y": [
-                59.806764, 54.857584, -20.253892, -38.100941, -83.103930,
-                59.806764, 54.857584, -20.253892, -38.100941, -83.103930,
-                59.806764, 54.857584, -20.253892, -38.100941, -83.103930,
-                59.806764, 54.857584, -20.253892, -38.100941, -83.103930,
-                59.806764, 54.857584, -20.253892, -38.100941, -83.103930,
-            ],
-            "cell_id": [
-                3.0, 3.0, 1.0, 1.0, 1.0, 3.0, 3.0, 1.0, 1.0, 1.0,
-                3.0, 3.0, 1.0, 1.0, 1.0, 3.0, 3.0, 1.0, 1.0, 1.0,
-                3.0, 3.0, 1.0, 1.0, 1.0,
-            ],
-            "sinr_db": [
-                -2.379967, -2.327379, -2.879403, -2.681959, -1.272086,
-                -2.379967, -2.327379, -2.879403, -2.681959, -1.272086,
-                -2.379967, -2.327379, -2.879403, -2.681959, -1.272086,
-                -2.379967, -2.327379, -2.879403, -2.681959, -1.272086,
-                -2.379967, -2.327379, -2.879403, -2.681959, -1.272086,
-            ],
-            "rsrp_dbm": [
-                -99.439212, -99.529860, -99.914970, -99.750036, -98.454310,
-                -99.439212, -99.529860, -99.914970, -99.750036, -98.454310,
-                -99.439212, -99.529860, -99.914970, -99.750036, -98.454310,
-                -99.439212, -99.529860, -99.914970, -99.750036, -98.454310,
-                -99.439212, -99.529860, -99.914970, -99.750036, -98.454310,
-            ],
-            "ue_id": [
-                0, 1, 0, 1, 0, 0, 1, 0, 1, 0,
-                0, 1, 0, 1, 0, 0, 1, 0, 1, 0,
-                0, 1, 0, 1, 0,
-            ],
-            "tick": [
-                0, 0, 0, 0, 0, 1, 1, 1, 1, 1,
-                2, 2, 2, 2, 2, 3, 3, 3, 3, 3,
-                4, 4, 4, 4, 4,
-            ],
-        })
-
-        ns_handover_count, nf_handover_count, no_change = count_handovers(df)
-        expected_ns = 18
-        expected_nf = 0
-        expected_no_change = 7
-        self.assertEqual(ns_handover_count, expected_ns)
-        self.assertEqual(nf_handover_count, expected_nf)
-        self.assertEqual(no_change, expected_no_change)
+        result = _count_handovers(self.df)
+        self.assertEqual(result, 3)
 
     def test_reattach_columns(self):
         self.predicted_df = pd.DataFrame(
@@ -291,17 +246,5 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         self.assertTrue(result["ue_id"].isna().all())
 
     def test_calculate_mro_metric(self):
-        data = {
-            "tick": [1, 2, 3, 4, 5] * 10,  # 5 unique ticks, each repeated 10 times
-            "loc_x": range(50),  # Dummy x coordinates (you can modify as needed)
-            "loc_y": range(50),  # Dummy y coordinates (you can modify as needed)
-            "ue_id": range(50),  # Dummy UE IDs
-            "sinr_db": [-3.0, -1.5, 1.0, -2.0, 0.5] * 10,  # Dummy SINR values
-        }
-        dummy_pred_data = pd.DataFrame(data)
-        ns_count = 1
-        nf_count = 2
-
-        d = calculate_mro_metric(ns_count, nf_count, dummy_pred_data)
-        real_d = 5 - (ns_count * (50 / 1000) + nf_count * (1000 / 1000))
-        self.assertEqual(d, real_d)
+        result = calculate_mro_metric(self.df)
+        self.assertEqual(result, 1.85)

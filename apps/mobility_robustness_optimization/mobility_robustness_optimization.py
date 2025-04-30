@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import pandas as pd
 import numpy as np
 import pickle
@@ -12,10 +13,8 @@ from radp.digital_twin.rf.bayesian.bayesian_engine import (
 )
 from notebooks.radp_library import get_percell_data
 from radp.digital_twin.utils.cell_selection import perform_attachment
-from notebooks.radp_library import get_ue_data
 
-
-class MobilityRobustnessOptimization:
+class MobilityRobustnessOptimization(ABC):
     """
     A class that contains a prototypical proof-of-concept of an `Mobility Robustness Optimization (MRO)` RIC xApp.
     """
@@ -38,12 +37,13 @@ class MobilityRobustnessOptimization:
     def update(self, new_data: pd.DataFrame):
         """
         (Re-)train Bayesian Digital Twins for each cell.
+        TODO: Add expected := [lat, lon, cell_id, "rsrp_dbm"] and redefine the method.
         """
         try:
             if not isinstance(new_data, pd.DataFrame):
                 raise TypeError("The input 'new_data' must be a pandas DataFrame.")
 
-            expected_columns = {"longitude", "latitude"}
+            expected_columns = {"mock_ue_id", "longitude", "latitude", "tick"}
             if not expected_columns.issubset(new_data.columns):
                 raise ValueError(
                     f"The input DataFrame must contain the following columns: {expected_columns}"
@@ -78,14 +78,12 @@ class MobilityRobustnessOptimization:
         """
         Saves the Bayesian Digital Twins to a pickle file. Returns `True` if saving succeeds,
         and `NotImplemented` if it fails.
-
+        
         """
         filename = f"{file_loc}/digital_twins.pkl"
         try:
             if not isinstance(bayesian_digital_twins, dict):
-                raise TypeError(
-                    "The input 'bayesian_digital_twins' must be a dictionary."
-                )
+                raise TypeError("The input 'bayesian_digital_twins' must be a dictionary.")
 
             # Ensure the directory exists
             os.makedirs(file_loc, exist_ok=True)
@@ -104,59 +102,14 @@ class MobilityRobustnessOptimization:
 
         return NotImplemented  # Return NotImplemented on failure
 
-    def solve(self) -> Optional[Tuple[float]]:
+    @abstractmethod
+    def solve(self):
         """
-        Iteratively optimizes the cell attachment strategy to find the best MRO metric.
-        Currently, 'perform_attachment' has no parameters to optimize, so this function
-        will focus on evaluating its current implementation. This setup is ready to be
-        expanded for parameter optimization in future developments.
+        Solve the mobility robustness optimization problem. 
+        
+        This method is an abstract method that must be implemented by its subclasses.
         """
-        best_metric = None
-
-        # Example of a simple loop that could be adapted for parameter tuning
-        # Since perform_attachment has no parameters now, we simulate one configuration
-        # This loop can be adapted to iterate over parameter sets for perform_attachment
-        for _ in range(
-        ):  # Single iteration for now, as there are no parameters to tune
-            mro_metric = self._calculate_metric()
-
-            # Initialize or update the best_metric
-            if best_metric is None or mro_metric > best_metric:
-                best_metric = mro_metric
-
-        return best_metric
-
-    def _calculate_metric(self) -> float:
-        """
-        Conducts the process of generating user equipment (UE) data, making predictions,
-        and computing Mobility Robustness Optimization (MRO) metrics.
-        """
-        # Ensure Bayesian Digital Twins are trained before proceeding
-        if not self.bayesian_digital_twins:
-            raise ValueError(
-                "Bayesian Digital Twins are not trained. Train the models before calculating metrics."
-            )
-
-        # Generate and preprocess simulation data
-        self.simulation_data = get_ue_data(self.mobility_params)
-        self.simulation_data = self.simulation_data.rename(
-            columns={"lat": "latitude", "lon": "longitude"}
-        )
-
-        # Predict power and perform attachment
-        predictions, full_prediction_df = self._predictions(self.simulation_data)
-
-        # Reattach columns to combine original simulation data with the predictions
-        reattached_data = reattach_columns(predictions, full_prediction_df)
-
-        # Count the number of successful and failed handovers
-        ns_handovers, nf_handovers, no_change = count_handovers(reattached_data)
-
-        # Calculate and return the MRO Metric
-        mro_metric = calculate_mro_metric(
-            ns_handovers, nf_handovers, self.simulation_data
-        )
-        return mro_metric
+        pass
 
     def _training(self, maxiter: int, train_data: pd.DataFrame) -> List[float]:
         """
@@ -254,7 +207,6 @@ class MobilityRobustnessOptimization:
         ue_data_tmp["key"] = 1
         topology_tmp["key"] = 1
         combined_df = pd.merge(ue_data_tmp, topology_tmp, on="key").drop("key", axis=1)
-        print(combined_df)
         return combined_df
 
     def _calculate_received_power(
@@ -290,7 +242,7 @@ class MobilityRobustnessOptimization:
         )
 
         return full_data
-
+    
     # Change the type hint from pd.Dataframe to Dict for _preprocess_ue_training_data and _preprocess_ue_update_data
     def _preprocess_ue_training_data(self) -> pd.DataFrame:
         data = self._preprocess_ue_topology_data()
@@ -457,58 +409,113 @@ class MobilityRobustnessOptimization:
             axis=1,
         )
         return data
+    
+    def _preprocess_simulation_data(self,df) -> pd.DataFrame:
+        df.drop(columns=["rxpower_stddev_dbm","rxpower_dbm","cell_rxpwr_dbm"], inplace=True)
+        df.rename(columns={"mock_ue_id": "ue_id","log_distance": "distance_km","pred_means":"cell_rxpower_dbm"}, inplace=True)
+        self.topology["cell_id"] = self.topology["cell_id"].str.replace("cell_", "").astype(int)
+        df["cell_id"] = df["cell_id"].str.extract("(\d+)").astype(int)
+        df = self._add_sinr_column(df)
+        return df
 
+    def _add_sinr_column(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Adds a 'sinr_db' column to the input DataFrame, computing the Signal-to-Interference-plus-Noise Ratio (SINR)
+        for each UE–cell pair based on received signal power, background noise, and interference.
+
+        Parameters:
+            df (pd.DataFrame): DataFrame with 'ue_id', 'cell_rxpower_dbm', and 'cell_carrier_freq_mhz' per row.
+
+        Returns:
+            pd.DataFrame: Updated DataFrame with an additional 'sinr_db' column.
+        """
+        # Convert background noise from dB to linear scale
+        noise_linear = 10 ** (constants.LATENT_BACKGROUND_NOISE_DB / 10)
+
+        # Compute SINR for each row (UE–cell pair), given its group
+        def compute_row_level_sinr(row: pd.Series, group: pd.DataFrame) -> float: # where cell column? [DONE]
+            """
+            Computes the SINR for a single UE–cell pair by removing interference and noise from the received signal power.
+
+        Parameters:
+                row (pd.Series): Current row containing signal data.
+                group (pd.DataFrame): Group of UE–cell rows sharing the same UE and frequency.
+
+            +--------+---------+------------------+------------------------+
+            | ue_id  | cell_id | cell_rxpower_dbm | cell_carrier_freq_mhz |
+            +========+=========+==================+========================+
+            |   0    |    1    |   -100.311970    |         2100.0         |
+            |   0    |    2    |    -99.841523    |         2100.0         |
+            |   1    |    1    |   -100.294405    |         2100.0         |
+            |   1    |    2    |   -100.132420    |         2100.0         |
+            |   2    |    1    |   -100.650003    |         2100.0         |
+            |   2    |    2    |   -100.456381    |         2100.0         |
+            |   3    |    1    |   -100.987321    |         2100.0         |
+            |   3    |    2    |   -100.864529    |         2100.0         |
+            +--------+---------+------------------+------------------------+
+
+
+            Returns:
+                float: The computed SINR value in decibels for the current UE–cell pair.
+            """
+            signal_dbm = row["cell_rxpower_dbm"]
+
+            # Exclude the current row (serving cell) to compute interference
+            interference_linear = np.sum(10 ** (group.loc[group.index != row.name, "cell_rxpower_dbm"] / 10))
+            total_interference_plus_noise_linear = interference_linear + noise_linear
+
+            total_interference_plus_noise_dbm = 10 * np.log10(total_interference_plus_noise_linear)
+            sinr_db = signal_dbm - total_interference_plus_noise_dbm
+            return sinr_db
+
+        # Apply per UE and frequency
+        df = df.copy()
+        df["sinr_db"] = df.groupby(["ue_id", "cell_carrier_freq_mhz"]).apply(
+            lambda group: group.apply(lambda row: compute_row_level_sinr(row, group), axis=1)
+        ).reset_index(level=[0, 1], drop=True)
+
+        return df
 
 # Functions for MRO metrics and Handover events
-def count_handovers(df):
-    # Initialize counters for NS (Successful Handovers), NF (Radio Link Failures), and no change
-    ns_handover_count = 0
-    nf_handover_count = 0
-    no_change = 0
+def _count_handovers(df: pd.DataFrame) -> int:
+    """
+    Count the number of seemless cell handovers (cell to cell switches) for user equipment (UE) based
+    on cell_id changes between consecutive ticks, excluding switches to 'RLF'.
 
-    # Threshold for considering a Radio Link Failure (RLF)
-    rlf_threshold = -2.9
+    Parameters:
+        df (pd.DataFrame): DataFrame containing 'ue_id', 'cell_id', and 'tick' columns.
 
-    # Track the previous state for each UE
-    ue_previous_state = {}
+    +--------+---------+------+
+    | ue_id  | cell_id | tick |
+    +========+=========+======+
+    |   0    |    4    |  1   |
+    |   1    |    2    |  2   |
+    |   2    |    5    |  3   |
+    |   3    |    3    |  4   |
+    +--------+---------+------+
 
-    # Loop through the dataframe row by row
+    Returns:
+        int: Total number of valid cell switches across all UEs.
+    """
+    count = 0
+    df = df.sort_values(by=["ue_id", "tick"])  # Ensure correct order
+    prev_cells = {}
+    prev_ticks = {}
+
     for _, row in df.iterrows():
-        ue_id = row["ue_id"]
-        current_cell_id = row["cell_id"]
-        current_sinr_db = row["sinr_db"]
+        ue_id, cell_id, tick = row["ue_id"], row["cell_id"], row["tick"]
 
-        # Check if we have previous state for this UE
-        if ue_id in ue_previous_state:
-            previous_cell_id, previous_sinr_db = ue_previous_state[ue_id]
+        if (
+            ue_id in prev_cells
+            and prev_cells[ue_id] != cell_id
+            and prev_cells[ue_id] is not None
+        ):
+            if tick == prev_ticks[ue_id] + 1 and cell_id != "RLF":
+                count += 1
 
-            # Check for cell ID change
-            if previous_cell_id != current_cell_id:
-                # Check if the SINR is above the threshold after a cell change
-                if current_sinr_db >= rlf_threshold:
-                    ns_handover_count += 1  # Successful handover
-                else:
-                    nf_handover_count += 1  # Failed handover due to RLF after change
-            elif previous_sinr_db < rlf_threshold and current_sinr_db >= rlf_threshold:
-                ns_handover_count += (
-                    1  # Successful recovery from RLF without cell change
-                )
-            elif current_sinr_db < rlf_threshold:
-                nf_handover_count += 1  # Ongoing or new RLF
-            else:
-                no_change += 1  # No significant event
-
-        else:
-            # If first occurrence of UE has SINR below the RLF threshold, consider it as RLF
-            if current_sinr_db < rlf_threshold:
-                nf_handover_count += 1
-            else:
-                no_change += 1  # No significant event when UE first appears and SINR is above threshold
-
-        # Update the state for this UE
-        ue_previous_state[ue_id] = (current_cell_id, current_sinr_db)
-
-    return ns_handover_count, nf_handover_count, no_change
+        prev_cells[ue_id] = cell_id
+        prev_ticks[ue_id] = tick
+    return count
 
 
 def reattach_columns(predicted_df, full_prediction_df):
@@ -528,7 +535,26 @@ def reattach_columns(predicted_df, full_prediction_df):
     return merged_df
 
 
-def calculate_mro_metric(ns_handover_count, nf_handover_count, prediction_ue_data):
+def calculate_mro_metric(data: pd.DataFrame) -> float:
+
+    """
+    Calculated total operational cellular time remaining after loss due to cell handovers (including RLF)
+
+    Parameters:
+        data (pd.DataFrame): DataFrame containing UE data with a 'tick' column.
+
+    +--------+---------+------+
+    | ue_id  | cell_id | tick |
+    +========+=========+======+
+    |   0    |    4    |  1   |
+    |   1    |    2    |  2   |
+    |   2    |    5    |  3   |
+    |   3    |    3    |  4   |
+    +--------+---------+------+
+
+    Returns:
+        float: Effective operational score symbolizing time effectively after subtracting handover and RLF delays.
+    """
     # Constants for interruption times
     ts = 50 / 1000  # Convert ms to seconds
     t_nas = 1000 / 1000  # Convert ms to seconds
@@ -536,12 +562,38 @@ def calculate_mro_metric(ns_handover_count, nf_handover_count, prediction_ue_dat
     # Calculate total time (T) based on ticks; assuming each tick represents a uniform time slice
     # This could be adjusted if ticks represent variable time slices
     # Rather than passing the UE Data as whole we can send just an integar for tick
-    ticks = len(prediction_ue_data["tick"].unique())
+    ticks = len(data["tick"].unique())
     # Assuming each tick represents 50ms (this value may need to be adjusted based on actual data characteristics)
     tick_duration_seconds = 1  # 1 second per tick
     T = ticks * tick_duration_seconds
+
+    ns_handover_count = _count_handovers(
+        data
+    )  # Count of handovers to different cells (excluding RLF)
+    nf_handover_count = _count_rlf(data)  # Count of handovers to RLF
 
     # Calculate D
     D = T - (ns_handover_count * ts + nf_handover_count * t_nas)
 
     return D
+
+def _count_rlf(df: pd.DataFrame) -> int:
+    """
+    Counts the number of Radio Link Failures (RLF) by analyzing cell handovers onto RLF for UE
+
+    Parameters:
+        df (pd.DataFrame): DataFrame containing 'ue_id', 'cell_id', and 'tick' columns.
+
+    +--------+---------+------+
+    | ue_id  | cell_id | tick |
+    +========+=========+======+
+    |   0    |    4    |  1   |
+    |   1    |    2    |  2   |
+    |   2    |    5    |  3   |
+    |   3    |    3    |  4   |
+    +--------+---------+------+
+
+    Returns:
+        int: Total number of UE transitions to RLF cells.
+    """
+    return (df["cell_id"] == "RLF").sum()
