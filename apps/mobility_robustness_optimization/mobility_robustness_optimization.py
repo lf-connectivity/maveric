@@ -14,6 +14,7 @@ from radp.digital_twin.rf.bayesian.bayesian_engine import (
 from notebooks.radp_library import get_percell_data
 from radp.digital_twin.utils.cell_selection import perform_attachment
 
+
 class MobilityRobustnessOptimization(ABC):
     """
     A class that contains a prototypical proof-of-concept of an `Mobility Robustness Optimization (MRO)` RIC xApp.
@@ -78,12 +79,14 @@ class MobilityRobustnessOptimization(ABC):
         """
         Saves the Bayesian Digital Twins to a pickle file. Returns `True` if saving succeeds,
         and `NotImplemented` if it fails.
-        
+
         """
         filename = f"{file_loc}/digital_twins.pkl"
         try:
             if not isinstance(bayesian_digital_twins, dict):
-                raise TypeError("The input 'bayesian_digital_twins' must be a dictionary.")
+                raise TypeError(
+                    "The input 'bayesian_digital_twins' must be a dictionary."
+                )
 
             # Ensure the directory exists
             os.makedirs(file_loc, exist_ok=True)
@@ -105,8 +108,8 @@ class MobilityRobustnessOptimization(ABC):
     @abstractmethod
     def solve(self):
         """
-        Solve the mobility robustness optimization problem. 
-        
+        Solve the mobility robustness optimization problem.
+
         This method is an abstract method that must be implemented by its subclasses.
         """
         pass
@@ -242,7 +245,7 @@ class MobilityRobustnessOptimization(ABC):
         )
 
         return full_data
-    
+
     # Change the type hint from pd.Dataframe to Dict for _preprocess_ue_training_data and _preprocess_ue_update_data
     def _preprocess_ue_training_data(self) -> pd.DataFrame:
         data = self._preprocess_ue_topology_data()
@@ -409,11 +412,23 @@ class MobilityRobustnessOptimization(ABC):
             axis=1,
         )
         return data
-    
-    def _preprocess_simulation_data(self,df) -> pd.DataFrame:
-        df.drop(columns=["rxpower_stddev_dbm","rxpower_dbm","cell_rxpwr_dbm"], inplace=True)
-        df.rename(columns={"mock_ue_id": "ue_id","log_distance": "distance_km","pred_means":"cell_rxpower_dbm"}, inplace=True)
-        self.topology["cell_id"] = self.topology["cell_id"].str.replace("cell_", "").astype(int)
+
+    def _preprocess_simulation_data(self, df) -> pd.DataFrame:
+        df.drop(
+            columns=["rxpower_stddev_dbm", "rxpower_dbm", "cell_rxpwr_dbm"],
+            inplace=True,
+        )
+        df.rename(
+            columns={
+                "mock_ue_id": "ue_id",
+                "log_distance": "distance_km",
+                "pred_means": "cell_rxpower_dbm",
+            },
+            inplace=True,
+        )
+        self.topology["cell_id"] = (
+            self.topology["cell_id"].str.replace("cell_", "").astype(int)
+        )
         df["cell_id"] = df["cell_id"].str.extract("(\d+)").astype(int)
         df = self._add_sinr_column(df)
         return df
@@ -433,48 +448,61 @@ class MobilityRobustnessOptimization(ABC):
         noise_linear = 10 ** (constants.LATENT_BACKGROUND_NOISE_DB / 10)
 
         # Compute SINR for each row (UE–cell pair), given its group
-        def compute_row_level_sinr(row: pd.Series, group: pd.DataFrame) -> float: # where cell column? [DONE]
+        def compute_row_level_sinr(
+            row: pd.Series, group: pd.DataFrame
+        ) -> float:  # where cell column? [DONE]
             """
-            Computes the SINR for a single UE–cell pair by removing interference and noise from the received signal power.
+                Computes the SINR for a single UE–cell pair by removing interference and noise from the received signal power.
 
-        Parameters:
-                row (pd.Series): Current row containing signal data.
-                group (pd.DataFrame): Group of UE–cell rows sharing the same UE and frequency.
+            Parameters:
+                    row (pd.Series): Current row containing signal data.
+                    group (pd.DataFrame): Group of UE–cell rows sharing the same UE and frequency.
 
-            +--------+---------+------------------+------------------------+
-            | ue_id  | cell_id | cell_rxpower_dbm | cell_carrier_freq_mhz |
-            +========+=========+==================+========================+
-            |   0    |    1    |   -100.311970    |         2100.0         |
-            |   0    |    2    |    -99.841523    |         2100.0         |
-            |   1    |    1    |   -100.294405    |         2100.0         |
-            |   1    |    2    |   -100.132420    |         2100.0         |
-            |   2    |    1    |   -100.650003    |         2100.0         |
-            |   2    |    2    |   -100.456381    |         2100.0         |
-            |   3    |    1    |   -100.987321    |         2100.0         |
-            |   3    |    2    |   -100.864529    |         2100.0         |
-            +--------+---------+------------------+------------------------+
+                +--------+---------+------------------+------------------------+
+                | ue_id  | cell_id | cell_rxpower_dbm | cell_carrier_freq_mhz |
+                +========+=========+==================+========================+
+                |   0    |    1    |   -100.311970    |         2100.0         |
+                |   0    |    2    |    -99.841523    |         2100.0         |
+                |   1    |    1    |   -100.294405    |         2100.0         |
+                |   1    |    2    |   -100.132420    |         2100.0         |
+                |   2    |    1    |   -100.650003    |         2100.0         |
+                |   2    |    2    |   -100.456381    |         2100.0         |
+                |   3    |    1    |   -100.987321    |         2100.0         |
+                |   3    |    2    |   -100.864529    |         2100.0         |
+                +--------+---------+------------------+------------------------+
 
 
-            Returns:
-                float: The computed SINR value in decibels for the current UE–cell pair.
+                Returns:
+                    float: The computed SINR value in decibels for the current UE–cell pair.
             """
             signal_dbm = row["cell_rxpower_dbm"]
 
             # Exclude the current row (serving cell) to compute interference
-            interference_linear = np.sum(10 ** (group.loc[group.index != row.name, "cell_rxpower_dbm"] / 10))
+            interference_linear = np.sum(
+                10 ** (group.loc[group.index != row.name, "cell_rxpower_dbm"] / 10)
+            )
             total_interference_plus_noise_linear = interference_linear + noise_linear
 
-            total_interference_plus_noise_dbm = 10 * np.log10(total_interference_plus_noise_linear)
+            total_interference_plus_noise_dbm = 10 * np.log10(
+                total_interference_plus_noise_linear
+            )
             sinr_db = signal_dbm - total_interference_plus_noise_dbm
             return sinr_db
 
         # Apply per UE and frequency
         df = df.copy()
-        df["sinr_db"] = df.groupby(["ue_id", "cell_carrier_freq_mhz"]).apply(
-            lambda group: group.apply(lambda row: compute_row_level_sinr(row, group), axis=1)
-        ).reset_index(level=[0, 1], drop=True)
+        df["sinr_db"] = (
+            df.groupby(["ue_id", "cell_carrier_freq_mhz"])
+            .apply(
+                lambda group: group.apply(
+                    lambda row: compute_row_level_sinr(row, group), axis=1
+                )
+            )
+            .reset_index(level=[0, 1], drop=True)
+        )
 
         return df
+
 
 # Functions for MRO metrics and Handover events
 def _count_handovers(df: pd.DataFrame) -> int:
@@ -536,7 +564,6 @@ def reattach_columns(predicted_df, full_prediction_df):
 
 
 def calculate_mro_metric(data: pd.DataFrame) -> float:
-
     """
     Calculated total operational cellular time remaining after loss due to cell handovers (including RLF)
 
@@ -576,6 +603,7 @@ def calculate_mro_metric(data: pd.DataFrame) -> float:
     D = T - (ns_handover_count * ts + nf_handover_count * t_nas)
 
     return D
+
 
 def _count_rlf(df: pd.DataFrame) -> int:
     """

@@ -1,11 +1,18 @@
-from .mobility_robustness_optimization import MobilityRobustnessOptimization, calculate_mro_metric
+from .mobility_robustness_optimization import (
+    MobilityRobustnessOptimization,
+    calculate_mro_metric,
+)
 from radp.digital_twin.utils.constants import RLF_THRESHOLD
 from notebooks.radp_library import get_ue_data
-from radp.digital_twin.utils.cell_selection import (perform_attachment_hyst_ttt, find_hyst_diff)
+from radp.digital_twin.utils.cell_selection import (
+    perform_attachment_hyst_ttt,
+    find_hyst_diff,
+)
 import pandas as pd
 import numpy as np
 import warnings
 from gpytorch.utils.warnings import NumericalWarning
+
 
 class SimpleMRO(MobilityRobustnessOptimization):
     """
@@ -18,18 +25,22 @@ class SimpleMRO(MobilityRobustnessOptimization):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Additional initialization can be done here if needed
-    
+
     def solve(self):
         """
         Solve the mobility robustness optimization problem.
         """
         # Ensure Bayesian Digital Twins are trained before proceeding
         if not self.bayesian_digital_twins:
-            raise ValueError("Bayesian Digital Twins are not trained. Train the models before calculating metrics.")
-        
+            raise ValueError(
+                "Bayesian Digital Twins are not trained. Train the models before calculating metrics."
+            )
+
         # Generate and preprocess simulation data
         self.simulation_data = get_ue_data(self.mobility_params)
-        self.simulation_data = self.simulation_data.rename(columns={"lat": "latitude", "lon": "longitude"})
+        self.simulation_data = self.simulation_data.rename(
+            columns={"lat": "latitude", "lon": "longitude"}
+        )
 
         # Predict power and perform attachment
         predictions, full_prediction_df = self._predictions(self.simulation_data)
@@ -45,7 +56,7 @@ class SimpleMRO(MobilityRobustnessOptimization):
         max_diff = find_hyst_diff(df)
         num_ticks = df["tick"].nunique()
         hyst_range = [0, max_diff]
-        ttt_range = [2, num_ticks+1]
+        ttt_range = [2, num_ticks + 1]
 
         # Suppress the specific NumericalWarning from gpytorch
         warnings.filterwarnings("ignore", category=NumericalWarning)
@@ -69,6 +80,10 @@ class SimpleMRO(MobilityRobustnessOptimization):
             # Store the data in the score DataFrame
             score.loc[len(score)] = [hyst, ttt, mro_metric]
             print(f"{i:<6} {hyst:<14.10f} {ttt:<6} {mro_metric:<12.6f}")
-        
-        print(f"\nOptimized Hyst: {score.loc[score['score'].idxmax(), 'hyst']}, Optimized TTT: {int(score.loc[score['score'].idxmax(), 'ttt'])}")        
-        return score.loc[score["score"].idxmax(), "hyst"], int(score.loc[score["score"].idxmax(), "ttt"])
+
+        print(
+            f"\nOptimized Hyst: {score.loc[score['score'].idxmax(), 'hyst']}, Optimized TTT: {int(score.loc[score['score'].idxmax(), 'ttt'])}"
+        )
+        return score.loc[score["score"].idxmax(), "hyst"], int(
+            score.loc[score["score"].idxmax(), "ttt"]
+        )

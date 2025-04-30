@@ -90,7 +90,6 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
     def test_solve(self):  # TODO: Implement AFTER PR
         pass
 
-
     def test_training(self):
         mro = SimpleMRO(mobility_params={}, topology=self.dummy_topology)
         train_data = self.training_data.copy()

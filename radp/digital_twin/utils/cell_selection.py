@@ -218,7 +218,7 @@ def find_hyst_diff(df2: pd.DataFrame) -> float:
     return max_val - min_val
 
 def _perform_attachment_hyst_ttt_per_tick(ue_data_for_current_tick: pd.DataFrame, strongest_server_history: List[pd.DataFrame],
-                                          past_attachment: pd.DataFrame, ttt: int, hyst: float, use_strongest_server: bool = False,) -> tuple[List[pd.DataFrame], pd.DataFrame]:
+                                          past_attachment: pd.DataFrame, ttt: int, hyst: float, use_strongest_server: bool = False,) -> Tuple[List[pd.DataFrame], pd.DataFrame]:
     """
     Determines and updates the cell selction for each user for a given tick using hysteresis and time-to-trigger (TTT) rules.
     This function either attaches the UE to the strongest server or evaluates attachment changes based on hyst

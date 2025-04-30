@@ -1,5 +1,11 @@
-from .mobility_robustness_optimization import MobilityRobustnessOptimization, calculate_mro_metric
-from radp.digital_twin.utils.cell_selection import perform_attachment_hyst_ttt, find_hyst_diff
+from .mobility_robustness_optimization import (
+    MobilityRobustnessOptimization,
+    calculate_mro_metric,
+)
+from radp.digital_twin.utils.cell_selection import (
+    perform_attachment_hyst_ttt,
+    find_hyst_diff,
+)
 from notebooks.radp_library import get_ue_data
 from radp.digital_twin.utils.constants import RLF_THRESHOLD
 
@@ -23,11 +29,15 @@ class ReinforcedMRO(MobilityRobustnessOptimization):
         Trains a PPO agent to optimize hysteresis and TTT values.
         """
         if not self.bayesian_digital_twins:
-            raise ValueError("Bayesian Digital Twins are not trained. Train the models before calculating metrics.")
+            raise ValueError(
+                "Bayesian Digital Twins are not trained. Train the models before calculating metrics."
+            )
 
         # Load and prepare simulation data
         self.simulation_data = get_ue_data(self.mobility_params)
-        self.simulation_data = self.simulation_data.rename(columns={"lat": "latitude", "lon": "longitude"})
+        self.simulation_data = self.simulation_data.rename(
+            columns={"lat": "latitude", "lon": "longitude"}
+        )
         predictions, full_prediction_df = self._predictions(self.simulation_data)
         df = self._preprocess_simulation_data(full_prediction_df)
 
@@ -38,7 +48,9 @@ class ReinforcedMRO(MobilityRobustnessOptimization):
         ttt_range = [2, num_ticks + 1]
 
         # Create and vectorize RL environment
-        env = DummyVecEnv([lambda: ReinforcedMROEnv(df, RLF_THRESHOLD, hyst_range, ttt_range)])
+        env = DummyVecEnv(
+            [lambda: ReinforcedMROEnv(df, RLF_THRESHOLD, hyst_range, ttt_range)]
+        )
 
         # PPO agent
         model = PPO("MlpPolicy", env, verbose=2, n_steps=64, batch_size=64)
@@ -63,9 +75,11 @@ class ReinforcedMROEnv(Env):
         self.hyst_range = hyst_range
         self.ttt_range = ttt_range
 
-        self.action_space = Box(low=np.array([hyst_range[0], ttt_range[0]]),
-                                high=np.array([hyst_range[1], ttt_range[1]]),
-                                dtype=np.float64)
+        self.action_space = Box(
+            low=np.array([hyst_range[0], ttt_range[0]]),
+            high=np.array([hyst_range[1], ttt_range[1]]),
+            dtype=np.float64,
+        )
         self.observation_space = Box(low=0, high=1, shape=(1,), dtype=np.float64)
 
         self.state = np.array([0.0])
@@ -78,7 +92,9 @@ class ReinforcedMROEnv(Env):
         hyst, ttt = action
         ttt = int(round(ttt))
 
-        attached_df = perform_attachment_hyst_ttt(self.df, hyst, ttt, self.rlf_threshold)
+        attached_df = perform_attachment_hyst_ttt(
+            self.df, hyst, ttt, self.rlf_threshold
+        )
         mro_metric = calculate_mro_metric(attached_df)
 
         reward = mro_metric
@@ -88,8 +104,10 @@ class ReinforcedMROEnv(Env):
 
         done = self.current_step >= self.max_steps
 
-        print(f"Episode: {self.episode_num}, Timestep: {self.current_step}, "
-              f"Hyst: {hyst:.6f}, TTT: {ttt}, Reward: {reward:.6f}, Done: {done}")
+        print(
+            f"Episode: {self.episode_num}, Timestep: {self.current_step}, "
+            f"Hyst: {hyst:.6f}, TTT: {ttt}, Reward: {reward:.6f}, Done: {done}"
+        )
 
         if done:
             avg_reward = self.episode_reward / self.max_steps
