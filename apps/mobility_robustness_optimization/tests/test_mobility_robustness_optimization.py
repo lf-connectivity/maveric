@@ -1,16 +1,19 @@
 import unittest
+from unittest.mock import MagicMock
+
 import pandas as pd
-import numpy as np
+from gpytorch.kernels import RBFKernel, ScaleKernel
+
+# import numpy as np
 from apps.mobility_robustness_optimization.mobility_robustness_optimization import (
-    MobilityRobustnessOptimization as MRO,
     BayesianDigitalTwin,
-    NormMethod,
-    reattach_columns,
-    calculate_mro_metric,
     _count_handovers,
+    _count_rlf,
+    calculate_mro_metric,
+    reattach_columns,
 )
 from apps.mobility_robustness_optimization.simple_mro import SimpleMRO
-from unittest.mock import MagicMock
+from notebooks.radp_library import preprocess_ue_data
 
 
 class TestMobilityRobustnessOptimization(unittest.TestCase):
@@ -63,11 +66,9 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
                 "loc_y": [12.0, 13.0],
             }
         )
-        self.training_data = pd.DataFrame(
-            {"ue_id": [0, 1], "tick": [0, 1], "loc_x": [5.0, 10.0], "loc_y": [0.0, 1.0]}
-        )
+        self.training_data = pd.DataFrame({"ue_id": [0, 1], "tick": [0, 1], "loc_x": [5.0, 10.0], "loc_y": [0.0, 1.0]})
 
-        self.mobility_params = {
+        self.mobility_model_params = {
             "param1": {"value": 10, "type": "int"},
             "param2": {"value": 20, "type": "float"},
         }
@@ -77,141 +78,79 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
 
         # Instantiate MRO object
         self.mro = SimpleMRO(
-            self.mobility_params, self.dummy_topology, bdt={"cell_001": self.mock_bdt}
+            self.mobility_model_params,
+            self.dummy_topology,
+            bdt={"cell_001": self.mock_bdt},
         )
-        self.mro.training_data = self.training_data
-        self.mro.prediction_data = self.prediction_data
-        self.mro.update_data = self.update_data
-        self.mro.simulation_data = self.simulation_data
 
-    def test_update(self):  # TODO: Implement AFTER PR
+    def test_count_rlf(self):
+        result = _count_rlf(self.df)
+        self.assertEqual(result, 2)
+
+    def test_train_or_update_rf_twin(self):  # TODO: Implement AFTER PR
         pass
 
     def test_solve(self):  # TODO: Implement AFTER PR
         pass
 
     def test_training(self):
-        mro = SimpleMRO(mobility_params={}, topology=self.dummy_topology)
+        mro = SimpleMRO(mobility_model_params={}, topology=self.dummy_topology)
         train_data = self.training_data.copy()
-        train_data.rename(
-            columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True
-        )
-        # n_iter = 5
+        train_data.rename(columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True)
+
         # for different n_inter
+        train_data = preprocess_ue_data(train_data, self.dummy_topology)
+
+        if self.dummy_topology["cell_id"].dtype == int:
+            self.dummy_topology["cell_id"] = self.dummy_topology["cell_id"].apply(lambda x: f"cell_{x}")
+        if train_data["cell_id"].dtype == int:
+            train_data["cell_id"] = train_data["cell_id"].apply(lambda x: f"cell_{x}")
+
+        # Prepare the new data for training or updating
+        prepared_data = mro._prepare_train_or_update_data(train_data)
+
         for n_iter in [5, 10, 20]:
-            loss_vs_iter = mro._training(maxiter=n_iter, train_data=train_data)
+            loss_vs_iter = mro._training(maxiter=n_iter, train_data=prepared_data)
             self.assertEqual(len(loss_vs_iter), len(self.dummy_topology["cell_id"]))
-            self.assertEqual(loss_vs_iter[0].shape[0], n_iter)
+            self.assertEqual(loss_vs_iter[0].shape[0], n_iter)  # type: ignore
 
     def test_predictions(self):
-        # without _training() --> model not available --> empty df response
-        mro = SimpleMRO(mobility_params={}, topology=self.dummy_topology)
-        prediction_data = self.prediction_data.copy()
-        mro.prediction_data = prediction_data.rename(
-            columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True
-        )
-        predicted, full_prediction_df = mro._predictions(pred_data=prediction_data)
-        self.assertTrue(predicted.empty)
-        self.assertTrue(full_prediction_df.empty)
-
-        # with _training()
         topology = self.dummy_topology.copy()
         topology["cell_id"] = ["cell_1", "cell_2"]
-        mro = SimpleMRO(mobility_params=self.mobility_params, topology=topology)
+        mro = SimpleMRO(mobility_model_params=self.mobility_model_params, topology=topology)
         train_data = self.training_data.copy()
-        train_data.rename(
-            columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True
-        )
-        mro._training(20, train_data)  # needed, otherwise model won't be available
+        train_data.rename(columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True)
+
+        train_data = preprocess_ue_data(train_data, self.dummy_topology)
+
+        if self.dummy_topology["cell_id"].dtype == int:
+            self.dummy_topology["cell_id"] = self.dummy_topology["cell_id"].apply(lambda x: f"cell_{x}")
+        if train_data["cell_id"].dtype == int:
+            train_data["cell_id"] = train_data["cell_id"].apply(lambda x: f"cell_{x}")
+
+        # Prepare the new data for training or updating
+        prepared_data = mro._prepare_train_or_update_data(train_data)
+
+        # Train the models
+        mro._training(20, prepared_data)
+
+        # Perform predictions
         prediction_data = self.prediction_data.copy()
-        prediction_data.rename(
-            columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True
-        )
+        prediction_data.rename(columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True)
         predicted, full_prediction_df = mro._predictions(prediction_data)
-        self.assertEqual(predicted.shape, (2, 5))
-        self.assertEqual(full_prediction_df.shape, (4, 15))
 
-    def test_prepare_all_UEs_from_all_cells_df(self):
-        result = self.mro._prepare_all_UEs_from_all_cells_df()
-        self.assertEqual(result.shape[0], 2 * 2)  # 2 UEs x 2 cells
-
-    def test_calculate_received_power(self):
-        dummy_distance = 1
-        dummy_freq = 1800
-        expected_power = -74.55545010206612
-        power = self.mro._calculate_received_power(
-            distance_km=dummy_distance, frequency_mhz=dummy_freq
-        )
-        self.assertEqual(expected_power, power)
-
-    def test_preprocess_ue_topology_data(self):
-        result = self.mro._prepare_all_UEs_from_all_cells_df()
-        # Ensure that the resulting dataframe has the correct number of columns
-        self.assertIn("ue_id", result.columns)
-        self.assertIn("cell_id", result.columns)
-
-        # Check if the combined dataframe has the correct number of rows (Cartesian product of UEs and cells)
-        self.assertEqual(
-            result.shape[0], len(self.update_data) * len(self.dummy_topology)
-        )
-
-        # Ensure that the combined dataframe has the expected values
-        self.assertTrue(all(result["ue_id"].isin(self.update_data["ue_id"])))
-
-    def test_preprocess_ue_training_data(self):
-        # fmt: off
-        expected_columns = ["ue_id","tick", "latitude", "longitude", "cell_id", "cell_lat", "cell_lon",
-                            "cell_carrier_freq_mhz", "cell_az_deg", "log_distance", "cell_rxpwr_dbm", "relative_bearing",]
-        # fmt: on
-        self.mro.training_data.rename(
-            columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True
-        )
-        training_data = self.mro._preprocess_ue_training_data()
-        self.assertIsInstance(training_data, dict)
-        self.assertEqual(len(training_data), len(self.dummy_topology))
-        for df in training_data.values():
-            self.assertListEqual(list(df.columns), expected_columns)
-            self.assertTrue(all(df["ue_id"].isin(self.training_data["ue_id"])))
-
-    def test_preprocess_ue_update_data(self):
-        # fmt: off
-        expected_columns = ["ue_id","tick", "latitude", "longitude", "cell_id", "cell_lat", "cell_lon",
-                            "cell_carrier_freq_mhz", "cell_az_deg", "log_distance", "cell_rxpwr_dbm", "relative_bearing",]
-        # fmt: on
-        self.mro.update_data.rename(
-            columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True
-        )
-        update_data = self.mro._preprocess_ue_update_data()
-        self.assertIsInstance(update_data, dict)
-        self.assertEqual(len(update_data), len(self.dummy_topology))
-        for df in update_data.values():
-            self.assertListEqual(list(df.columns), expected_columns)
-            self.assertTrue(all(df["ue_id"].isin(self.update_data["ue_id"])))
-
-    def test_preprocess_prediction_data(self):
-        # fmt: off
-        expected_columns = ["ue_id","tick", "latitude", "longitude", "cell_id", "cell_lat", "cell_lon",
-                            "cell_carrier_freq_mhz", "cell_az_deg", "log_distance", "cell_rxpwr_dbm", "relative_bearing",]
-        # fmt: on
-        self.mro.prediction_data.rename(
-            columns={"loc_x": "latitude", "loc_y": "longitude"}, inplace=True
-        )
-        data = self.mro._preprocess_prediction_data()
-        self.assertIsInstance(data, pd.DataFrame)
-        self.assertEqual(
-            len(data), len(self.dummy_topology) * len(self.mro.prediction_data["ue_id"])
-        )
-        self.assertListEqual(list(data.columns), expected_columns)
-        self.assertTrue(all(data["ue_id"].isin(self.prediction_data["ue_id"])))
+        # Assertions
+        self.assertEqual(predicted.shape, (2, 5))  # Check the shape of the predicted DataFrame
+        self.assertEqual(full_prediction_df.shape, (4, 15))  # Check the shape of the full prediction DataFrame
+        self.assertIn("pred_means", full_prediction_df.columns)  # Ensure predictions column exists
+        self.assertTrue(all(full_prediction_df["cell_id"].isin(["cell_1", "cell_2"])))  # Check cell IDs
 
     def test_count_handovers(self):
         result = _count_handovers(self.df)
         self.assertEqual(result, 3)
 
     def test_reattach_columns(self):
-        self.predicted_df = pd.DataFrame(
-            {"tick": [1, 2, 3, 4], "loc_x": [10, 20, 30, 40], "loc_y": [5, 6, 7, 8]}
-        )
+        self.predicted_df = pd.DataFrame({"tick": [1, 2, 3, 4], "loc_x": [10, 20, 30, 40], "loc_y": [5, 6, 7, 8]})
         self.full_prediction_df = pd.DataFrame(
             {
                 "mock_ue_id": [100, 101, 102, 103],
@@ -232,12 +171,8 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         result = reattach_columns(self.predicted_df, self.full_prediction_df)
 
         self.assertTrue("ue_id" in result.columns)  # Ensure 'ue_id' column exists
-        self.assertFalse(
-            "mock_ue_id" in result.columns
-        )  # Ensure 'mock_ue_id' column is removed
-        self.assertEqual(
-            result.shape[0], self.predicted_df.shape[0]
-        )  # Ensure size matches predicted_df
+        self.assertFalse("mock_ue_id" in result.columns)  # Ensure 'mock_ue_id' column is removed
+        self.assertEqual(result.shape[0], self.predicted_df.shape[0])  # Ensure size matches predicted_df
         self.assertEqual(result.loc[0, "ue_id"], 100)
         self.assertEqual(result.loc[1, "ue_id"], 101)
 
@@ -247,3 +182,150 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
     def test_calculate_mro_metric(self):
         result = calculate_mro_metric(self.df)
         self.assertEqual(result, 1.85)
+
+    def test_update(self):
+        # Mock the Bayesian Digital Twin and its methods
+        mock_twin = MagicMock()
+        self.mro.bayesian_digital_twins = {"cell_001": mock_twin}
+
+        # Create a sample DataFrame to pass to the _update method
+        df = pd.DataFrame(
+            {
+                "log_distance": [0.1, 0.2, 0.3, 0.4, 0.5],
+                "relative_bearing": [10, 20, 30, 40, 50],
+                "cell_rxpwr_dbm": [-80, -75, -70, -65, -60],
+            }
+        )
+
+        # Call the _update method
+        self.mro._update("cell_001", df)
+
+        # Assertions
+        # Ensure duplicates are removed
+        self.assertEqual(mock_twin.update_trained_gpmodel.call_count, 1)
+        processed_df = mock_twin.update_trained_gpmodel.call_args[0][0][0]
+        self.assertTrue(processed_df.equals(df.drop_duplicates(subset=["log_distance", "relative_bearing"])))
+
+        # Ensure the kernel is reconfigured
+        self.assertTrue(isinstance(mock_twin.model.covar_module, ScaleKernel))
+        self.assertTrue(isinstance(mock_twin.model.covar_module.base_kernel, RBFKernel))
+
+        # Ensure GaussianLikelihood is set up correctly
+        self.assertTrue(hasattr(mock_twin, "likelihood"))
+        self.assertEqual(mock_twin.likelihood.noise, 1e-2)
+
+        # Ensure cholesky_jitter context is used
+        mock_twin.update_trained_gpmodel.assert_called_once()
+
+    def test_prepare_train_or_update_data(self):
+        # Create a sample DataFrame for input
+        input_data = pd.DataFrame(
+            {
+                "cell_id": ["cell_1", "cell_2", "cell_1", "cell_2"],
+                "latitude": [45.0, 46.0, 45.1, 46.1],
+                "longitude": [-73.0, -74.0, -73.1, -74.1],
+                "cell_rxpwr_dbm": [-80, -75, -85, -70],
+            }
+        )
+
+        # Add required columns to topology
+        topology = pd.DataFrame(
+            {
+                "cell_id": ["cell_1", "cell_2"],
+                "cell_lat": [45.0, 46.0],
+                "cell_lon": [-73.0, -74.0],
+                "cell_az_deg": [120, 240],
+            }
+        )
+
+        # Instantiate the MRO object
+        mro = SimpleMRO(mobility_model_params={}, topology=topology)
+
+        # Call the method
+        result = mro._prepare_train_or_update_data(input_data)
+
+        # Assertions
+        self.assertIsInstance(result, dict)  # Ensure the result is a dictionary
+        self.assertEqual(len(result), 2)  # Ensure there are two keys (one for each cell_id)
+        self.assertIn("cell_1", result)  # Ensure 'cell_1' is a key
+        self.assertIn("cell_2", result)  # Ensure 'cell_2' is a key
+
+        # Check the structure of the DataFrame for one cell
+        cell_1_data = result["cell_1"]
+        self.assertIsInstance(cell_1_data, pd.DataFrame)  # Ensure it's a DataFrame
+        self.assertTrue(
+            {"log_distance", "relative_bearing", "cell_rxpwr_dbm"}.issubset(cell_1_data.columns)
+        )  # Check columns
+
+    def test_preprocess_simulation_data(self):
+        # Create a sample topology DataFrame
+        topology = pd.DataFrame(
+            {
+                "cell_id": ["cell_1", "cell_2"],
+                "cell_lat": [45.0, 46.0],
+                "cell_lon": [-73.0, -74.0],
+                "cell_carrier_freq_mhz": [2100, 2000],
+            }
+        )
+
+        # Create a sample input DataFrame
+        input_data = pd.DataFrame(
+            {
+                "mock_ue_id": [1, 2],
+                "log_distance": [0.5, 1.0],
+                "pred_means": [-80, -75],
+                "rxpower_stddev_dbm": [2.0, 1.5],
+                "rxpower_dbm": [-85, -78],
+                "cell_rxpwr_dbm": [-90, -80],
+                "cell_id": ["cell_1", "cell_2"],
+            }
+        )
+
+        # Instantiate the MRO object
+        mro = SimpleMRO(mobility_model_params={}, topology=topology)
+
+        # Call the method
+        result = mro._preprocess_simulation_data(input_data)
+
+        # Assertions
+        self.assertIsInstance(result, pd.DataFrame)  # Ensure the result is a DataFrame
+        self.assertIn("ue_id", result.columns)  # Ensure 'ue_id' column exists
+        self.assertIn("distance_km", result.columns)  # Ensure 'distance_km' column exists
+        self.assertIn("cell_rxpower_dbm", result.columns)  # Ensure 'cell_rxpower_dbm' column exists
+        self.assertIn("sinr_db", result.columns)  # Ensure 'sinr_db' column exists
+        self.assertNotIn("rxpower_stddev_dbm", result.columns)  # Ensure dropped columns are removed
+        self.assertNotIn("rxpower_dbm", result.columns)  # Ensure dropped columns are removed
+        self.assertNotIn("cell_rxpwr_dbm", result.columns)  # Ensure dropped columns are removed
+
+        # Check data types
+        self.assertTrue(pd.api.types.is_numeric_dtype(result["distance_km"]))
+        self.assertTrue(pd.api.types.is_numeric_dtype(result["sinr_db"]))
+
+        # Check cell_id conversion
+        self.assertTrue(result["cell_id"].dtype == int)
+        self.assertTrue((result["cell_id"] == [1, 2]).all())
+
+    def test_add_sinr_column(self):
+        # Create a sample input DataFrame
+        input_data = pd.DataFrame(
+            {
+                "ue_id": [1, 1, 2, 2],
+                "cell_id": [1, 2, 1, 2],
+                "cell_rxpower_dbm": [-80, -85, -75, -90],
+                "cell_carrier_freq_mhz": [2100, 2100, 1800, 1800],
+            }
+        )
+
+        # Instantiate the MRO object
+        mro = SimpleMRO(mobility_model_params={}, topology=self.dummy_topology)
+
+        # Call the method
+        result = mro._add_sinr_column(input_data)
+
+        # Assertions
+        self.assertIsInstance(result, pd.DataFrame)  # Ensure the result is a DataFrame
+        self.assertIn("sinr_db", result.columns)  # Ensure 'sinr_db' column exists
+        self.assertTrue(pd.api.types.is_numeric_dtype(result["sinr_db"]))  # Ensure 'sinr_db' is numeric
+
+        # Check SINR values are computed correctly
+        self.assertFalse(result["sinr_db"].isna().any())  # Ensure no NaN values in 'sinr_db'

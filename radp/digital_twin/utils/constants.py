@@ -13,6 +13,7 @@ CIRC_KM_TO_DEG_LAT: float = 180.0 / (math.pi * RADIUS_EARTH_EQUATOR_KM)
 
 LATENT_BACKGROUND_NOISE_DB = -150
 RLF_THRESHOLD = -25
+TXPWR_DBM = 23.0
 
 ANTENNA_GAIN: Final[str] = "antenna_gain"
 CELL_AZ_DEG: Final[str] = "cell_az_deg"

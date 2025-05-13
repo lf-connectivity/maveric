@@ -132,7 +132,10 @@ def get_rsrp_dbm_sinr_db_by_layer(
 
     return rsrp_dbm_by_layer, sinr_db_by_layer
 
-def perform_attachment_hyst_ttt(ue_data: pd.DataFrame, hyst: float, ttt: int, rlf_threshold: float) -> pd.DataFrame:
+
+def perform_attachment_hyst_ttt(
+    ue_data: pd.DataFrame, hyst: float, ttt: int, rlf_threshold: float
+) -> pd.DataFrame:
     """
     Performs UE-to-cell attachment across all ticks in the simulation.
     Initially, when insufficient history is available, the UE is naively attached to the strongest available cell.
@@ -217,8 +220,15 @@ def find_hyst_diff(df2: pd.DataFrame) -> float:
     # Return the difference between the max and min values
     return max_val - min_val
 
-def _perform_attachment_hyst_ttt_per_tick(ue_data_for_current_tick: pd.DataFrame, strongest_server_history: List[pd.DataFrame],
-                                          past_attachment: pd.DataFrame, ttt: int, hyst: float, use_strongest_server: bool = False,) -> Tuple[List[pd.DataFrame], pd.DataFrame]:
+
+def _perform_attachment_hyst_ttt_per_tick(
+    ue_data_for_current_tick: pd.DataFrame,
+    strongest_server_history: List[pd.DataFrame],
+    past_attachment: pd.DataFrame,
+    ttt: int,
+    hyst: float,
+    use_strongest_server: bool = False,
+) -> Tuple[List[pd.DataFrame], pd.DataFrame]:
     """
     Determines and updates the cell selction for each user for a given tick using hysteresis and time-to-trigger (TTT) rules.
     This function either attaches the UE to the strongest server or evaluates attachment changes based on hyst
@@ -273,7 +283,10 @@ def _perform_attachment_hyst_ttt_per_tick(ue_data_for_current_tick: pd.DataFrame
 
     return strongest_server_history, current_attachment
 
-def _check_hyst(ue_data_for_current_tick: pd.DataFrame, past_attachment: pd.DataFrame, hyst: float) -> pd.DataFrame:
+
+def _check_hyst(
+    ue_data_for_current_tick: pd.DataFrame, past_attachment: pd.DataFrame, hyst: float
+) -> pd.DataFrame:
     """
     Evaluates if a newly strongest cell is significantly better than the previously attached cell
     by applying the hysteresis (hyst) margin.
@@ -381,7 +394,7 @@ def _check_hyst(ue_data_for_current_tick: pd.DataFrame, past_attachment: pd.Data
 def _check_ttt(
     strongest_server_history: List[pd.DataFrame],
     ue_data_for_current_tick: pd.DataFrame,
-    past_attachment: pd.DataFrame
+    past_attachment: pd.DataFrame,
 ) -> pd.DataFrame:
     """
     Ensures that a UE only switches to a new cell if it has consistently been
@@ -469,7 +482,9 @@ def _check_ttt(
     return current_attachment
 
 
-def _check_rlf_threshold(df: pd.DataFrame, current_tick_df: pd.DataFrame, rlf_threshold: float) -> pd.DataFrame:
+def _check_rlf_threshold(
+    df: pd.DataFrame, current_tick_df: pd.DataFrame, rlf_threshold: float
+) -> pd.DataFrame:
     """
     Updates the dataframe based on the SINR threshold and data from `current_tick_df`.
 
@@ -546,7 +561,9 @@ def _check_rlf_threshold(df: pd.DataFrame, current_tick_df: pd.DataFrame, rlf_th
                     target_idx = target_indices[0]
 
                     # Find all common columns
-                    common_cols = updated_df.columns.intersection(current_tick_df.columns)
+                    common_cols = updated_df.columns.intersection(
+                        current_tick_df.columns
+                    )
 
                     for col in common_cols:
                         try:
@@ -569,7 +586,12 @@ def _check_rlf_threshold(df: pd.DataFrame, current_tick_df: pd.DataFrame, rlf_th
     return updated_df
 
 
-def _check_hyst_in_current_tick(ue_data_for_current_tick: pd.DataFrame, current_attachment: pd.DataFrame, past_attachment: pd.DataFrame, hyst: float) -> pd.DataFrame:
+def _check_hyst_in_current_tick(
+    ue_data_for_current_tick: pd.DataFrame,
+    current_attachment: pd.DataFrame,
+    past_attachment: pd.DataFrame,
+    hyst: float,
+) -> pd.DataFrame:
     """
     Applies a hyst check to the data in the current timestamp to prevent unnecessary handovers.
     If the new cell's signal is not stronger than the previous cell by at least `hyst` dB,
