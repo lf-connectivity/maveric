@@ -45,7 +45,7 @@ class MobilityRobustnessOptimization(ABC):
         self.mobility_model_params = mobility_model_params
         self.simulation_data = None
 
-    def train_or_update_rf_twin(self, new_data: pd.DataFrame) -> None:
+    def train_or_update_rf_twins(self, new_data: pd.DataFrame) -> None:
         """
         Updates the Bayesian Digital Twins with new observations if they exist.
         If not, it trains new twins from scratch.
@@ -86,7 +86,6 @@ class MobilityRobustnessOptimization(ABC):
 
             # update if bayesian digital twins exist already
             if self.bayesian_digital_twins:
-                # ? Do we need to use logger instead of print?
                 print("Updating existing Bayesian Digital Twins with new data.")
 
                 for cell_id, df in prepared_data.items():

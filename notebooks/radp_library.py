@@ -15,6 +15,7 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import plotly.express as px
 import rasterio.features
 from dotenv import load_dotenv
 from rasterio.transform import Affine
@@ -24,7 +25,7 @@ from radp.digital_twin.mobility.mobility import gauss_markov
 from radp.digital_twin.mobility.ue_tracks import UETracksGenerator
 from radp.digital_twin.mobility.ue_tracks_params import UETracksGenerationParams
 from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin, NormMethod
-from radp.digital_twin.utils.constants import TXPWR_DBM
+from radp.digital_twin.utils.constants import RLF_THRESHOLD, TXPWR_DBM
 from radp.digital_twin.utils.gis_tools import GISTools
 
 Boundary = Union[geometry.Polygon, geometry.MultiPolygon]
@@ -39,7 +40,10 @@ FFMPEG_PATH = os.environ.get("FFMPEG_PATH", None)
 
 def _kml_obj_to_string(kml_obj: fastkml.KML) -> bytes:
     kml_str = kml_obj.to_string(prettyprint=False).replace("kml:", "")
-
+    """
+    Converts a FastKML object to its string representation.
+    @return str: string representation of the KML object
+    """
     # Encode to 'utf-8' to eliminate unicode code points
     return kml_str.encode()
 
@@ -60,6 +64,12 @@ def write_kml_as_kmz_file(kml_obj: fastkml.KML, kmz_filename: str) -> None:
 class ShapesKMLWriter(object):
     @classmethod
     def _doc_name(cls, kmz_name: str) -> str:
+        """
+        Extracts the document name from a given KMZ file path.
+        @params kmz_name: the file path of the KMZ file.
+        @returns: the name of the document without the file extension.
+        """
+
         doc_name = os.path.basename(kmz_name)
         return os.path.splitext(doc_name)[0]
 
@@ -81,6 +91,7 @@ class ShapesKMLWriter(object):
             styles = []
 
         k = fastkml.KML()
+        doc = fastkml.Document(ns=KML_NS, name=(name or "Shapes"), description=(desc or ""), styles=styles)
         doc = fastkml.Document(ns=KML_NS, name=(name or "Shapes"), description=(desc or ""), styles=styles)
         k.append(doc)
 
@@ -108,6 +119,15 @@ class ShapesKMLWriter(object):
         styles: Optional[List[fastkml.Style]] = None,
         desc: Optional[str] = None,
     ) -> None:
+        """
+        Add a geometric shape to a KML folder or document.
+        @param folder: The KML folder or document to which the shape will be added.
+        @param shape: The geometric shape to add, represented as a BaseGeometry object.
+        @param name: The name of the placemark representing the shape.
+        @param styles: Optional list of styles to apply to the placemark.
+        @param desc: Optional description of the placemark. Defaults to the value of `name` if not provided.
+        @returns: None.
+        """
         if desc is None:
             desc = name
         shape_placemark = fastkml.Placemark(ns=KML_NS, name=name, description=desc, styles=styles)
@@ -212,10 +232,12 @@ def get_percell_data(
     invalid_value: float = -500.0,
     seed: int = 0,
 ) -> Tuple[List[pd.DataFrame], List[pd.DataFrame]]:
-    """Prediction dataframe cleanup"""
+    """
+    Prediction dataframe cleanup
+    Dataframe should contain ['cell_id', 'log_distance', 'relative_bearing', 'cell_rxpwr_dbm'] cloumns.
+    """
     data_out = []
     data_stats = []
-
     data_in_sampled = data_in
 
     data_in_sampled.columns = [col.replace("_1", "") if col.endswith("_1") else col for col in data_in_sampled.columns]
@@ -226,6 +248,7 @@ def get_percell_data(
         data_cell_sampled = data_cell_valid.sort_values("cell_rxpwr_dbm", ascending=False).head(
             n=min(n_samples, len(data_cell_valid))
         )
+
     else:
         # get n_samples independent random samples inside training groups
         data_cell_sampled = data_cell_valid.sample(n=min(n_samples, len(data_cell_valid)), random_state=(seed))
@@ -242,8 +265,9 @@ def get_percell_data(
     return data_out, data_stats
 
 
-def y_to_latitude(lower_bound, y, zoom_factor, tile_pixels=256):
-    """Convert a y tile coordinate to a latitude coordinate.
+def y_to_latitude(lower_bound: bool, y: float, zoom_factor: int, tile_pixels: int = 256) -> float:
+    """
+    Convert a y tile coordinate to a latitude coordinate.
 
     Arguments:
         lower_bound: A bool whether to use the lower edge of the tile.
@@ -263,7 +287,7 @@ def y_to_latitude(lower_bound, y, zoom_factor, tile_pixels=256):
     return -latitude_degrees
 
 
-def bing_tile_to_center(x, y, level, tile_pixels=256):
+def bing_tile_to_center(x: float, y: float, level: int, tile_pixels: int = 256) -> float:
     """Get the center coordinate as [latitude, longitude]
     for a given tile.
 
@@ -286,14 +310,21 @@ def bing_tile_to_center(x, y, level, tile_pixels=256):
     return out
 
 
-def bing_tile_to_center_df_row(row, level):
+def bing_tile_to_center_df_row(row: int, level: int) -> int:
+    """
+    Convert Bing tile coordinates in a DataFrame row to their center coordinates.
+    @param row: A DataFrame row containing Bing tile coordinates with attributes `loc_x` and `loc_y`.
+    @param level: The zoom level of the Bing tile.
+    @returns: The modified DataFrame row with updated `loc_x` and `loc_y` values representing the center coordinates.
+    """
+
     y, x = bing_tile_to_center(row.loc_x, row.loc_y, level)
     row.loc_x = x
     row.loc_y = y
     return row
 
 
-def longitude_to_world_pixel(longitude, zoom_factor, tile_pixels=256):
+def longitude_to_world_pixel(longitude: float, zoom_factor: int, tile_pixels: int = 256) -> float:
     """Convert degrees longitude to world pixel coordinates.
 
     World pixel coordinates span the whole range of longitude
@@ -314,7 +345,7 @@ def longitude_to_world_pixel(longitude, zoom_factor, tile_pixels=256):
     return pixel_x
 
 
-def latitude_to_world_pixel(latitude, zoom_factor, tile_pixels=256):
+def latitude_to_world_pixel(latitude: float, zoom_factor: int, tile_pixels: int = 256) -> float:
     """Convert degrees latitude to world pixel coordinates.
 
     World pixel coordinates span the whole range of latitude
@@ -337,7 +368,7 @@ def latitude_to_world_pixel(latitude, zoom_factor, tile_pixels=256):
     return pixel_y
 
 
-def map_clip(val, min_val, max_val):
+def map_clip(val: float, min_val: float, max_val: float) -> float:
     """Clip val to [min_val, max_val].
 
     Arguments:
@@ -351,7 +382,15 @@ def map_clip(val, min_val, max_val):
     return np.max([min_val, np.min([val, max_val])])
 
 
-def lon_lat_to_bing_tile(longitude, latitude, level, tile_pixels=256):
+def lon_lat_to_bing_tile(longitude: float, latitude: float, level: int, tile_pixels: int = 256) -> float:
+    """
+    Convert longitude and latitude to Bing tile coordinates.
+    @param longitude: Longitude of the location in degrees.
+    @param latitude: Latitude of the location in degrees.
+    @param level: Zoom level for the Bing tile.
+    @param tile_pixels: Size of the tile in pixels (default is 256).
+    @returns: (x, y) pair representing the Bing tile coordinates.
+    """
     zoom_factor = 1 << level
     pixel_x = longitude_to_world_pixel(longitude, zoom_factor)
     x = int(map_clip(np.floor(pixel_x / tile_pixels), 0, tile_pixels * zoom_factor - 1))
@@ -360,7 +399,14 @@ def lon_lat_to_bing_tile(longitude, latitude, level, tile_pixels=256):
     return x, y
 
 
-def lon_lat_to_bing_tile_df_row(row, level):
+def lon_lat_to_bing_tile_df_row(row: int, level: int) -> int:
+    """
+    Convert longitude and latitude in a DataFrame row to Bing tile coordinates.
+    @param row: A DataFrame row containing 'loc_x' (longitude) and 'loc_y' (latitude) attributes.
+    @param level: The zoom level for the Bing tile conversion.
+    @returns: The modified DataFrame row with 'loc_x' and 'loc_y' updated to Bing tile coordinates.
+    """
+
     x, y = lon_lat_to_bing_tile(row.loc_x, row.loc_y, level)
     row.loc_x = x
     row.loc_y = y
@@ -368,10 +414,24 @@ def lon_lat_to_bing_tile_df_row(row, level):
 
 
 def get_lonlat_from_xy_idxs(xy: np.ndarray, lower_left: Tuple[float, float]) -> np.ndarray:
+    """
+    Convert x and y indices to longitude and latitude coordinates.
+    @param xy: A numpy array of x and y indices.
+    @param lower_left: A tuple representing the longitude and latitude of the lower-left corner.
+    @returns: A numpy array of longitude and latitude coordinates.
+    """
     return xy * SRTM_STEP + lower_left
 
 
-def find_closest(data_df, lat, lon):
+def find_closest(data_df: pd.DataFrame, lat: float, lon: float) -> Optional[int]:
+    """
+    Find the closest point in a DataFrame to a given latitude and longitude.
+
+    @param data_df: A pandas DataFrame containing location data with columns 'loc_y' (latitude) and 'loc_x' (longitude).
+    @param lat: Latitude of the target point.
+    @param lon: Longitude of the target point.
+    @returns: The index of the closest point if the minimum distance is less than 100, otherwise None.
+    """
     dist = data_df.apply(lambda row: GISTools.dist((row.loc_y, row.loc_x), (lat, lon)), axis=1)
     if dist.min() < 100:
         return dist.idxmin()
@@ -380,10 +440,20 @@ def find_closest(data_df, lat, lon):
 
 
 def get_track_samples(
-    data_df,
-    num_UEs,
-    ticks,
-):
+    data_df: pd.DataFrame,
+    num_UEs: int,
+    ticks: int,
+) -> pd.DataFrame:
+    """
+    Generate track samples based on a Gauss-Markov mobility model
+    and map them to the closest points in the given dataset.
+
+    @param data_df: Input DataFrame containing location data with columns 'loc_x' and 'loc_y'.
+    @param num_UEs: Number of user equipment (UE) tracks to simulate.
+    @param ticks: Number of time steps to simulate for the mobility model.
+    @returns: A DataFrame containing the sampled track points mapped to the closest points in the input dataset.
+    """
+
     alpha = 0.8
     variance = 0.5
 
@@ -416,6 +486,7 @@ def get_track_samples(
 
     all_track_pts_df = pd.DataFrame(columns=["loc_x", "loc_y"], data=xy_lonlat_ue_tracks)
     all_track_pts_sampled_df = all_track_pts_df.apply(lambda row: find_closest(data_df, row.loc_y, row.loc_x), axis=1)
+
     return data_df.loc[all_track_pts_sampled_df]
 
 
@@ -441,6 +512,9 @@ def bdt(
     num_UEs=10,
     ticks=100,
 ):
+    """
+    Train and test Bayesian Digital Twins (BDT) for cellular network data.
+    """
     site_config_path = sim_idx_folders[0] + "/site_config.csv"
     site_config_df = pd.read_csv(f"/{bucket_path}/{sim_data_path}/{site_config_path}")
 
@@ -503,6 +577,7 @@ def bdt(
     for i in range(len(desired_idxs)):
         train_cell_id = idx_cell_id_mapping[i + 1]
         training_data[train_cell_id] = pd.concat([tilt_per_cell_df[i] for tilt_per_cell_df in percell_data_list])
+
         if track_sampling:
             training_data[train_cell_id] = get_track_samples(
                 training_data[train_cell_id],
@@ -532,6 +607,7 @@ def bdt(
         training_data_idx["cell_carrier_freq_mhz"] = site_config_df[site_config_df["cell_id"] == train_cell_id][
             "cell_carrier_freq_mhz"
         ].values[0]
+
         training_data_idx["log_distance"] = [
             GISTools.get_log_distance(
                 training_data_idx["cell_lat"].values[0],
@@ -576,6 +652,7 @@ def bdt(
         training_data_idx = training_data_idx.drop(
             training_data_idx[
                 (training_data_idx["cell_rxpwr_dbm"] < filter_out_samples_dbm_threshold)
+                & (training_data_idx["log_distance"] > np.log(1000 * filter_out_samples_kms_threshold))
                 & (training_data_idx["log_distance"] > np.log(1000 * filter_out_samples_kms_threshold))
             ].index
         )
@@ -649,6 +726,7 @@ def bdt(
         test_data_idx["cell_carrier_freq_mhz"] = site_config_df[site_config_df["cell_id"] == test_cell_id][
             "cell_carrier_freq_mhz"
         ].values[0]
+
         test_data_idx["log_distance"] = [
             GISTools.get_log_distance(
                 test_data_idx["cell_lat"].values[0],
@@ -784,6 +862,9 @@ def animate_predictions(
     filename,
     cmap="PuBuGn",
 ):
+    """ "
+    Create an animation visualizing true and predicted RSRP values over geographical coordinates.
+    """
     if not FFMPEG_PATH:
         print("Please provide ffmpeg path to create animation")
         return
@@ -820,6 +901,10 @@ def animate_predictions(
 
     # initialization function: plot the background of each frame
     def init():
+        """
+        Initialize the plotting environment by clearing the current figure and setting up the axes.
+        @returns: A list containing the true RSRP points and predicted RSRP points.
+        """
         plt.clf()
         _init_plt(axs)
         # pred_rsrp_points.set_offsets([])
@@ -827,6 +912,13 @@ def animate_predictions(
 
     # animation function.  This is called sequentially
     def animate(i):
+        """
+        Update the animation frame for visualizing predicted RSRP values.
+        @param i: Index of the current animation frame.
+        @returns: A list containing the scatter plot objects for true RSRP points
+                  and predicted RSRP points.
+        """
+
         plt.clf()
         _init_plt(axs)
         pred_rsrp_points = axs[1].scatter(lons, lats, c=pred_rsrp_list[i], cmap=cmap, s=25)
@@ -1082,7 +1174,14 @@ def plot_ue_tracks_on_axis(df: pd.DataFrame, ax, title: str) -> None:
 # Scatter plot of the Cell towers and UE Locations
 
 
-def mro_plot_scatter(df, topology):
+def mro_plot_scatter(df: pd.DataFrame, topology: pd.DataFrame) -> None:
+    """
+    Plot a scatter plot of cell towers and UE (User Equipment) locations.
+    @param df: DataFrame containing UE data with columns 'loc_x', 'loc_y', 'cell_id', and 'sinr_db'.
+    @param topology: DataFrame containing cell tower data with columns 'cell_lon', 'cell_lat', and 'cell_id'.
+    @returns: None. Displays a scatter plot with cell towers and UE locations.
+    """
+
     # Create a figure and axis
     plt.figure(figsize=(10, 8))
 
@@ -1106,7 +1205,7 @@ def mro_plot_scatter(df, topology):
     # Plot UEs from df without labels but with the same color coding
     for _, row in df.iterrows():
         color = color_map.get(row["cell_id"], "black")  # Default to black if unknown cell_id
-        if row["sinr_db"] < -2.9:  # REMOVE COMMENT WHEN sinr_db IS FIXED
+        if row["sinr_db"] < RLF_THRESHOLD:  # REMOVE COMMENT WHEN sinr_db IS FIXED
             color = "grey"  # Change to grey if sinr_db < 2
 
         plt.scatter(row["loc_x"], row["loc_y"], color=color)
@@ -1125,7 +1224,7 @@ def mro_plot_scatter(df, topology):
     plt.show()
 
 
-def get_ues_cells_cartesian_df(data, topology):
+def get_ues_cells_cartesian_df(data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFrame:
     """returns a cartesian dataframe of UE and cell data"""
     if topology["cell_id"].dtype == object:
         topology["cell_id"] = topology["cell_id"].str.replace("cell_", "").astype(int)
@@ -1139,7 +1238,7 @@ def get_ues_cells_cartesian_df(data, topology):
     return cartesian_df
 
 
-def calc_log_distance(cartesian_df):
+def calc_log_distance(cartesian_df: pd.DataFrame) -> pd.DataFrame:
     """adds a log distance column to the cartesian dataframe based on the lat/lon of the UE and cell"""
     cartesian_df["log_distance"] = cartesian_df.apply(
         lambda row: GISTools.get_log_distance(row["latitude"], row["longitude"], row["cell_lat"], row["cell_lon"]),
@@ -1148,7 +1247,7 @@ def calc_log_distance(cartesian_df):
     return cartesian_df
 
 
-def calc_rx_power(cartesian_df):
+def calc_rx_power(cartesian_df: pd.DataFrame) -> pd.DataFrame:
     """adds a cell_rxpwr_dbm column to the cartesian dataframe,
     based on the log distance and cell frequency using fspl"""
     cartesian_df["cell_rxpwr_dbm"] = cartesian_df.apply(
@@ -1158,7 +1257,7 @@ def calc_rx_power(cartesian_df):
     return cartesian_df
 
 
-def calc_relative_bearing(cartesian_df):
+def calc_relative_bearing(cartesian_df: pd.DataFrame) -> pd.DataFrame:
     """adds a relative_bearing column to the cartesian dataframe,
     based on the lat/lon of the UE and cell and az_deg of the cell"""
     cartesian_df["relative_bearing"] = cartesian_df.apply(
@@ -1174,7 +1273,7 @@ def calc_relative_bearing(cartesian_df):
     return cartesian_df
 
 
-def preprocess_ue_data(data, topology):
+def preprocess_ue_data(data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFrame:
     """creates a cartesian dataframe of UE and cell data, adds log distance and rx power columns"""
     cartesian_df = get_ues_cells_cartesian_df(data, topology)
     cartesian_df = calc_log_distance(cartesian_df)
@@ -1271,3 +1370,121 @@ def add_cell_info(new_data_with_rx_data: pd.DataFrame, topology: pd.DataFrame) -
     )
 
     return new_data_topology_merged
+
+
+def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
+    """
+    Plots SINR (in dB) over ticks for a specific ue_id.
+
+    - Solid bold line: Connected cell_id (from df), color-coded.
+    - Dotted lines: All cell_id sinr_db values from df2 for context.
+    - RLF events: Drop to bottom with bold black line.
+    - RLF_THRESHOLD: Horizontal dashed line.
+
+    Parameters:
+    df (pd.DataFrame): Connected cell data: 'ue_id', 'tick', 'sinr_db', 'cell_id' (or 'RLF').
+    df2 (pd.DataFrame): All candidate cell data: 'ue_id', 'tick', 'cell_id', 'sinr_db'.
+    topology (pd.DataFrame): Not used.
+    ue_id (int): UE to plot.
+    """
+    ue_df = df[df["ue_id"] == ue_id].sort_values("tick")
+    ue_df2 = df2[df2["ue_id"] == ue_id].sort_values("tick")
+
+    if ue_df.empty or ue_df2.empty:
+        print(f"No data found for ue_id {ue_id}.")
+        return
+
+    # Base color map
+    base_colors = {1.0: "red", 2.0: "green", 3.0: "blue"}
+
+    # Get all unique cell_ids (excluding RLF) for dynamic coloring
+    all_cell_ids = pd.concat([ue_df2["cell_id"], ue_df[ue_df["cell_id"] != "RLF"]["cell_id"]]).unique()
+    missing_ids = [cid for cid in all_cell_ids if cid not in base_colors]
+
+    # Generate extra colors from colormap if needed
+    extra_colors = cm.get_cmap("tab10", len(missing_ids))
+    dynamic_colors = {cid: extra_colors(i) for i, cid in enumerate(missing_ids)}
+
+    # Merge base + dynamic maps
+    full_color_map = {**base_colors, **dynamic_colors}
+
+    # Drop value for RLF plotting
+    min_sinr = min(ue_df2["sinr_db"].min(), ue_df[ue_df["cell_id"] != "RLF"]["sinr_db"].min())
+    drop_value = min_sinr - 5
+
+    plt.figure(figsize=(12, 6))
+
+    # --- Plot all available cell sinrs (df2) as dotted lines ---
+    for cell_id, group in ue_df2.groupby("cell_id"):
+        plt.plot(
+            group["tick"],
+            group["sinr_db"],
+            linestyle=":",
+            color=full_color_map.get(cell_id, "gray"),
+            label=f"cell_id {cell_id} (available)",
+            alpha=0.5,
+        )
+
+    # --- Plot connected segments (df) ---
+    ue_df["cell_id_shifted"] = ue_df["cell_id"].shift()
+    ue_df["segment"] = (ue_df["cell_id"] != ue_df["cell_id_shifted"]).cumsum()
+
+    for _, segment_df in ue_df.groupby("segment"):
+        cell = segment_df["cell_id"].iloc[0]
+        if cell == "RLF":
+            plt.plot(
+                segment_df["tick"],
+                [drop_value] * len(segment_df),
+                color="black",
+                linestyle="-",
+                linewidth=3,
+                label="RLF",
+            )
+        else:
+            plt.plot(
+                segment_df["tick"],
+                segment_df["sinr_db"],
+                color=full_color_map.get(cell, "gray"),
+                linestyle="-",
+                linewidth=3,
+                label=f"cell_id {cell} (connected)",
+            )
+
+    # --- Plot RLF threshold ---
+    plt.axhline(y=RLF_THRESHOLD, color="black", linestyle="--", linewidth=2, label="RLF_THRESHOLD")
+
+    # --- Decorate ---
+    plt.title(f"SINR over Time for UE ID {ue_id}")
+    plt.xlabel("Tick")
+    plt.ylabel("SINR (dB)")
+    plt.grid(True)
+    plt.legend(title="Legend", bbox_to_anchor=(1.05, 1), loc="upper left")
+    plt.tight_layout()
+    plt.show()
+
+
+def mro_score_3d_plot(df: pd.DataFrame) -> None:
+    """
+    Create an interactive 3D scatter plot using Plotly.
+
+    Parameters:
+    - df (pd.DataFrame): A DataFrame with columns ['hyst', 'ttt', 'score']
+    """
+    # Validate input
+    required_cols = {"hyst", "ttt", "score"}
+    if not required_cols.issubset(df.columns):
+        raise ValueError(f"DataFrame must contain columns: {required_cols}")
+
+    # Create plot
+    fig = px.scatter_3d(
+        df,
+        x="ttt",
+        y="hyst",
+        z="score",
+        color="score",
+        color_continuous_scale="Viridis",
+        title="Interactive 3D Plot: ttt vs hyst vs score",
+    )
+    fig.update_traces(marker=dict(size=5))
+    fig.update_layout(margin=dict(l=0, r=0, b=0, t=30))
+    fig.show()

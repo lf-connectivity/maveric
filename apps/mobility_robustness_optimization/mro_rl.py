@@ -1,20 +1,19 @@
-from .mobility_robustness_optimization import (
-    MobilityRobustnessOptimization,
-    calculate_mro_metric,
-)
-from radp.digital_twin.utils.cell_selection import (
-    perform_attachment_hyst_ttt,
-    find_hyst_diff,
-)
-from notebooks.radp_library import get_ue_data
-from radp.digital_twin.utils.constants import RLF_THRESHOLD
+from typing import Optional
 
-from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import DummyVecEnv
+import numpy as np
+import pandas as pd
+import torch
 from gymnasium import Env
 from gymnasium.spaces import Box
-import numpy as np
-import torch
+from stable_baselines3 import PPO
+from stable_baselines3.common.vec_env import DummyVecEnv
+
+from notebooks.radp_library import get_ue_data
+from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin
+from radp.digital_twin.utils.cell_selection import find_hyst_diff, perform_attachment_hyst_ttt
+from radp.digital_twin.utils.constants import RLF_THRESHOLD
+
+from .mobility_robustness_optimization import MobilityRobustnessOptimization, calculate_mro_metric
 
 
 class ReinforcedMRO(MobilityRobustnessOptimization):
@@ -22,48 +21,43 @@ class ReinforcedMRO(MobilityRobustnessOptimization):
     Solves the mobility robustness optimization problem using reinforcement learning (PPO).
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        mobility_model_params: dict[str, dict],
+        topology: pd.DataFrame,
+        bdt: Optional[dict[str, BayesianDigitalTwin]] = None,
+    ):
+        super().__init__(mobility_model_params, topology, bdt)
 
     def solve(self, total_timesteps=100):
         """
         Trains a PPO agent to optimize hysteresis and TTT values.
         """
         if not self.bayesian_digital_twins:
-            raise ValueError(
-                "Bayesian Digital Twins are not trained. Train the models before calculating metrics."
-            )
+            raise ValueError("Bayesian Digital Twins are not trained. Train the models before calculating metrics.")
 
         # Load and prepare simulation data
         self.simulation_data = get_ue_data(self.mobility_model_params)
-        self.simulation_data = self.simulation_data.rename(
-            columns={"lat": "latitude", "lon": "longitude"}
-        )
+        self.simulation_data = self.simulation_data.rename(columns={"lat": "latitude", "lon": "longitude"})
 
         if self.topology["cell_id"].dtype == int:
-            self.topology["cell_id"] = self.topology["cell_id"].apply(
-                lambda x: f"cell_{int(x)}"
-            )
+            self.topology["cell_id"] = self.topology["cell_id"].apply(lambda x: f"cell_{int(x)}")
 
         predictions, full_prediction_df = self._predictions(self.simulation_data)
-        df = self._preprocess_simulation_data(full_prediction_df)
+        self.simulation_data = self._preprocess_simulation_data(full_prediction_df)
 
         # Define parameter ranges
-        max_diff = find_hyst_diff(df)
-        num_ticks = df["tick"].nunique()
+        max_diff = find_hyst_diff(self.simulation_data)
+        num_ticks = self.simulation_data["tick"].nunique()
         hyst_range = [0, max_diff]
         ttt_range = [2, num_ticks + 1]
 
         # Create and vectorize RL environment
-        env = DummyVecEnv(
-            [lambda: ReinforcedMROEnv(df, RLF_THRESHOLD, hyst_range, ttt_range)]
-        )
+        env = DummyVecEnv([lambda: ReinforcedMROEnv(self.simulation_data, RLF_THRESHOLD, hyst_range, ttt_range)])
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
         # PPO agent
-        model = PPO(
-            "MlpPolicy", env, verbose=2, n_steps=64, batch_size=64, device=device
-        )
+        model = PPO("MlpPolicy", env, verbose=2, n_steps=64, batch_size=64, device=device)
         model.learn(total_timesteps)
 
         # Predict optimal action using trained model
@@ -102,9 +96,7 @@ class ReinforcedMROEnv(Env):
         hyst, ttt = action
         ttt = int(round(ttt))
 
-        attached_df = perform_attachment_hyst_ttt(
-            self.df, hyst, ttt, self.rlf_threshold
-        )
+        attached_df = perform_attachment_hyst_ttt(self.df, hyst, ttt, self.rlf_threshold)
         mro_metric = calculate_mro_metric(attached_df)
 
         reward = mro_metric
