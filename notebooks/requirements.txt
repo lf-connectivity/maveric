@@ -12,3 +12,6 @@ scikit-image==0.19.3
 scikit-learn==1.2.1
 shapely==2.0.1
 torch==2.0.0
+stable_baselines3==2.0.0
+plotly==6.0.1
+python-dotenv==1.0.1
