@@ -69,6 +69,7 @@ srv/
 
 # notebook data
 notebooks/data/sim_data/
+notebooks/data/mro_data/
 
 # lock files
 *.lock
