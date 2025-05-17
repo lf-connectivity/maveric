@@ -1373,6 +1373,20 @@ def add_cell_info(new_data_with_rx_data: pd.DataFrame, topology: pd.DataFrame) -
 
 
 def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
+    """
+    Plots SINR (in dB) over ticks for a specific ue_id.
+
+    - Solid bold line: Connected cell_id (from df), color-coded.
+    - Dotted lines: All cell_id sinr_db values from df2 for context.
+    - RLF events: Drop to bottom with bold black line.
+    - RLF_THRESHOLD: Horizontal dashed line.
+
+    Parameters:
+    df (pd.DataFrame): Connected cell data: 'ue_id', 'tick', 'sinr_db', 'cell_id' (or 'RLF').
+    df2 (pd.DataFrame): All candidate cell data: 'ue_id', 'tick', 'cell_id', 'sinr_db'.
+    topology (pd.DataFrame): Not used.
+    ue_id (int): UE to plot.
+    """
     ue_df = df[df["ue_id"] == ue_id].sort_values("tick").reset_index(drop=True)
     ue_df2 = df2[df2["ue_id"] == ue_id].sort_values("tick")
 
