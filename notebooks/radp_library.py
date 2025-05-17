@@ -1373,95 +1373,94 @@ def add_cell_info(new_data_with_rx_data: pd.DataFrame, topology: pd.DataFrame) -
 
 
 def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
-    """
-    Plots SINR (in dB) over ticks for a specific ue_id.
-
-    - Solid bold line: Connected cell_id (from df), color-coded.
-    - Dotted lines: All cell_id sinr_db values from df2 for context.
-    - RLF events: Drop to bottom with bold black line.
-    - RLF_THRESHOLD: Horizontal dashed line.
-
-    Parameters:
-    df (pd.DataFrame): Connected cell data: 'ue_id', 'tick', 'sinr_db', 'cell_id' (or 'RLF').
-    df2 (pd.DataFrame): All candidate cell data: 'ue_id', 'tick', 'cell_id', 'sinr_db'.
-    topology (pd.DataFrame): Not used.
-    ue_id (int): UE to plot.
-    """
-    ue_df = df[df["ue_id"] == ue_id].sort_values("tick")
+    ue_df = df[df["ue_id"] == ue_id].sort_values("tick").reset_index(drop=True)
     ue_df2 = df2[df2["ue_id"] == ue_id].sort_values("tick")
 
     if ue_df.empty or ue_df2.empty:
         print(f"No data found for ue_id {ue_id}.")
         return
 
-    # Base color map
+    # Base + dynamic color map
     base_colors = {1.0: "red", 2.0: "green", 3.0: "blue"}
-
-    # Get all unique cell_ids (excluding RLF) for dynamic coloring
-    all_cell_ids = pd.concat([ue_df2["cell_id"], ue_df[ue_df["cell_id"] != "RLF"]["cell_id"]]).unique()
+    all_cell_ids = pd.concat([
+        ue_df2["cell_id"],
+        ue_df[ue_df["cell_id"] != "RLF"]["cell_id"]
+    ]).unique()
     missing_ids = [cid for cid in all_cell_ids if cid not in base_colors]
-
-    # Generate extra colors from colormap if needed
     extra_colors = cm.get_cmap("tab10", len(missing_ids))
     dynamic_colors = {cid: extra_colors(i) for i, cid in enumerate(missing_ids)}
-
-    # Merge base + dynamic maps
     full_color_map = {**base_colors, **dynamic_colors}
 
-    # Drop value for RLF plotting
-    min_sinr = min(ue_df2["sinr_db"].min(), ue_df[ue_df["cell_id"] != "RLF"]["sinr_db"].min())
+    min_sinr = min(
+        ue_df2["sinr_db"].min(),
+        ue_df[ue_df["cell_id"] != "RLF"]["sinr_db"].min()
+    )
     drop_value = min_sinr - 5
 
     plt.figure(figsize=(12, 6))
+    legend_cells = set()
 
-    # --- Plot all available cell sinrs (df2) as dotted lines ---
+    # --- Plot all candidate cell SINRs (dotted, bold) ---
     for cell_id, group in ue_df2.groupby("cell_id"):
+        label = f"cell_id {cell_id}" if cell_id not in legend_cells else None
+        legend_cells.add(cell_id)
         plt.plot(
             group["tick"],
             group["sinr_db"],
             linestyle=":",
+            linewidth=2.5,
             color=full_color_map.get(cell_id, "gray"),
-            label=f"cell_id {cell_id} (available)",
-            alpha=0.5,
+            label=label,
+            alpha=0.7,
         )
 
-    # --- Plot connected segments (df) ---
-    ue_df["cell_id_shifted"] = ue_df["cell_id"].shift()
-    ue_df["segment"] = (ue_df["cell_id"] != ue_df["cell_id_shifted"]).cumsum()
+    # --- Plot connected UE SINR as a continuous line, color-coded per cell_id ---
+    previous_idx = None
+    for i in range(len(ue_df) - 1):
+        tick1, tick2 = ue_df.loc[i, "tick"], ue_df.loc[i + 1, "tick"]
+        sinr1, sinr2 = ue_df.loc[i, "sinr_db"], ue_df.loc[i + 1, "sinr_db"]
+        cell1, cell2 = ue_df.loc[i, "cell_id"], ue_df.loc[i + 1, "cell_id"]
 
-    for _, segment_df in ue_df.groupby("segment"):
-        cell = segment_df["cell_id"].iloc[0]
-        if cell == "RLF":
+        # If current or next point is RLF, break the line
+        if cell1 == "RLF" or cell2 == "RLF":
+            continue
+
+        # Draw line from point i to i+1 with color of current cell
+        label = f"cell_id {cell1}" if cell1 not in legend_cells else None
+        if label:
+            legend_cells.add(cell1)
+        plt.plot(
+            [tick1, tick2],
+            [sinr1, sinr2],
+            color=full_color_map.get(cell1, "gray"),
+            linewidth=3,
+            label=label,
+        )
+
+    # --- Plot RLFs as vertical drops ---
+    rlf_ticks = ue_df[ue_df["cell_id"] == "RLF"]["tick"]
+    if not rlf_ticks.empty:
+        for rlf_tick in rlf_ticks:
             plt.plot(
-                segment_df["tick"],
-                [drop_value] * len(segment_df),
-                color="black",
-                linestyle="-",
-                linewidth=3,
-                label="RLF",
+                [rlf_tick],
+                [drop_value],
+                "ko",
+                markersize=8,
+                label="RLF" if "RLF" not in legend_cells else None
             )
-        else:
-            plt.plot(
-                segment_df["tick"],
-                segment_df["sinr_db"],
-                color=full_color_map.get(cell, "gray"),
-                linestyle="-",
-                linewidth=3,
-                label=f"cell_id {cell} (connected)",
-            )
+            legend_cells.add("RLF")
 
-    # --- Plot RLF threshold ---
-    plt.axhline(y=RLF_THRESHOLD, color="black", linestyle="--", linewidth=2, label="RLF_THRESHOLD")
+    # --- RLF Threshold ---
+    plt.axhline(y=RLF_THRESHOLD, color="black", linestyle="--", linewidth=2)
 
-    # --- Decorate ---
+    # --- Final Decorations ---
     plt.title(f"SINR over Time for UE ID {ue_id}")
     plt.xlabel("Tick")
     plt.ylabel("SINR (dB)")
     plt.grid(True)
-    plt.legend(title="Legend", bbox_to_anchor=(1.05, 1), loc="upper left")
+    plt.legend(title=None, bbox_to_anchor=(1.05, 1), loc="upper left")
     plt.tight_layout()
     plt.show()
-
 
 def mro_score_3d_plot(df: pd.DataFrame) -> None:
     """

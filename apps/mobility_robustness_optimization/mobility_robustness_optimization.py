@@ -354,20 +354,39 @@ class MobilityRobustnessOptimization(ABC):
         Returns:
             pd.DataFrame: Updated DataFrame with an additional 'sinr_db' column.
         """
-
-        # Apply per UE and frequency
         df = df.copy()
-        df["sinr_db"] = (
-            df.groupby(["ue_id", "cell_carrier_freq_mhz"])
-            .apply(lambda group: group.apply(lambda row: _compute_row_level_sinr(row, group), axis=1))
-            .reset_index(level=[0, 1], drop=True)
-        )
+        sinr_column = []
+
+        # Group by location
+        for (_, group) in df.groupby(["ue_id", "tick"]):
+            # Group further by frequency layer within the same location
+            freq_groups = group.groupby("cell_carrier_freq_mhz")
+
+            # Create a temporary Series to store sinr values for current group
+            group_sinr_values = pd.Series(index=group.index, dtype=float)
+
+            for freq, freq_group in freq_groups:
+                # List of all rx powers in this frequency group
+                all_rxpowers = freq_group["cell_rxpower_dbm"].tolist()
+                noise_db = constants.LATENT_BACKGROUND_NOISE_DB
+
+                for idx, row in freq_group.iterrows():
+                    serving_power = row["cell_rxpower_dbm"]
+                    # Remove this row's signal from interference
+                    interference_others = [p for p in all_rxpowers if p != serving_power or all_rxpowers.count(p) > 1]
+                    sinr_db = _compute_row_level_sinr(serving_power, interference_others, noise_db)
+                    group_sinr_values.at[idx] = sinr_db
+
+            sinr_column.append(group_sinr_values)
+
+        # Combine all the sinr values and add to DataFrame
+        df["sinr_db"] = pd.concat(sinr_column).sort_index()
 
         return df
 
 
 # Compute SINR for each row (UE–cell pair), given its group
-def _compute_row_level_sinr(row: pd.Series, group: pd.DataFrame) -> float:
+def _compute_row_level_sinr(signal_dbm: float, interference_dbm_list: list, noise_db: float) -> float:
     """
         Computes the SINR for a single UE–cell pair by removing interference
         and noise from the received signal power.
@@ -393,17 +412,12 @@ def _compute_row_level_sinr(row: pd.Series, group: pd.DataFrame) -> float:
         Returns:
             float: The computed SINR value in decibels for the current UE–cell pair.
     """
-    signal_dbm = row["cell_rxpower_dbm"]
-    # Convert background noise from dB to linear scale
-    noise_linear = 10 ** (constants.LATENT_BACKGROUND_NOISE_DB / 10)
+    signal_linear = 10 ** (signal_dbm / 10)
+    interference_linear = sum(10 ** (p / 10) for p in interference_dbm_list)
+    noise_linear = 10 ** (noise_db / 10)
 
-    # Exclude the current row (serving cell) to compute interference
-    interference_linear = np.sum(10 ** (group.loc[group.index != row.name, "cell_rxpower_dbm"] / 10))
-    total_interference_plus_noise_linear = interference_linear + noise_linear
-
-    total_interference_plus_noise_dbm = 10 * np.log10(total_interference_plus_noise_linear)
-    sinr_db = signal_dbm - total_interference_plus_noise_dbm
-    return sinr_db
+    sinr_linear = signal_linear / (interference_linear + noise_linear)
+    return 10 * np.log10(sinr_linear)
 
 
 # Functions for MRO metrics and Handover events
