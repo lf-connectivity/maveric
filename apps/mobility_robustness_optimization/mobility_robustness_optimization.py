@@ -175,6 +175,18 @@ class MobilityRobustnessOptimization(ABC):
         """
         Trains the Bayesian Digital Twins for each cell in the topology using the UE locations and features
         like log distance, relative bearing, and cell received power (Rx power).
+        
+        +---------+----------+-----------+----------------+--------------+-------------------+
+        | cell_id | latitude | longitude | cell_rxpwr_dbm | log_distance | relative_bearing  |
+        +=========+==========+===========+================+==============+===================+
+        |    1    | 90.412   | 23.810    |      -85       |   -2.546     |       25.0        |
+        |    1    | 90.413   | 23.811    |      -90       |   -2.850     |       45.0        |
+        |    2    | 90.415   | 23.812    |      -80       |   -2.268     |       60.0        |
+        |    2    | 90.416   | 23.813    |      -88       |   -2.547     |       90.0        |
+        |    3    | 90.417   | 23.814    |      -78       |   -2.120     |       30.0        |
+        |    3    | 90.418   | 23.815    |      -92       |   -2.760     |       75.0        |
+        +---------+----------+-----------+----------------+--------------+-------------------+
+
         """
         bayesian_digital_twins = {}
         loss_vs_iters = []
@@ -205,6 +217,18 @@ class MobilityRobustnessOptimization(ABC):
         strongest signals, reconfiguring the Gaussian Process with a Scale and RBF kernel, increasing observation
         noise via GaussianLikelihood, and using higher jitter to stabilize Cholesky decomposition before training
         on the processed data.
+        
+        +---------+----------+-----------+----------------+--------------+-------------------+
+        | cell_id | latitude | longitude | cell_rxpwr_dbm | log_distance | relative_bearing  |
+        +=========+==========+===========+================+==============+===================+
+        |    1    | 90.412   | 23.810    |      -85       |   -2.546     |       25.0        |
+        |    1    | 90.413   | 23.811    |      -90       |   -2.850     |       45.0        |
+        |    2    | 90.415   | 23.812    |      -80       |   -2.268     |       60.0        |
+        |    2    | 90.416   | 23.813    |      -88       |   -2.547     |       90.0        |
+        |    3    | 90.417   | 23.814    |      -78       |   -2.120     |       30.0        |
+        |    3    | 90.418   | 23.815    |      -92       |   -2.760     |       75.0        |
+        +---------+----------+-----------+----------------+--------------+-------------------+
+
         """
         # Remove near-duplicates in feature space
         df = df.drop_duplicates(subset=["log_distance", "relative_bearing"])
@@ -232,6 +256,17 @@ class MobilityRobustnessOptimization(ABC):
     def _prepare_train_or_update_data(self, df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         """
         Returnd key value pairs of cell_id and processed DataFrame for each cell_id.
+            
+        +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
+        | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
+        +========+==========+===========+======+=========+==========+==========+==============+========================+
+        |   0    | 90.412   | 23.810    |  0   |    1    | 90.410   | 23.809   |     120       |        1800           |
+        |   1    | 90.413   | 23.811    |  0   |    1    | 90.414   | 23.810   |     120       |        1800           |
+        |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240       |        2100           |
+        |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240       |        2100           |
+        +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
+
+        
         """
         required_columns = {"cell_lat", "cell_lon", "cell_az_deg"}
         if not required_columns.issubset(df.columns):
@@ -281,7 +316,16 @@ class MobilityRobustnessOptimization(ABC):
         """
         Predicts the received power for each User Equipment (UE) at different locations
         and ticks using Bayesian Digital Twins.
-
+          
+        +---------+-----------+------------+----------+
+        |  ue_id  | latitude  | longitude  |   tick   |
+        +=========+===========+============+==========+
+        |    1    | 90.412    | 23.810     |     0    |
+        |    2    | 90.413    | 23.811     |     0    |
+        |    1    | 90.415    | 23.812     |     1    |
+        |    2    | 90.416    | 23.813     |     1    |
+        +---------+-----------+------------+----------+
+        
         It then determines the best cell for each UE to attach based on the predicted power values.
         """
         # self.prediction_data = pred_data
@@ -323,7 +367,18 @@ class MobilityRobustnessOptimization(ABC):
             full_prediction_df["cell_id"] = full_prediction_df["cell_id"].apply(lambda x: f"cell_{x}")
         return predicted, full_prediction_df
 
-    def _preprocess_simulation_data(self, df) -> pd.DataFrame:
+    def _preprocess_simulation_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        '''
+        +------------+-------------+-------------+-------------+------------+------------+-------------------------+
+        | mock_ue_id | cell_id     | rxpower_dbm |  rxpower_stddev_dbm  |  log_distance | pred_means |     tick    |
+        +============+=============+=============+=====================+==============+=============+==============+
+        |     0      | "cell_1"    |   -85.0     |        1.2           |     0.305     |   -86.3     |     0      |
+        |     1      | "cell_2"    |   -88.5     |        1.5           |     0.422     |   -87.1     |     0      |
+        |     0      | "cell_2"    |   -82.1     |        1.1           |     0.207     |   -84.2     |     1      |
+        |     1      | "cell_3"    |   -90.4     |        1.3           |     0.499     |   -89.0     |     1      |
+        +------------+-------------+-------------+----------------------+--------------+-------------+-------------+
+
+        '''
         df.drop(
             columns=["rxpower_stddev_dbm", "rxpower_dbm", "cell_rxpwr_dbm"],
             inplace=True,
@@ -353,6 +408,20 @@ class MobilityRobustnessOptimization(ABC):
 
         Returns:
             pd.DataFrame: Updated DataFrame with an additional 'sinr_db' column.
+               
+        +--------+---------+------------------+------------------------+
+        | ue_id  | cell_id | cell_rxpower_dbm | cell_carrier_freq_mhz  |
+        +========+=========+==================+========================+
+        |   0    |    1    |   -100.311970    |         2100.0         |
+        |   0    |    2    |    -99.841523    |         2100.0         |
+        |   1    |    1    |   -100.294405    |         2100.0         |
+        |   1    |    2    |   -100.132420    |         2100.0         |
+        |   2    |    1    |   -100.650003    |         2100.0         |
+        |   2    |    2    |   -100.456381    |         2100.0         |
+        |   3    |    1    |   -100.987321    |         2100.0         |
+        |   3    |    2    |   -100.864529    |         2100.0         |
+        +--------+---------+------------------+------------------------+
+        
         """
         df = df.copy()
         sinr_column = []
