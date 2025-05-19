@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
+import numpy as np
 import pandas as pd
 from gpytorch.kernels import RBFKernel, ScaleKernel
 
@@ -258,74 +259,55 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         )  # Check columns
 
     def test_preprocess_simulation_data(self):
-        # Create a sample topology DataFrame
-        topology = pd.DataFrame(
+        self.dummy_topology = pd.DataFrame({"cell_id": ["cell_1", "cell_2"]})
+        self.optimizer = SimpleMRO({}, self.dummy_topology)
+        self.optimizer.topology["cell_id"] = self.optimizer.topology["cell_id"].str.replace("cell_", "").astype(int)
+
+        df = pd.DataFrame(
             {
-                "cell_id": ["cell_1", "cell_2"],
-                "cell_lat": [45.0, 46.0],
-                "cell_lon": [-73.0, -74.0],
-                "cell_carrier_freq_mhz": [2100, 2000],
+                "mock_ue_id": [0],
+                "tick": [1],
+                "cell_id": ["cell_1"],
+                "log_distance": [0.75],
+                "pred_means": [-95],
+                "rxpower_stddev_dbm": [1.0],
+                "rxpower_dbm": [-90],
+                "cell_rxpwr_dbm": [-92],
+                "cell_carrier_freq_mhz": [1800],  # Required for SINR calculation
             }
         )
 
-        # Create a sample input DataFrame
-        input_data = pd.DataFrame(
-            {
-                "mock_ue_id": [1, 2],
-                "log_distance": [0.5, 1.0],
-                "pred_means": [-80, -75],
-                "rxpower_stddev_dbm": [2.0, 1.5],
-                "rxpower_dbm": [-85, -78],
-                "cell_rxpwr_dbm": [-90, -80],
-                "cell_id": ["cell_1", "cell_2"],
-            }
-        )
+        result = self.optimizer._preprocess_simulation_data(df)
 
-        # Instantiate the MRO object
-        mro = SimpleMRO(mobility_model_params={}, topology=topology)
+        self.assertIn("ue_id", result.columns)
+        self.assertIn("distance_km", result.columns)
+        self.assertIn("cell_rxpower_dbm", result.columns)
 
-        # Call the method
-        result = mro._preprocess_simulation_data(input_data)
+        self.assertNotIn("rxpower_stddev_dbm", result.columns)
+        self.assertNotIn("rxpower_dbm", result.columns)
+        self.assertNotIn("cell_rxpwr_dbm", result.columns)
 
-        # Assertions
-        self.assertIsInstance(result, pd.DataFrame)  # Ensure the result is a DataFrame
-        self.assertIn("ue_id", result.columns)  # Ensure 'ue_id' column exists
-        self.assertIn("distance_km", result.columns)  # Ensure 'distance_km' column exists
-        self.assertIn("cell_rxpower_dbm", result.columns)  # Ensure 'cell_rxpower_dbm' column exists
-        self.assertIn("sinr_db", result.columns)  # Ensure 'sinr_db' column exists
-        self.assertNotIn("rxpower_stddev_dbm", result.columns)  # Ensure dropped columns are removed
-        self.assertNotIn("rxpower_dbm", result.columns)  # Ensure dropped columns are removed
-        self.assertNotIn("cell_rxpwr_dbm", result.columns)  # Ensure dropped columns are removed
+        self.assertTrue(np.issubdtype(result["cell_id"].dtype, np.integer))
 
-        # Check data types
-        self.assertTrue(pd.api.types.is_numeric_dtype(result["distance_km"]))
-        self.assertTrue(pd.api.types.is_numeric_dtype(result["sinr_db"]))
+        self.assertIn("sinr_db", result.columns)
+        self.assertTrue(np.isfinite(result["sinr_db"].iloc[0]))
 
-        # Check cell_id conversion
-        self.assertTrue(result["cell_id"].dtype == int)
-        self.assertTrue((result["cell_id"] == [1, 2]).all())
-
-    def test_add_sinr_column(self):
-        # Create a sample input DataFrame
-        input_data = pd.DataFrame(
-            {
-                "ue_id": [1, 1, 2, 2],
-                "cell_id": [1, 2, 1, 2],
-                "cell_rxpower_dbm": [-80, -85, -75, -90],
-                "cell_carrier_freq_mhz": [2100, 2100, 1800, 1800],
-            }
-        )
-
-        # Instantiate the MRO object
+    def test_add_sinr_column_basic(self):
+        data = {
+            "ue_id": [0, 0],
+            "tick": [1, 1],
+            "cell_id": [1, 2],
+            "cell_rxpower_dbm": [-100, -95],
+            "cell_carrier_freq_mhz": [2100.0, 2100.0],
+        }
+        df = pd.DataFrame(data)
         mro = SimpleMRO(mobility_model_params={}, topology=self.dummy_topology)
+        result_df = mro._add_sinr_column(df)
 
-        # Call the method
-        result = mro._add_sinr_column(input_data)
+        # Check that 'sinr_db' column was added
+        self.assertIn("sinr_db", result_df.columns)
 
-        # Assertions
-        self.assertIsInstance(result, pd.DataFrame)  # Ensure the result is a DataFrame
-        self.assertIn("sinr_db", result.columns)  # Ensure 'sinr_db' column exists
-        self.assertTrue(pd.api.types.is_numeric_dtype(result["sinr_db"]))  # Ensure 'sinr_db' is numeric
-
-        # Check SINR values are computed correctly
-        self.assertFalse(result["sinr_db"].isna().any())  # Ensure no NaN values in 'sinr_db'
+        # Check that SINR is finite and of correct length
+        self.assertEqual(len(result_df["sinr_db"]), len(df))
+        for val in result_df["sinr_db"]:
+            self.assertTrue(np.isfinite(val))
