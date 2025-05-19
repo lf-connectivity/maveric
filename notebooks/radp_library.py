@@ -235,6 +235,19 @@ def get_percell_data(
     """
     Prediction dataframe cleanup
     Dataframe should contain ['cell_id', 'log_distance', 'relative_bearing', 'cell_rxpwr_dbm'] cloumns.
+    
+    
+    +---------+--------------+------------------+----------------+
+    | cell_id | log_distance | relative_bearing | cell_rxpwr_dbm |
+    +=========+==============+==================+================+
+    |   1     | 102.22       | 33.67            | -85.4          |
+    |   2     | 102.42       | 33.85            | -90.1          |
+    |   3     | 102.54       | 33.87            | -88.9          |
+    |   1     | 102.29       | 33.57            | -75.3          |
+    |   2     | 102.36       | 33.91            | -72.0          |
+    |   3     | 102.08       | 33.83            | -78.7          |
+    +---------+--------------+------------------+----------------+
+    
     """
     data_out = []
     data_stats = []
@@ -252,10 +265,6 @@ def get_percell_data(
     else:
         # get n_samples independent random samples inside training groups
         data_cell_sampled = data_cell_valid.sample(n=min(n_samples, len(data_cell_valid)), random_state=(seed))
-
-    # logging.info(f"n_samples={n_samples}, len(data_cell_valid)={len(data_cell_valid)}")
-    # plt.scatter(y=data_cell_sampled.loc_y, x=data_cell_sampled.loc_x, s=10)
-    # plt.show()
 
     data_out.append(data_cell_sampled.reset_index(drop=True))
 
@@ -431,6 +440,17 @@ def find_closest(data_df: pd.DataFrame, lat: float, lon: float) -> Optional[int]
     @param lat: Latitude of the target point.
     @param lon: Longitude of the target point.
     @returns: The index of the closest point if the minimum distance is less than 100, otherwise None.
+   
+    +------------+------------+
+    |  loc_x     |  loc_y     |
+    +============+============+
+    |  90.412521 | 23.810331  |
+    |  90.413000 | 23.811000  |
+    |  90.410000 | 23.809000  |
+    |  90.420000 | 23.820000  |
+    |  90.405000 | 23.800000  |
+    +------------+------------+
+    
     """
     dist = data_df.apply(lambda row: GISTools.dist((row.loc_y, row.loc_x), (lat, lon)), axis=1)
     if dist.min() < 100:
@@ -452,6 +472,17 @@ def get_track_samples(
     @param num_UEs: Number of user equipment (UE) tracks to simulate.
     @param ticks: Number of time steps to simulate for the mobility model.
     @returns: A DataFrame containing the sampled track points mapped to the closest points in the input dataset.
+    
+    +------------+------------+
+    |  loc_x     |  loc_y     |
+    +============+============+
+    |  90.412521 | 23.810331  |
+    |  90.413000 | 23.811000  |
+    |  90.410000 | 23.809000  |
+    |  90.420000 | 23.820000  |
+    |  90.405000 | 23.800000  |
+    +------------+------------+
+
     """
 
     alpha = 0.8
@@ -1037,6 +1068,18 @@ def calculate_received_power(distance_km: float, frequency_mhz: int) -> float:
 def plot_ue_tracks(df: pd.DataFrame) -> None:
     """
     Plots the movement tracks of unique UE IDs on a grid of subplots.
+    
+    +-------------+------+-----------+------------+
+    | mock_ue_id  | tick |   lat     |    lon     |
+    +=============+======+===========+============+
+    |     1       |  0   | 23.8103   | 90.4125    |
+    |     1       |  1   | 23.8109   | 90.4130    |
+    |     1       |  2   | 23.8115   | 90.4135    |
+    |     2       |  0   | 23.8120   | 90.4140    |
+    |     2       |  1   | 23.8125   | 90.4145    |
+    |     2       |  2   | 23.8130   | 90.4150    |
+    +-------------+------+-----------+------------+
+
     """
 
     # Initialize an empty list to store batch indices
@@ -1116,6 +1159,27 @@ def plot_ue_tracks(df: pd.DataFrame) -> None:
 def plot_ue_tracks_side_by_side(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
     """
     Plots the movement tracks of unique UE IDs from two DataFrames side by side.
+    
+    df1:
+    +-------------+-----------+------------+
+    | mock_ue_id  |   lat     |    lon     |
+    +=============+===========+============+
+    |     1       | 23.8101   | 90.4100    |
+    |     2       | 23.8105   | 90.4110    |
+    |     3       | 23.8110   | 90.4120    |
+    |     4       | 23.8115   | 90.4130    |
+    +-------------+-----------+------------+
+    
+    df2: 
+    +-------------+-----------+------------+
+    | mock_ue_id  |   lat     |    lon     |
+    +=============+===========+============+
+    |     1       | 23.8120   | 90.4140    |
+    |     2       | 23.8125   | 90.4150    |
+    |     3       | 23.8130   | 90.4160    |
+    |     4       | 23.8135   | 90.4170    |
+    +-------------+-----------+------------+
+
     """
     # Set up subplots with 2 columns for side by side plots
     fig, axes = plt.subplots(1, 2, figsize=(25, 10))  # 2 rows, 2 columns (side by side)
@@ -1134,6 +1198,19 @@ def plot_ue_tracks_side_by_side(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
 def plot_ue_tracks_on_axis(df: pd.DataFrame, ax, title: str) -> None:
     """
     Helper function to plot UE tracks on a given axis.
+    
+    +-------------+-----------+------------+
+    | mock_ue_id  |   lat     |    lon     |
+    +=============+===========+============+
+    |     1       | 23.8103   | 90.4125    |
+    |     1       | 23.8109   | 90.4130    |
+    |     1       | 23.8115   | 90.4135    |
+    |     2       | 23.8120   | 90.4140    |
+    |     2       | 23.8125   | 90.4145    |
+    |     2       | 23.8130   | 90.4150    |
+    +-------------+-----------+------------+
+
+    
     """
     data = df
     unique_ids = data["mock_ue_id"].unique()
@@ -1180,6 +1257,25 @@ def mro_plot_scatter(df: pd.DataFrame, topology: pd.DataFrame) -> None:
     @param df: DataFrame containing UE data with columns 'loc_x', 'loc_y', 'cell_id', and 'sinr_db'.
     @param topology: DataFrame containing cell tower data with columns 'cell_lon', 'cell_lat', and 'cell_id'.
     @returns: None. Displays a scatter plot with cell towers and UE locations.
+    
+    df:
+    +---------+--------+--------+----------+
+    | cell_id | loc_x  | loc_y  | sinr_db  |
+    +=========+========+========+==========+
+    |    1    | 90.412 | 23.810 |   15.3   |
+    |    2    | 90.413 | 23.811 |   12.1   |
+    |    1    | 90.415 | 23.812 |   18.7   |
+    |    2    | 90.416 | 23.813 |    5.5   |
+    +---------+--------+--------+----------+
+
+    topology:
+    +---------+----------+----------+
+    | cell_id | cell_lon | cell_lat |
+    +=========+==========+==========+
+    |    1    | 90.410   | 23.809   |
+    |    2    | 90.414   | 23.810   |
+    +---------+----------+----------+
+
     """
 
     # Create a figure and axis
@@ -1225,7 +1321,28 @@ def mro_plot_scatter(df: pd.DataFrame, topology: pd.DataFrame) -> None:
 
 
 def get_ues_cells_cartesian_df(data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFrame:
-    """returns a cartesian dataframe of UE and cell data"""
+    """
+    returns a cartesian dataframe of UE and cell data
+    
+    df:
+    +---------+-----------+------------+----------+
+    |  ue_id  | latitude  | longitude  |   tick   |
+    +=========+===========+============+==========+
+    |    1    | 90.412    | 23.810     |     0    |
+    |    2    | 90.413    | 23.811     |     0    |
+    |    1    | 90.415    | 23.812     |     1    |
+    |    2    | 90.416    | 23.813     |     1    |
+    +---------+-----------+------------+----------+
+
+    topology:
+    +---------+----------+----------+--------------+------------------------+
+    | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
+    +=========+==========+==========+==============+========================+
+    |    1    | 90.410   | 23.809   |     120      |         1800           |
+    |    2    | 90.414   | 23.810   |     240      |         2100           |
+    +---------+----------+----------+--------------+------------------------+
+
+    """
     if topology["cell_id"].dtype == object:
         topology["cell_id"] = topology["cell_id"].str.replace("cell_", "").astype(int)
     data["key"] = 1
@@ -1239,7 +1356,19 @@ def get_ues_cells_cartesian_df(data: pd.DataFrame, topology: pd.DataFrame) -> pd
 
 
 def calc_log_distance(cartesian_df: pd.DataFrame) -> pd.DataFrame:
-    """adds a log distance column to the cartesian dataframe based on the lat/lon of the UE and cell"""
+    """
+    adds a log distance column to the cartesian dataframe based on the lat/lon of the UE and cell
+    
+    +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
+    | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
+    +========+==========+===========+======+=========+==========+==========+==============+========================+
+    |   0    | 90.412   | 23.810    |  0   |    1    | 90.410   | 23.809   |     120       |        1800           |
+    |   1    | 90.413   | 23.811    |  0   |    1    | 90.414   | 23.810   |     120       |        1800           |
+    |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240       |        2100           |
+    |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240       |        2100           |
+    +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
+
+    """
     cartesian_df["log_distance"] = cartesian_df.apply(
         lambda row: GISTools.get_log_distance(row["latitude"], row["longitude"], row["cell_lat"], row["cell_lon"]),
         axis=1,
@@ -1248,8 +1377,21 @@ def calc_log_distance(cartesian_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def calc_rx_power(cartesian_df: pd.DataFrame) -> pd.DataFrame:
-    """adds a cell_rxpwr_dbm column to the cartesian dataframe,
-    based on the log distance and cell frequency using fspl"""
+    """
+    adds a cell_rxpwr_dbm column to the cartesian dataframe,
+    based on the log distance and cell frequency using fspl
+    
+    
+    +--------+----------+-----------+------+---------+----------+----------+--------------+--------------+------------------------+
+    | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  | log_distance |
+    +========+==========+===========+======+=========+==========+==========+==============+========================+==============+
+    |   0    | 90.412   | 23.810    |  0   |    1    | 90.410   | 23.809   |     120       |        1800           |   -2.546     |
+    |   1    | 90.413   | 23.811    |  0   |    1    | 90.414   | 23.810   |     120       |        1800           |   -2.850     |
+    |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240       |        2100           |   -2.268     |
+    |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240       |        2100           |   -2.547     |
+    +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+--------------+
+
+    """
     cartesian_df["cell_rxpwr_dbm"] = cartesian_df.apply(
         lambda row: calculate_received_power(row["log_distance"], row["cell_carrier_freq_mhz"]),
         axis=1,
@@ -1258,8 +1400,20 @@ def calc_rx_power(cartesian_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def calc_relative_bearing(cartesian_df: pd.DataFrame) -> pd.DataFrame:
-    """adds a relative_bearing column to the cartesian dataframe,
-    based on the lat/lon of the UE and cell and az_deg of the cell"""
+    """
+    adds a relative_bearing column to the cartesian dataframe,
+    based on the lat/lon of the UE and cell and az_deg of the cell
+    
+    +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
+    | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
+    +========+==========+===========+======+=========+==========+==========+==============+========================+
+    |   0    | 90.412   | 23.810    |  0   |    1    | 90.410   | 23.809   |     120      |         1800           |
+    |   1    | 90.413   | 23.811    |  0   |    1    | 90.414   | 23.810   |     120      |         1800           |
+    |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240      |         2100           |
+    |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240      |         2100           |
+    +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
+    
+    """
     cartesian_df["relative_bearing"] = cartesian_df.apply(
         lambda row: GISTools.get_relative_bearing(
             row["cell_az_deg"],
@@ -1274,7 +1428,28 @@ def calc_relative_bearing(cartesian_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def preprocess_ue_data(data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFrame:
-    """creates a cartesian dataframe of UE and cell data, adds log distance and rx power columns"""
+    """
+    creates a cartesian dataframe of UE and cell data, adds log distance and rx power columns
+    
+    df:
+    +---------+-----------+------------+----------+
+    |  ue_id  | latitude  | longitude  |   tick   |
+    +=========+===========+============+==========+
+    |    1    | 90.412    | 23.810     |     0    |
+    |    2    | 90.413    | 23.811     |     0    |
+    |    1    | 90.415    | 23.812     |     1    |
+    |    2    | 90.416    | 23.813     |     1    |
+    +---------+-----------+------------+----------+
+
+    topology:
+    +---------+----------+----------+--------------+------------------------+
+    | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
+    +=========+==========+==========+==============+========================+
+    |    1    | 90.410   | 23.809   |     120      |         1800           |
+    |    2    | 90.414   | 23.810   |     240      |         2100           |
+    +---------+----------+----------+--------------+------------------------+
+
+    """
     cartesian_df = get_ues_cells_cartesian_df(data, topology)
     cartesian_df = calc_log_distance(cartesian_df)
     return calc_rx_power(cartesian_df)
@@ -1283,6 +1458,16 @@ def preprocess_ue_data(data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFra
 def normalize_cell_ids(df: pd.DataFrame) -> pd.DataFrame:
     """
     Normalizes the 'cell_id' column in the DataFrame by ensuring all IDs follow the 'cell_<integer>' format.
+    
+    +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
+    | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
+    +========+==========+===========+======+=========+==========+==========+==============+========================+
+    |   0    | 90.412   | 23.810    |  0   |    1    | 90.410   | 23.809   |     120      |         1800           |
+    |   1    | 90.413   | 23.811    |  0   |    1    | 90.414   | 23.810   |     120      |         1800           |
+    |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240      |         2100           |
+    |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240      |         2100           |
+    +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
+    
     """
 
     df = df.copy()
@@ -1293,6 +1478,16 @@ def normalize_cell_ids(df: pd.DataFrame) -> pd.DataFrame:
 def check_cartesian_format(df: pd.DataFrame, topology: pd.DataFrame) -> bool:
     """
     Validates that the DataFrame has the expected cartesian format for cell IDs per pixel.
+    
+    +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
+    | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
+    +========+==========+===========+======+=========+==========+==========+==============+========================+
+    |   0    | 90.412   | 23.810    |  0   |    1    | 90.410   | 23.809   |     120      |         1800           |
+    |   1    | 90.413   | 23.811    |  0   |    1    | 90.414   | 23.810   |     120      |         1800           |
+    |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240      |         2100           |
+    |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240      |         2100           |
+    +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
+    
     """
     expected_cells = list(topology["cell_id"])
     expected_cell_set = set(expected_cells)
@@ -1357,6 +1552,26 @@ def add_cell_info(new_data_with_rx_data: pd.DataFrame, topology: pd.DataFrame) -
     to the DataFrame based on cell_id.
 
     Converts integer cell_id to string format like 'cell_1' to match topology.
+    
+    df:
+    +---------+-----------+------------+----------+----------------+
+    | ue_id   | latitude  | longitude  | tick     | cell_rxpwr_dbm |
+    +=========+===========+============+==========+================+
+    |    1    | 90.412    | 23.810     |    0     |      -85       |
+    |    2    | 90.413    | 23.811     |    0     |      -88       |
+    |    1    | 90.415    | 23.812     |    1     |      -80       |
+    |    2    | 90.416    | 23.813     |    1     |      -90       |
+    +---------+-----------+------------+----------+----------------+
+
+    topology:
+    +---------+----------+----------+--------------+------------------------+
+    | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
+    +=========+==========+==========+==============+========================+
+    |    1    | 90.410   | 23.809   |     120      |         1800           |
+    |    2    | 90.414   | 23.810   |     240      |         2100           |
+    +---------+----------+----------+--------------+------------------------+
+
+    
     """
     # Convert int to str format matching topology: 'cell_1', 'cell_2', etc.
     if new_data_with_rx_data["cell_id"].dtype == int:
@@ -1386,82 +1601,109 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
     df2 (pd.DataFrame): All candidate cell data: 'ue_id', 'tick', 'cell_id', 'sinr_db'.
     topology (pd.DataFrame): Not used.
     ue_id (int): UE to plot.
+    
+    +--------+------+----------+----------+
+    | ue_id  | tick | cell_id  | sinr_db  |
+    +========+======+==========+==========+
+    |   0    |  0   |    1     |  14.0    |
+    |   0    |  0   |    2     |  12.5    |
+    |   1    |  0   |    1     |  13.2    |
+    |   1    |  0   |    2     |  10.8    |
+    |   0    |  1   |    1     |  16.7    |
+    |   0    |  1   |    2     |  12.3    |
+    |   1    |  1   |    1     |  -2.0    |
+    |   1    |  1   |    2     |  -4.3    |
+    +--------+------+----------+----------+ 
+    
     """
-    ue_df = df[df["ue_id"] == ue_id].sort_values("tick")
+    ue_df = df[df["ue_id"] == ue_id].sort_values("tick").reset_index(drop=True)
     ue_df2 = df2[df2["ue_id"] == ue_id].sort_values("tick")
 
     if ue_df.empty or ue_df2.empty:
         print(f"No data found for ue_id {ue_id}.")
         return
 
-    # Base color map
+    # Base + dynamic color map
     base_colors = {1.0: "red", 2.0: "green", 3.0: "blue"}
-
-    # Get all unique cell_ids (excluding RLF) for dynamic coloring
-    all_cell_ids = pd.concat([ue_df2["cell_id"], ue_df[ue_df["cell_id"] != "RLF"]["cell_id"]]).unique()
+    all_cell_ids = pd.concat([
+        ue_df2["cell_id"],
+        ue_df[ue_df["cell_id"] != "RLF"]["cell_id"]
+    ]).unique()
     missing_ids = [cid for cid in all_cell_ids if cid not in base_colors]
-
-    # Generate extra colors from colormap if needed
     extra_colors = cm.get_cmap("tab10", len(missing_ids))
     dynamic_colors = {cid: extra_colors(i) for i, cid in enumerate(missing_ids)}
-
-    # Merge base + dynamic maps
     full_color_map = {**base_colors, **dynamic_colors}
 
-    # Drop value for RLF plotting
-    min_sinr = min(ue_df2["sinr_db"].min(), ue_df[ue_df["cell_id"] != "RLF"]["sinr_db"].min())
+    min_sinr = min(
+        ue_df2["sinr_db"].min(),
+        ue_df[ue_df["cell_id"] != "RLF"]["sinr_db"].min()
+    )
     drop_value = min_sinr - 5
 
     plt.figure(figsize=(12, 6))
+    legend_cells = set()
 
-    # --- Plot all available cell sinrs (df2) as dotted lines ---
+    # --- Plot all candidate cell SINRs (dotted, bold) ---
     for cell_id, group in ue_df2.groupby("cell_id"):
+        label = f"cell_id {cell_id}" if cell_id not in legend_cells else None
+        legend_cells.add(cell_id)
         plt.plot(
             group["tick"],
             group["sinr_db"],
             linestyle=":",
+            linewidth=2.5,
             color=full_color_map.get(cell_id, "gray"),
-            label=f"cell_id {cell_id} (available)",
-            alpha=0.5,
+            label=label,
+            alpha=0.7,
         )
 
-    # --- Plot connected segments (df) ---
-    ue_df["cell_id_shifted"] = ue_df["cell_id"].shift()
-    ue_df["segment"] = (ue_df["cell_id"] != ue_df["cell_id_shifted"]).cumsum()
+    # --- Plot connected UE SINR as a continuous line, color-coded per cell_id ---
+    previous_idx = None
+    for i in range(len(ue_df) - 1):
+        tick1, tick2 = ue_df.loc[i, "tick"], ue_df.loc[i + 1, "tick"]
+        sinr1, sinr2 = ue_df.loc[i, "sinr_db"], ue_df.loc[i + 1, "sinr_db"]
+        cell1, cell2 = ue_df.loc[i, "cell_id"], ue_df.loc[i + 1, "cell_id"]
 
-    for _, segment_df in ue_df.groupby("segment"):
-        cell = segment_df["cell_id"].iloc[0]
-        if cell == "RLF":
+        # If current or next point is RLF, break the line
+        if cell1 == "RLF" or cell2 == "RLF":
+            continue
+
+        # Draw line from point i to i+1 with color of current cell
+        label = f"cell_id {cell1}" if cell1 not in legend_cells else None
+        if label:
+            legend_cells.add(cell1)
+        plt.plot(
+            [tick1, tick2],
+            [sinr1, sinr2],
+            color=full_color_map.get(cell1, "gray"),
+            linewidth=3,
+            label=label,
+        )
+
+    # --- Plot RLFs as vertical drops ---
+    rlf_ticks = ue_df[ue_df["cell_id"] == "RLF"]["tick"]
+    if not rlf_ticks.empty:
+        for rlf_tick in rlf_ticks:
             plt.plot(
-                segment_df["tick"],
-                [drop_value] * len(segment_df),
-                color="black",
-                linestyle="-",
-                linewidth=3,
-                label="RLF",
+                [rlf_tick],
+                [drop_value],
+                "ko",
+                markersize=8,
+                label="RLF" if "RLF" not in legend_cells else None
             )
-        else:
-            plt.plot(
-                segment_df["tick"],
-                segment_df["sinr_db"],
-                color=full_color_map.get(cell, "gray"),
-                linestyle="-",
-                linewidth=3,
-                label=f"cell_id {cell} (connected)",
-            )
+            legend_cells.add("RLF")
 
-    # --- Plot RLF threshold ---
-    plt.axhline(y=RLF_THRESHOLD, color="black", linestyle="--", linewidth=2, label="RLF_THRESHOLD")
+    # --- RLF Threshold ---
+    plt.axhline(y=RLF_THRESHOLD, color="black", linestyle="--", linewidth=2)
 
-    # --- Decorate ---
+    # --- Final Decorations ---
     plt.title(f"SINR over Time for UE ID {ue_id}")
     plt.xlabel("Tick")
     plt.ylabel("SINR (dB)")
     plt.grid(True)
-    plt.legend(title="Legend", bbox_to_anchor=(1.05, 1), loc="upper left")
+    plt.legend(title=None, bbox_to_anchor=(1.05, 1), loc="upper left")
     plt.tight_layout()
     plt.show()
-
 
 def mro_score_3d_plot(df: pd.DataFrame) -> None:
     """
