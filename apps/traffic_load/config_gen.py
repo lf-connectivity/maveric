@@ -19,7 +19,7 @@ except ImportError:
     print("Ensure RADP_ROOT is in PYTHONPATH. Using fallback definitions.")
     class c: # Define fallback constants ONLY IF import fails
         CELL_ID = "cell_id"; CELL_LAT = "cell_lat"; CELL_LON = "cell_lon"
-        CELL_AZ_DEG = "cell_az_deg"; CELL_TXPWR_DBM = "cell_txpwr_dbm"
+        CELL_AZ_DEG = "cell_az_deg"
         ECGI = "ecgi"; SITE_ID = "site_id"; CELL_NAME = "cell_name"
         ENODEB_ID = "enodeb_id"; TAC = "tac"; CELL_CARRIER_FREQ_MHZ = "cell_carrier_freq_mhz"
         LAT = "lat"; LON = "lon"; CELL_EL_DEG = "cell_el_deg"
@@ -52,23 +52,19 @@ class ScenarioConfigurationGenerator:
                                    start_enodeb_id: int = 1,
                                    default_tac: int = 1,
                                    default_freq: int = 2100,
-                                   default_power_dbm: float = 25.0,
                                    azimuth_step: int = 120) -> pd.DataFrame:
         """
         Generates a DataFrame with dummy topology data.
-        (Adapted from the original traffic_3.py)
         """
         logger.info(f"Generating dummy topology for {num_sites} sites with {cells_per_site} cells each.")
         topology_data = []
         current_ecgi = start_ecgi
         current_enodeb_id = start_enodeb_id
 
-        # Define column names using constants if available, otherwise fallback strings
         COL_CELL_ID = getattr(c, 'CELL_ID', 'cell_id')
         COL_CELL_LAT = getattr(c, 'CELL_LAT', 'cell_lat')
         COL_CELL_LON = getattr(c, 'CELL_LON', 'cell_lon')
         COL_CELL_AZ_DEG = getattr(c, 'CELL_AZ_DEG', 'cell_az_deg')
-        COL_CELL_TXPWR_DBM = getattr(c, 'CELL_TXPWR_DBM', 'cell_txpwr_dbm')
         COL_ECGI = getattr(c, 'ECGI', 'ecgi')
         COL_SITE_ID = getattr(c, 'SITE_ID', 'site_id')
         COL_CELL_NAME = getattr(c, 'CELL_NAME', 'cell_name')
@@ -98,17 +94,15 @@ class ScenarioConfigurationGenerator:
                     COL_CELL_LON: site_lon,
                     COL_CELL_ID: cell_id_str,
                     COL_CELL_CARRIER_FREQ_MHZ: default_freq,
-                    COL_CELL_TXPWR_DBM: default_power_dbm + np.random.uniform(-1, 1) # Slight variation
                 }
                 topology_data.append(row)
             current_ecgi += cells_per_site # Increment ECGI per site or per cell as needed
             current_enodeb_id += 1
 
         df = pd.DataFrame(topology_data)
-        column_order = [
+        column_order = [ 
             COL_ECGI, COL_SITE_ID, COL_CELL_NAME, COL_ENODEB_ID, COL_CELL_AZ_DEG, COL_TAC,
-            COL_CELL_LAT, COL_CELL_LON, COL_CELL_ID, COL_CELL_CARRIER_FREQ_MHZ,
-            COL_CELL_TXPWR_DBM
+            COL_CELL_LAT, COL_CELL_LON, COL_CELL_ID, COL_CELL_CARRIER_FREQ_MHZ
         ]
         df = df.reindex(columns=column_order)
         logger.info(f"Generated dummy topology DataFrame with {len(df)} cells.")
@@ -140,7 +134,6 @@ class ScenarioConfigurationGenerator:
                                            cells_per_site: int,
                                            lat_range: Tuple[float, float],
                                            lon_range: Tuple[float, float],
-                                           default_power_dbm: float = 25.0,
                                            azimuth_step: int = 120,
                                            default_config_params: Dict[str, Any] = None,
                                            output_topology_path: str = "topology.csv",
@@ -170,7 +163,7 @@ class ScenarioConfigurationGenerator:
         topology_df = self._generate_dummy_topology_df(
             num_sites=num_sites, cells_per_site=cells_per_site,
             lat_range=lat_range, lon_range=lon_range,
-            default_power_dbm=default_power_dbm, azimuth_step=azimuth_step
+            azimuth_step=azimuth_step
         )
         initial_config_df = self._generate_initial_config_df(topology_df, default_config_params)
 
@@ -180,7 +173,6 @@ class ScenarioConfigurationGenerator:
             logger.info(f"Saved generated topology to {output_topology_path}")
         except Exception as e:
             logger.error(f"Could not save generated topology to {output_topology_path}: {e}")
-            # Decide if to raise or just log
 
         try:
             os.makedirs(os.path.dirname(output_config_path) or '.', exist_ok=True)
@@ -220,19 +212,18 @@ class ScenarioConfigurationGenerator:
             A Pandas DataFrame with dummy training data.
         """
         logger.warning("Generating DUMMY training data. RSRP values DO NOT accurately reflect tilt effects.")
+        logger.warning("An internal assumed TxPower of 25 dBm is used for dummy RSRP calculation.")
         if possible_tilts is None:
-            possible_tilts = list(np.arange(0.0, 21.0, 1.0)) # Default tilts 0-20 degrees
+            possible_tilts = list(np.arange(0.0, 21.0, 1.0)) 
 
-        # Get constant names or defaults
         COL_CELL_ID = getattr(c, 'CELL_ID', 'cell_id')
         COL_CELL_EL_DEG = getattr(c, 'CELL_EL_DEG', 'cell_el_deg')
         COL_LAT = getattr(c, 'LAT', 'lat')
         COL_LON = getattr(c, 'LON', 'lon')
         COL_CELL_LAT = getattr(c, 'CELL_LAT', 'cell_lat')
         COL_CELL_LON = getattr(c, 'CELL_LON', 'cell_lon')
-        COL_CELL_TXPWR_DBM = getattr(c, 'CELL_TXPWR_DBM', 'cell_txpwr_dbm')
         
-        required_topo_cols = [COL_CELL_ID, COL_CELL_LAT, COL_CELL_LON, COL_CELL_TXPWR_DBM]
+        required_topo_cols = [COL_CELL_ID, COL_CELL_LAT, COL_CELL_LON]
         if not all(col in topology_df.columns for col in required_topo_cols):
             missing = [col for col in required_topo_cols if col not in topology_df.columns]
             raise ValueError(f"Topology DF missing required columns for dummy training data: {missing}")
@@ -242,9 +233,15 @@ class ScenarioConfigurationGenerator:
             missing = [col for col in required_ue_cols if col not in ue_data_all_ticks.columns]
             raise ValueError(f"UE data DF missing required columns for dummy training data: {missing}")
 
-
         dummy_training_data_list = []
-        ref_rx_power = -50  # Reference Rx power at 1m (dBm) for simplified model
+        # Assume a fixed Tx Power for this dummy RSRP calculation, as it's no longer in topology.csv
+        assumed_cell_txpwr_val = 25.0 # dBm 
+        ref_rx_power_at_1m_eff = assumed_cell_txpwr_val - 32.45 # Effective Pr at 1m assuming free space (FSPL at 1m for ~2GHz is ~32.45dB, so Pr = Pt-FSPL)
+                                                        # Or, more simply, use an arbitrary reference for Pr at 1m
+        ref_rx_power = -50 # Reference Rx power at a reference distance (e.g. 1m) if Pt was part of it.
+                           # For a simpler model: RSRP ~ C - 10*n*log10(d). C includes TxPower & antenna gains.
+                           # Let's use the previous simple model and just use the assumed_cell_txpwr_val where needed.
+
         path_loss_exponent = 3.5
 
         try:
@@ -279,29 +276,29 @@ class ScenarioConfigurationGenerator:
                     cell_id_val = cell_row[COL_CELL_ID]
                     cell_lat_val = cell_row[COL_CELL_LAT]
                     cell_lon_val = cell_row[COL_CELL_LON]
-                    cell_txpwr_val = cell_row[COL_CELL_TXPWR_DBM]
 
-                    # 1. Calculate Simple RSRP (distance-based)
                     try:
                         dist_km = GISTools.dist((ue_lat_val, ue_lon_val), (cell_lat_val, cell_lon_val))
                         dist_m = dist_km * 1000.0
-                        # Basic path loss: Pr = Pt - PL, PL = K + 10*n*log10(d)
-                        # Simplified: Assume ref_rx_power is Pt - K (power at 1m)
-                        simple_rsrp = ref_rx_power - 10 * path_loss_exponent * np.log10(dist_m) if dist_m > 1e-3 else cell_txpwr_val
-                    except Exception: # Catch any math errors, e.g. log(0) if dist_m is too small
-                        simple_rsrp = cell_txpwr_val - 100 # Heavily penalize if distance calc fails
+                        # Simplified RSRP: Use an arbitrary reference point that implies TxPower.
+                        # Let's use 'ref_rx_power = -50' as power at some reference distance (e.g. 10m)
+                        # and scale from there, or more directly: RSRP = TxPower_assumed - PathLoss
+                        # PathLoss = K + 10*n*log10(d_meters)
+                        # For this dummy data, we'll stick to the simple previous model structure, using the assumed TxPower.
+                        # Arbitrary reference point for calculation start (e.g. Effective power after some initial loss)
+                        effective_start_power = assumed_cell_txpwr_val - 40 # Example: TxPower minus some antenna gain and fixed losses
+                        simple_rsrp = effective_start_power - 10 * path_loss_exponent * np.log10(dist_m) if dist_m > 1.0 else assumed_cell_txpwr_val - 40 # Avoid log(<=0) or very high RSRP at <1m
+                    except Exception: 
+                        simple_rsrp = assumed_cell_txpwr_val - 140 # Heavily penalize if distance calc fails
 
-                    # 2. Assign Random Tilt
                     random_tilt = np.random.choice(possible_tilts)
-
-                    # 3. Apply Crude Tilt Adjustment to RSRP
                     tilt_deviation = abs(random_tilt - assumed_optimal_tilt)
                     rsrp_penalty = tilt_deviation * tilt_penalty_factor
                     adjusted_rsrp = simple_rsrp - rsrp_penalty
 
                     dummy_training_data_list.append({
                         COL_CELL_ID: cell_id_val,
-                        "avg_rsrp": adjusted_rsrp, # This is the "dummy" RSRP
+                        "avg_rsrp": adjusted_rsrp, 
                         COL_LON: ue_lon_val,
                         COL_LAT: ue_lat_val,
                         COL_CELL_EL_DEG: random_tilt
@@ -310,7 +307,6 @@ class ScenarioConfigurationGenerator:
             final_dummy_training_df = pd.DataFrame()
             if dummy_training_data_list:
                 final_dummy_training_df = pd.DataFrame(dummy_training_data_list)
-                # Ensure correct column order
                 output_cols = [COL_CELL_ID, "avg_rsrp", COL_LON, COL_LAT, COL_CELL_EL_DEG]
                 final_dummy_training_df = final_dummy_training_df[output_cols]
             

@@ -60,7 +60,6 @@ def main(args):
             cells_per_site=args.cells_per_site,
             lat_range=tuple(args.lat_range),
             lon_range=tuple(args.lon_range),
-            default_power_dbm=args.default_cell_power,
             default_config_params=default_cfg_params,
             output_topology_path=args.topology_csv,
             output_config_path=args.config_csv
@@ -101,6 +100,9 @@ def main(args):
 
 
     # --- 2. Load Spatial and Time Parameters ---
+    # Initialize to None in case try block fails before assignment
+    spatial_params = None 
+    time_params = None
     try:
         with open(args.spatial_params_json, "r") as f:
             spatial_params = json.load(f)
@@ -111,23 +113,48 @@ def main(args):
         logger.error(f"Parameter file not found: {e}. Creating dummy files if specified, else exiting.")
         if args.create_dummy_params_if_missing:
             logger.info("Attempting to create dummy spatial and time parameter files.")
-            num_types_generated = 3
-            default_types = [f"type_{i+1}" for i in range(num_types_generated)]
-            spatial_params = {"types": default_types, "proportions": list(np.random.dirichlet(np.ones(num_types_generated)))}
-            with open(args.spatial_params_json, "w") as f: json.dump(spatial_params, f, indent=4)
-            logger.info(f"Created dummy {args.spatial_params_json}")
 
-            num_ticks_dummy = time_params.get("total_ticks", 24) # Use from args if possible, else default
-            time_params = {
-                "total_ticks": num_ticks_dummy, "tick_duration_min": 60,
-                "time_weights": {stype: list(np.random.rand(num_ticks_dummy)) for stype in default_types},
+            # Create dummy spatial_params dictionary and file FIRST
+            # This 'spatial_params' dictionary is now defined for this scope
+            num_spatial_types_generated = 3
+            default_spatial_types = [f"type_{i+1}" for i in range(num_spatial_types_generated)]
+            spatial_params = {
+                "types": default_spatial_types,
+                "proportions": list(np.random.dirichlet(np.ones(num_spatial_types_generated)))
             }
-            with open(args.time_params_json, "w") as f: json.dump(time_params, f, indent=4)
-            logger.info(f"Created dummy {args.time_params_json}")
-        else:
+            try:
+                with open(args.spatial_params_json, "w") as f: json.dump(spatial_params, f, indent=4)
+                logger.info(f"Created dummy {args.spatial_params_json}")
+            except Exception as write_e:
+                 logger.error(f"Could not write dummy {args.spatial_params_json}: {write_e}. Exiting.")
+                 sys.exit(1)
+
+            # Now create dummy time_params dictionary and file
+            # Use types from the 'spatial_params' dictionary created above
+            num_ticks_for_dummy_time = 24 # Default number of ticks for dummy file
+            
+            # This 'time_params' dictionary is now defined for this scope
+            time_params = {
+                "total_ticks": num_ticks_for_dummy_time, 
+                "tick_duration_min": 60,
+                "time_weights": {stype: list(np.random.rand(num_ticks_for_dummy_time)) for stype in default_spatial_types},
+            }
+            try:
+                with open(args.time_params_json, "w") as f: json.dump(time_params, f, indent=4)
+                logger.info(f"Created dummy {args.time_params_json}")
+            except Exception as write_e:
+                 logger.error(f"Could not write dummy {args.time_params_json}: {write_e}. Exiting.")
+                 sys.exit(1)
+        else: # if not args.create_dummy_params_if_missing
+            logger.error(f"Exiting because parameter file was not found and --create_dummy_params_if_missing is false.")
             sys.exit(1)
-    except Exception as e:
+    except Exception as e: # Catch other errors like JSONDecodeError
         logger.error(f"Error loading JSON parameter files: {e}. Exiting.")
+        sys.exit(1)
+    
+    # Ensure dictionaries are loaded/created before proceeding
+    if spatial_params is None or time_params is None:
+        logger.error("Critical error: spatial_params or time_params dictionaries are not defined after loading/dummy creation. Exiting.")
         sys.exit(1)
 
     # --- 3. Generate Traffic Demand ---
@@ -142,19 +169,19 @@ def main(args):
     if not ue_data_per_tick_dict:
         logger.error("Traffic demand generation resulted in no UE data. Exiting.")
         sys.exit(1)
-    if not spatial_layout:
-        logger.warning("Spatial layout generation was empty. Plots might be affected.")
+    if not spatial_layout: # spatial_layout can be empty if Voronoi fails for legit reasons (e.g. <4 sites)
+        logger.warning("Spatial layout generation was empty. Plots might be affected or fail if they rely on it.")
         
     # Save the generated spatial layout (optional)
     try:
         layout_output_path = os.path.join(args.output_dir, "generated_spatial_layout.json")
-        os.makedirs(os.path.dirname(layout_output_path), exist_ok=True)
+        os.makedirs(os.path.dirname(layout_output_path), exist_ok=True) # Ensure dir exists
         serializable_layout = []
-        for cell in spatial_layout:
+        for cell in spatial_layout: # spatial_layout might be empty
             serializable_layout.append({
-                "bounds": [[coord[0], coord[1]] for coord in cell["bounds"]],
-                "type": cell["type"],
-                "cell_id": cell.get("cell_id", -1), # Use .get for safety
+                "bounds": [[coord[0], coord[1]] for coord in cell.get("bounds", [])], # Use .get for safety
+                "type": cell.get("type", "unknown"),
+                "cell_id": cell.get("cell_id", -1), 
                 "area_sq_km": cell.get("area_sq_km", 0.0)
             })
         with open(layout_output_path, "w") as f:
@@ -167,20 +194,29 @@ def main(args):
     # --- 4. Save Per-Tick UE Data ---
     logger.info(f"Saving per-tick UE data to directory: {args.ue_data_dir}")
     os.makedirs(args.ue_data_dir, exist_ok=True)
-    all_ue_dfs = [] # For dummy training data generation
+    all_ue_dfs = [] 
     for tick, ue_df in ue_data_per_tick_dict.items():
         if ue_df.empty:
             logger.info(f"No UEs generated for tick {tick}, skipping save for this tick.")
             continue
         all_ue_dfs.append(ue_df)
-        # Standardize column names for CCO app (mock_ue_id, lon, lat, tick)
-        # Assuming c.LON and c.LAT are already the lon/lat column names from TrafficDemandModel
         COL_LAT = getattr(c, 'LAT', 'lat'); COL_LON = getattr(c, 'LON', 'lon')
-        ue_df_to_save = ue_df[['ue_id', COL_LON, COL_LAT, 'tick']].rename(
-            columns={'ue_id': 'mock_ue_id', COL_LON: 'lon', COL_LAT: 'lat'}
-        )
-        # Ensure correct order
-        ue_df_to_save = ue_df_to_save[['mock_ue_id', 'lon', 'lat', 'tick']]
+        
+        # Ensure required columns exist before trying to rename/select them
+        cols_to_save = {}
+        if 'ue_id' in ue_df.columns: cols_to_save['mock_ue_id'] = ue_df['ue_id']
+        if COL_LON in ue_df.columns: cols_to_save['lon'] = ue_df[COL_LON]
+        if COL_LAT in ue_df.columns: cols_to_save['lat'] = ue_df[COL_LAT]
+        if 'tick' in ue_df.columns: cols_to_save['tick'] = ue_df['tick']
+        
+        ue_df_to_save = pd.DataFrame(cols_to_save)
+        # Ensure correct order, add missing columns with NA if necessary
+        final_columns_order = ['mock_ue_id', 'lon', 'lat', 'tick']
+        for col in final_columns_order:
+            if col not in ue_df_to_save.columns:
+                ue_df_to_save[col] = pd.NA 
+        ue_df_to_save = ue_df_to_save[final_columns_order]
+
 
         output_filename = f"generated_ue_data_for_cco_{tick}.csv"
         output_csv_path = os.path.join(args.ue_data_dir, output_filename)
@@ -195,14 +231,17 @@ def main(args):
     if args.generate_dummy_training_flag:
         if all_ue_dfs:
             combined_ue_data_for_training = pd.concat(all_ue_dfs, ignore_index=True)
-            logger.info("Generating dummy training data...")
-            _ = config_generator.generate_dummy_training_data(
-                topology_df=topology_df,
-                ue_data_all_ticks=combined_ue_data_for_training,
-                num_training_samples=args.num_training_samples,
-                possible_tilts=list(np.arange(0.0, 21.0, 1.0)), # Example tilts
-                output_training_data_path=args.dummy_training_csv
-            )
+            if not combined_ue_data_for_training.empty:
+                logger.info("Generating dummy training data...")
+                _ = config_generator.generate_dummy_training_data(
+                    topology_df=topology_df,
+                    ue_data_all_ticks=combined_ue_data_for_training,
+                    num_training_samples=args.num_training_samples,
+                    possible_tilts=list(np.arange(0.0, 21.0, 1.0)), 
+                    output_training_data_path=args.dummy_training_csv
+                )
+            else:
+                logger.warning("Combined UE data for training is empty. Skipping dummy training data generation.")
         else:
             logger.warning("No UE data was generated across ticks. Skipping dummy training data generation.")
     else:
@@ -212,7 +251,7 @@ def main(args):
     # --- 6. Generate Visualizations ---
     if args.generate_plots_flag:
         logger.info(f"Generating visualizations and saving to directory: {args.plot_dir}")
-        os.makedirs(args.plot_dir, exist_ok=True)
+        os.makedirs(args.plot_dir, exist_ok=True) 
         
         # For serving cell visualization (optional, requires a simple model here or pre-generated data)
         # This app currently does not implement its own serving cell calculation.
@@ -235,7 +274,7 @@ def main(args):
                     tick_to_plot=tick,
                     ue_data_for_tick=ue_df_for_plot,
                     topology_df=topology_df,
-                    spatial_layout=spatial_layout,
+                    spatial_layout=spatial_layout, # spatial_layout might be empty
                     spatial_params_for_colors=spatial_params, # Pass spatial_params for color consistency
                     plot_output_path_template=plot_path_template,
                     serving_cell_data_for_tick=None # Pass actual serving cell data here if available
@@ -286,7 +325,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Adjust relative paths to be under output_dir
+    # Adjust relative paths to be under output_dir for outputs
     args.topology_csv = os.path.join(args.output_dir, args.topology_csv)
     args.config_csv = os.path.join(args.output_dir, args.config_csv)
     args.ue_data_dir = os.path.join(args.output_dir, args.ue_data_dir)
@@ -296,6 +335,6 @@ if __name__ == "__main__":
     # For spatial/time params, we expect them to be inputs, but can create dummies in place if specified
     # So, their paths are not prefixed by output_dir unless user explicitly sets them there.
 
-    os.makedirs(args.output_dir, exist_ok=True)
+    os.makedirs(args.output_dir, exist_ok=True) # Ensure base output directory exists
 
     main(args)

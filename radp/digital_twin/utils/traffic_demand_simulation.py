@@ -374,7 +374,10 @@ class TrafficDemandModel:
 
         Args:
             topology_df: DataFrame with cell tower locations.
-                         Expected columns: c.CELL_ID, c.CELL_LAT, c.CELL_LON.
+                         Expected columns: ecgi, site_id, cell_name, enodeb_id, 
+                                           cell_az_deg, tac, cell_lat, cell_lon, 
+                                           cell_id, cell_carrier_freq_mhz.
+                                           (cell_txpwr_dbm is NOT expected by this model).
             spatial_params: Dictionary defining area "types" and "proportions".
             time_params: Dictionary defining "total_ticks" and "time_weights"
                          (mapping area types to lists of UE density weights per tick).
@@ -393,7 +396,6 @@ class TrafficDemandModel:
         spatial_layout = self._generate_spatial_layout(topology_df, spatial_params)
         if not spatial_layout:
             logger.error("Failed to generate spatial layout. Aborting traffic demand generation.")
-            # Return empty structures
             return {}, []
 
         # 2. Distribute UEs in the layout over time
