@@ -5,20 +5,16 @@ import sys
 import json
 import logging
 import argparse
+from typing import Dict, List, Any
 
 import pandas as pd
 import numpy as np
 
-# Assuming these modules are in the same directory or Python path is set up correctly
-# For a real application, these imports would depend on your project structure
-# and how you install/manage packages.
 try:
-    # If radp is installed or in PYTHONPATH
     from radp.digital_twin.utils.traffic_demand_simulation import TrafficDemandModel
-    from radp.digital_twin.utils import constants as c # For column names
+    from radp.digital_twin.utils import constants as c
 except ImportError:
     print("Error: Could not import TrafficDemandModel or RADP constants.")
-    print("Ensure 'radp' is installed or MAVERIC_ROOT/radp is in your PYTHONPATH.")
     sys.exit(1)
 
 try:
@@ -26,7 +22,6 @@ try:
     from plot_gen import TrafficDataVisualizer
 except ImportError:
     print("Error: Could not import ScenarioConfigurationGenerator or TrafficDataVisualizer.")
-    print("Ensure config_gen.py and plot_gen.py are in the same directory or accessible.")
     sys.exit(1)
 
 
@@ -38,303 +33,173 @@ logger = logging.getLogger(__name__)
 
 def main(args):
     """
-    Main function to orchestrate traffic demand generation, configuration,
-    and visualization.
+    The orchestration of traffic demand generation, configuration, and visualization over multiple days is performed by this function.
     """
+
     logger.info("--- Starting Traffic Demand Application ---")
 
-    # --- 0. Initialize Generators/Models ---
+    # --- 0. Initialization of Generators and Models ---
     config_generator = ScenarioConfigurationGenerator()
     traffic_model = TrafficDemandModel()
     visualizer = TrafficDataVisualizer()
 
-    # --- 1. Load/Generate Topology & Initial Config ---
+    # --- 1. Loading or Generation of Topology and Initial Configuration ---
+    # The topology and initial configuration are loaded or generated once for the entire multi-day simulation.
     topology_df = None
-    initial_config_df = None
-
     if args.generate_config_flag:
+        # If the flag is set, new topology and initial configuration files are generated.
         logger.info("Generating new topology and initial configuration files...")
         default_cfg_params = {getattr(c, 'CELL_EL_DEG', 'cell_el_deg'): args.default_cell_tilt}
-        topology_df, initial_config_df = config_generator.generate_topology_and_config_files(
-            num_sites=args.num_sites,
-            cells_per_site=args.cells_per_site,
-            lat_range=tuple(args.lat_range),
-            lon_range=tuple(args.lon_range),
-            default_config_params=default_cfg_params,
-            output_topology_path=args.topology_csv,
+        topology_df, _ = config_generator.generate_topology_and_config_files(
+            num_sites=args.num_sites, cells_per_site=args.cells_per_site,
+            lat_range=tuple(args.lat_range), lon_range=tuple(args.lon_range),
+            default_config_params=default_cfg_params, output_topology_path=args.topology_csv,
             output_config_path=args.config_csv
         )
     else:
-        logger.info(f"Loading topology from {args.topology_csv} and config from {args.config_csv}")
+        # If the flag is not set, the topology is loaded from the specified CSV file.
+        logger.info(f"Loading topology from {args.topology_csv}")
         try:
             topology_df = pd.read_csv(args.topology_csv)
-            # Basic validation
-            required_topo_cols = [getattr(c, 'CELL_ID', 'cell_id'), getattr(c, 'CELL_LAT', 'cell_lat'), getattr(c, 'CELL_LON', 'cell_lon')]
-            if not all(col in topology_df.columns for col in required_topo_cols):
-                 raise ValueError(f"Topology CSV missing one of required columns: {required_topo_cols}")
-            logger.info(f"Loaded topology with {len(topology_df)} cells.")
-        except FileNotFoundError:
-            logger.error(f"Topology file not found: {args.topology_csv}. Exiting.")
-            sys.exit(1)
         except Exception as e:
             logger.error(f"Error loading topology: {e}. Exiting.")
-            sys.exit(1)
-
-        try:
-            initial_config_df = pd.read_csv(args.config_csv)
-            # Basic validation
-            required_conf_cols = [getattr(c, 'CELL_ID', 'cell_id'), getattr(c, 'CELL_EL_DEG', 'cell_el_deg')]
-            if not all(col in initial_config_df.columns for col in required_conf_cols):
-                raise ValueError(f"Config CSV missing one of required columns: {required_conf_cols}")
-            logger.info(f"Loaded initial config for {len(initial_config_df)} cells.")
-        except FileNotFoundError:
-            logger.error(f"Config file not found: {args.config_csv}. Exiting.")
-            sys.exit(1)
-        except Exception as e:
-            logger.error(f"Error loading config: {e}. Exiting.")
             sys.exit(1)
             
     if topology_df is None or topology_df.empty:
         logger.error("Topology data is not available. Exiting.")
         sys.exit(1)
 
-
-    # --- 2. Load Spatial and Time Parameters ---
-    # Initialize to None in case try block fails before assignment
-    spatial_params = None 
-    time_params = None
+    # --- 2. Loading of Spatial and Temporal Parameters ---
+    # The spatial and temporal parameters are loaded from the provided JSON files.
     try:
         with open(args.spatial_params_json, "r") as f:
             spatial_params = json.load(f)
         with open(args.time_params_json, "r") as f:
             time_params = json.load(f)
-        logger.info(f"Loaded spatial parameters from {args.spatial_params_json} and time parameters from {args.time_params_json}")
-    except FileNotFoundError as e:
-        logger.error(f"Parameter file not found: {e}. Creating dummy files if specified, else exiting.")
-        if args.create_dummy_params_if_missing:
-            logger.info("Attempting to create dummy spatial and time parameter files.")
-
-            # Create dummy spatial_params dictionary and file FIRST
-            # This 'spatial_params' dictionary is now defined for this scope
-            num_spatial_types_generated = 3
-            default_spatial_types = [f"type_{i+1}" for i in range(num_spatial_types_generated)]
-            spatial_params = {
-                "types": default_spatial_types,
-                "proportions": list(np.random.dirichlet(np.ones(num_spatial_types_generated)))
-            }
-            try:
-                with open(args.spatial_params_json, "w") as f: json.dump(spatial_params, f, indent=4)
-                logger.info(f"Created dummy {args.spatial_params_json}")
-            except Exception as write_e:
-                 logger.error(f"Could not write dummy {args.spatial_params_json}: {write_e}. Exiting.")
-                 sys.exit(1)
-
-            # Now create dummy time_params dictionary and file
-            # Use types from the 'spatial_params' dictionary created above
-            num_ticks_for_dummy_time = 24 # Default number of ticks for dummy file
-            
-            # This 'time_params' dictionary is now defined for this scope
-            time_params = {
-                "total_ticks": num_ticks_for_dummy_time, 
-                "tick_duration_min": 60,
-                "time_weights": {stype: list(np.random.rand(num_ticks_for_dummy_time)) for stype in default_spatial_types},
-            }
-            try:
-                with open(args.time_params_json, "w") as f: json.dump(time_params, f, indent=4)
-                logger.info(f"Created dummy {args.time_params_json}")
-            except Exception as write_e:
-                 logger.error(f"Could not write dummy {args.time_params_json}: {write_e}. Exiting.")
-                 sys.exit(1)
-        else: # if not args.create_dummy_params_if_missing
-            logger.error(f"Exiting because parameter file was not found and --create_dummy_params_if_missing is false.")
-            sys.exit(1)
-    except Exception as e: # Catch other errors like JSONDecodeError
+    except Exception as e:
         logger.error(f"Error loading JSON parameter files: {e}. Exiting.")
         sys.exit(1)
     
-    # Ensure dictionaries are loaded/created before proceeding
-    if spatial_params is None or time_params is None:
-        logger.error("Critical error: spatial_params or time_params dictionaries are not defined after loading/dummy creation. Exiting.")
-        sys.exit(1)
-
-    # --- 3. Generate Traffic Demand ---
-    logger.info(f"Generating traffic demand for {args.num_ues} UEs per tick...")
-    ue_data_per_tick_dict, spatial_layout = traffic_model.generate_traffic_demand(
+    # --- 3. Generation of a Fixed Spatial Layout (Executed Once) ---
+    # The spatial layout is generated once and is utilized for all simulation days.
+    logger.info("Generating a fixed spatial layout to be used for all simulation days...")
+    spatial_layout = traffic_model.generate_spatial_layout(
         topology_df=topology_df,
-        spatial_params=spatial_params,
-        time_params=time_params,
-        num_ues_per_tick=args.num_ues
+        spatial_params=spatial_params
     )
-
-    if not ue_data_per_tick_dict:
-        logger.error("Traffic demand generation resulted in no UE data. Exiting.")
+    if not spatial_layout:
+        logger.error("Failed to generate the spatial layout. Cannot proceed with UE distribution.")
         sys.exit(1)
-    if not spatial_layout: # spatial_layout can be empty if Voronoi fails for legit reasons (e.g. <4 sites)
-        logger.warning("Spatial layout generation was empty. Plots might be affected or fail if they rely on it.")
+
+    all_ue_dfs_for_training = []
+
+    # --- 4. Execution of the Main Simulation Loop for N Days ---
+    for day in range(args.days):
+        logger.info(f"--- Starting simulation for Day {day} ---")
         
-    # Save the generated spatial layout (optional)
-    try:
-        layout_output_path = os.path.join(args.output_dir, "generated_spatial_layout.json")
-        os.makedirs(os.path.dirname(layout_output_path), exist_ok=True) # Ensure dir exists
-        serializable_layout = []
-        for cell in spatial_layout: # spatial_layout might be empty
-            serializable_layout.append({
-                "bounds": [[coord[0], coord[1]] for coord in cell.get("bounds", [])], # Use .get for safety
-                "type": cell.get("type", "unknown"),
-                "cell_id": cell.get("cell_id", -1), 
-                "area_sq_km": cell.get("area_sq_km", 0.0)
-            })
-        with open(layout_output_path, "w") as f:
-            json.dump(serializable_layout, f, indent=2)
-        logger.info(f"Saved generated spatial layout to {layout_output_path}")
-    except Exception as e:
-        logger.error(f"Could not save spatial layout: {e}")
+        day_output_dir = os.path.join(args.output_dir, f"Day_{day}")
+        day_ue_data_dir = os.path.join(day_output_dir, os.path.basename(args.ue_data_dir))
+        day_plot_dir = os.path.join(day_output_dir, os.path.basename(args.plot_dir))
+        os.makedirs(day_ue_data_dir, exist_ok=True)
+        os.makedirs(day_plot_dir, exist_ok=True)
+        
+        # The distribution of UEs for the current day is performed using the fixed layout.
+        logger.info(f"Distributing UEs for Day {day} using the fixed layout...")
+        ue_data_per_tick_dict = traffic_model.distribute_ues_over_time(
+            spatial_layout=spatial_layout,
+            time_params=time_params,
+            num_ues_per_tick=args.num_ues
+        )
 
-
-    # --- 4. Save Per-Tick UE Data ---
-    logger.info(f"Saving per-tick UE data to directory: {args.ue_data_dir}")
-    os.makedirs(args.ue_data_dir, exist_ok=True)
-    all_ue_dfs = [] 
-    for tick, ue_df in ue_data_per_tick_dict.items():
-        if ue_df.empty:
-            logger.info(f"No UEs generated for tick {tick}, skipping save for this tick.")
+        if not ue_data_per_tick_dict:
+            logger.warning(f"UE distribution failed for Day {day}. Skipping to next day.")
             continue
-        all_ue_dfs.append(ue_df)
-        COL_LAT = getattr(c, 'LAT', 'lat'); COL_LON = getattr(c, 'LON', 'lon')
+            
+        logger.info(f"Saving per-tick UE data for Day {day} to: {day_ue_data_dir}")
+        for tick, ue_df in ue_data_per_tick_dict.items():
+            if ue_df.empty:
+                continue
+            
+            ue_df_with_day = ue_df.copy()
+            ue_df_with_day['day'] = day
+            all_ue_dfs_for_training.append(ue_df_with_day)
+            
+            cols_to_save = {
+                'mock_ue_id': ue_df.get('ue_id'),
+                'lon': ue_df.get(getattr(c, 'LON', 'lon')),
+                'lat': ue_df.get(getattr(c, 'LAT', 'lat')),
+                'tick': ue_df.get('tick')
+            }
+            ue_df_to_save = pd.DataFrame({k: v for k, v in cols_to_save.items() if v is not None})
+            output_filename = os.path.join(day_ue_data_dir, f"generated_ue_data_for_cco_{tick}.csv")
+            ue_df_to_save.to_csv(output_filename, index=False)
         
-        # Ensure required columns exist before trying to rename/select them
-        cols_to_save = {}
-        if 'ue_id' in ue_df.columns: cols_to_save['mock_ue_id'] = ue_df['ue_id']
-        if COL_LON in ue_df.columns: cols_to_save['lon'] = ue_df[COL_LON]
-        if COL_LAT in ue_df.columns: cols_to_save['lat'] = ue_df[COL_LAT]
-        if 'tick' in ue_df.columns: cols_to_save['tick'] = ue_df['tick']
-        
-        ue_df_to_save = pd.DataFrame(cols_to_save)
-        # Ensure correct order, add missing columns with NA if necessary
-        final_columns_order = ['mock_ue_id', 'lon', 'lat', 'tick']
-        for col in final_columns_order:
-            if col not in ue_df_to_save.columns:
-                ue_df_to_save[col] = pd.NA 
-        ue_df_to_save = ue_df_to_save[final_columns_order]
+        if args.generate_plots_flag:
+            # If plot generation is enabled, visualizations for the current day are generated and saved.
+            logger.info(f"Generating visualizations for Day {day} and saving to: {day_plot_dir}")
+            ticks_to_plot = sorted(ue_data_per_tick_dict.keys())
+            if args.plot_max_ticks > 0 and len(ticks_to_plot) > args.plot_max_ticks:
+                sample_indices = np.linspace(0, len(ticks_to_plot) - 1, args.plot_max_ticks, dtype=int)
+                ticks_to_plot = [ticks_to_plot[i] for i in sample_indices]
 
+            for tick in ticks_to_plot:
+                ue_df_for_plot = ue_data_per_tick_dict.get(tick)
+                if ue_df_for_plot is not None and not ue_df_for_plot.empty:
+                    plot_path_template = os.path.join(day_plot_dir, "ue_distribution_tick_{tick}.png")
+                    visualizer.generate_tick_visualization(
+                        tick_to_plot=tick, ue_data_for_tick=ue_df_for_plot,
+                        topology_df=topology_df, spatial_layout=spatial_layout,
+                        spatial_params_for_colors=spatial_params,
+                        plot_output_path_template=plot_path_template
+                    )
+        logger.info(f"--- Finished simulation for Day {day} ---")
 
-        output_filename = f"generated_ue_data_for_cco_{tick}.csv"
-        output_csv_path = os.path.join(args.ue_data_dir, output_filename)
-        try:
-            ue_df_to_save.to_csv(output_csv_path, index=False)
-            logger.debug(f"Saved UE data for tick {tick} to: {output_csv_path}")
-        except Exception as e:
-            logger.error(f"Failed to save UE data for tick {tick} to {output_csv_path}: {e}")
-    logger.info("Finished saving per-tick UE data.")
-
-    # --- 5. Generate Dummy Training Data ---
+    # --- 5. Generation of Dummy Training Data ---
     if args.generate_dummy_training_flag:
-        if all_ue_dfs:
-            combined_ue_data_for_training = pd.concat(all_ue_dfs, ignore_index=True)
-            if not combined_ue_data_for_training.empty:
-                logger.info("Generating dummy training data...")
-                _ = config_generator.generate_dummy_training_data(
+        # If the flag is set and UE data is available, dummy training data is generated from all simulated days.
+        if all_ue_dfs_for_training:
+            combined_ue_data = pd.concat(all_ue_dfs_for_training, ignore_index=True)
+            if not combined_ue_data.empty:
+                logger.info("Generating dummy training data from all simulated days...")
+                config_generator.generate_dummy_training_data(
                     topology_df=topology_df,
-                    ue_data_all_ticks=combined_ue_data_for_training,
+                    ue_data_all_ticks=combined_ue_data,
                     num_training_samples=args.num_training_samples,
-                    possible_tilts=list(np.arange(0.0, 21.0, 1.0)), 
                     output_training_data_path=args.dummy_training_csv
                 )
-            else:
-                logger.warning("Combined UE data for training is empty. Skipping dummy training data generation.")
         else:
-            logger.warning("No UE data was generated across ticks. Skipping dummy training data generation.")
-    else:
-        logger.info("Skipping dummy training data generation as per flag.")
-
-
-    # --- 6. Generate Visualizations ---
-    if args.generate_plots_flag:
-        logger.info(f"Generating visualizations and saving to directory: {args.plot_dir}")
-        os.makedirs(args.plot_dir, exist_ok=True) 
-        
-        # For serving cell visualization (optional, requires a simple model here or pre-generated data)
-        # This app currently does not implement its own serving cell calculation.
-        # If you need it, you'd add logic here to compute or load it.
-        # For now, plots will show UEs without serving cell specific coloring unless such data is loaded.
-        
-        ticks_to_plot = sorted(ue_data_per_tick_dict.keys())
-        if args.plot_max_ticks > 0 and len(ticks_to_plot) > args.plot_max_ticks:
-            # Plot first, middle, and last few if too many ticks
-            sample_indices = np.linspace(0, len(ticks_to_plot) - 1, args.plot_max_ticks, dtype=int)
-            ticks_to_plot = [ticks_to_plot[i] for i in sample_indices]
-            logger.info(f"Too many ticks to plot all. Plotting a sample of {args.plot_max_ticks} ticks: {ticks_to_plot}")
-
-
-        for tick in ticks_to_plot:
-            ue_df_for_plot = ue_data_per_tick_dict.get(tick)
-            if ue_df_for_plot is not None and not ue_df_for_plot.empty:
-                plot_path_template = os.path.join(args.plot_dir, "ue_distribution_tick_{tick}.png")
-                visualizer.generate_tick_visualization(
-                    tick_to_plot=tick,
-                    ue_data_for_tick=ue_df_for_plot,
-                    topology_df=topology_df,
-                    spatial_layout=spatial_layout, # spatial_layout might be empty
-                    spatial_params_for_colors=spatial_params, # Pass spatial_params for color consistency
-                    plot_output_path_template=plot_path_template,
-                    serving_cell_data_for_tick=None # Pass actual serving cell data here if available
-                )
-            else:
-                logger.info(f"Skipping plot for tick {tick} as no UE data was found.")
-        logger.info("Finished generating visualizations.")
-    else:
-        logger.info("Skipping plot generation as per flag.")
+            logger.warning("No UE data was generated across any day. Skipping dummy training data generation.")
 
     logger.info("--- Traffic Demand Application Finished ---")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Traffic Demand Generation Application")
-
-    # Configuration generation
+    parser = argparse.ArgumentParser(description="Multi-Day Traffic Demand Generation Application")
+    parser.add_argument("--days", type=int, default=5, help="Number of days to simulate.")
     parser.add_argument("--generate_config_flag", action="store_true", help="Generate new topology and config files.")
-    parser.add_argument("--num_sites", type=int, default=5, help="Number of sites to generate if --generate_config_flag is set.")
-    parser.add_argument("--cells_per_site", type=int, default=3, help="Cells per site if --generate_config_flag is set.")
-    parser.add_argument("--lat_range", type=float, nargs=2, default=[40.7, 40.8], help="Latitude range for generation.")
-    parser.add_argument("--lon_range", type=float, nargs=2, default=[-74.05, -73.95], help="Longitude range for generation.")
-    parser.add_argument("--default_cell_power", type=float, default=25.0, help="Default cell Tx power (dBm).")
+    parser.add_argument("--num_sites", type=int, default=5, help="Number of sites to generate.")
+    parser.add_argument("--cells_per_site", type=int, default=3, help="Cells per site.")
+    parser.add_argument("--lat_range", type=float, nargs=2, default=[40.7, 40.8], help="Latitude range.")
+    parser.add_argument("--lon_range", type=float, nargs=2, default=[-74.05, -73.95], help="Longitude range.")
     parser.add_argument("--default_cell_tilt", type=float, default=12.0, help="Default cell electrical tilt.")
-
-    # File paths
-    parser.add_argument("--output_dir", type=str, default="./generated_data", help="Base directory for all generated outputs.")
-    parser.add_argument("--topology_csv", type=str, default="topology.csv", help="Path to topology CSV file (input/output).")
-    parser.add_argument("--config_csv", type=str, default="config.csv", help="Path to initial config CSV file (input/output).")
-    parser.add_argument("--spatial_params_json", type=str, default="spatial_params.json", help="Path to spatial parameters JSON file.")
-    parser.add_argument("--time_params_json", type=str, default="time_params.json", help="Path to time parameters JSON file.")
-    parser.add_argument("--ue_data_dir", type=str, default="ue_data_per_tick", help="Directory to save per-tick UE data CSVs.")
-    parser.add_argument("--dummy_training_csv", type=str, default="dummy_ue_training_data.csv", help="Path to save dummy training data CSV.")
-    parser.add_argument("--plot_dir", type=str, default="plots", help="Directory to save generated plots.")
-
-    # Simulation parameters
+    parser.add_argument("--output_dir", type=str, default="./generated_data", help="Base directory for all outputs.")
+    parser.add_argument("--topology_csv", type=str, default="topology.csv", help="Filename for topology CSV within output_dir.")
+    parser.add_argument("--config_csv", type=str, default="config.csv", help="Filename for initial config CSV within output_dir.")
+    parser.add_argument("--dummy_training_csv", type=str, default="dummy_ue_training_data.csv", help="Filename for dummy training data CSV within output_dir.")
+    parser.add_argument("--spatial_params_json", type=str, default="spatial_params.json", help="Path to spatial parameters JSON.")
+    parser.add_argument("--time_params_json", type=str, default="time_params.json", help="Path to time parameters JSON.")
+    parser.add_argument("--ue_data_dir", type=str, default="ue_data_per_tick", help="Subdirectory name for per-tick UE data within each Day directory.")
+    parser.add_argument("--plot_dir", type=str, default="plots", help="Subdirectory name for plots within each Day directory.")
     parser.add_argument("--num_ues", type=int, default=500, help="Number of UEs to generate per tick.")
-    parser.add_argument("--create_dummy_params_if_missing", action="store_true", help="Create dummy spatial/time JSONs if not found.")
-    
-    # Dummy training data generation
     parser.add_argument("--generate_dummy_training_flag", action="store_true", help="Generate dummy training data file.")
-    parser.add_argument("--num_training_samples", type=int, default=12000, help="Approximate number of samples for dummy training data.")
-
-    # Plotting
+    parser.add_argument("--num_training_samples", type=int, default=12000, help="Number of samples for dummy training data.")
     parser.add_argument("--generate_plots_flag", action="store_true", help="Generate visualization plots.")
-    parser.add_argument("--plot_max_ticks", type=int, default=10, help="Maximum number of ticks to plot if many are generated (0 for all).")
-
-
+    parser.add_argument("--plot_max_ticks", type=int, default=10, help="Max number of ticks to plot per day (0 for all).")
     args = parser.parse_args()
 
-    # Adjust relative paths to be under output_dir for outputs
     args.topology_csv = os.path.join(args.output_dir, args.topology_csv)
     args.config_csv = os.path.join(args.output_dir, args.config_csv)
-    args.ue_data_dir = os.path.join(args.output_dir, args.ue_data_dir)
     args.dummy_training_csv = os.path.join(args.output_dir, args.dummy_training_csv)
-    args.plot_dir = os.path.join(args.output_dir, args.plot_dir)
-    
-    # For spatial/time params, we expect them to be inputs, but can create dummies in place if specified
-    # So, their paths are not prefixed by output_dir unless user explicitly sets them there.
-
-    os.makedirs(args.output_dir, exist_ok=True) # Ensure base output directory exists
+    os.makedirs(args.output_dir, exist_ok=True)
 
     main(args)
