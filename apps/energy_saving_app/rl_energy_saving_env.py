@@ -1,36 +1,35 @@
 # rl_energy_saving_env.py
 
-import os
-import sys
 import logging
-import math
-from typing import Dict, List, Any, Optional, Tuple
+import sys
+from typing import Dict, List, Optional, Tuple
 
 import gymnasium as gym
-from gymnasium import spaces
 import numpy as np
 import pandas as pd
+from gymnasium import spaces
 
 try:
-    from radp.digital_twin.utils import constants as c
-    from radp.digital_twin.utils.gis_tools import GISTools
-    from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin
-    from radp.digital_twin.utils.cell_selection import perform_attachment
     # It is assumed that CCOEngine is located in a module accessible from this path.
     # Adjustments should be made if the project structure differs.
     from apps.coverage_capacity_optimization.cco_engine import CcoEngine
+    from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin
+    from radp.digital_twin.utils import constants as c
+    from radp.digital_twin.utils.cell_selection import perform_attachment
 except ImportError as e:
     print(f"FATAL: Error importing RADP modules for TickAwareEnergyEnv: {e}")
     sys.exit(1)
 
 logger = logging.getLogger(__name__)
 
+
 class TickAwareEnergyEnv(gym.Env):
     """
     An RL environment for energy savings is provided, which is aware of the time of day (tick)
     and utilizes corresponding per-tick UE data for local simulation with BDT models.
     """
-    metadata = {'render_modes': []}
+
+    metadata = {"render_modes": []}
 
     def __init__(
         self,
@@ -42,17 +41,17 @@ class TickAwareEnergyEnv(gym.Env):
         weak_coverage_threshold: float,
         over_coverage_threshold: float,
         qos_sinr_threshold: float,
-        horizon: int
+        horizon: int,
     ):
         super().__init__()
         self.bdt_predictors = bayesian_digital_twins
         self.site_config_df_initial = site_config_df.copy()
-        
-        self.COL_CELL_ID = getattr(c, 'CELL_ID', 'cell_id')
-        self.COL_CELL_EL_DEG = getattr(c, 'CELL_EL_DEG', 'cell_el_deg')
-        self.COL_RSRP_DBM = getattr(c, 'RSRP_DBM', 'rsrp_dbm')
-        self.COL_SINR_DB = getattr(c, 'SINR_DB', 'sinr_db')
-        self.COL_UE_ID = getattr(c, 'UE_ID', 'ue_id') # The UE ID is standardized if present in constants.
+
+        self.COL_CELL_ID = getattr(c, "CELL_ID", "cell_id")
+        self.COL_CELL_EL_DEG = getattr(c, "CELL_EL_DEG", "cell_el_deg")
+        self.COL_RSRP_DBM = getattr(c, "RSRP_DBM", "rsrp_dbm")
+        self.COL_SINR_DB = getattr(c, "SINR_DB", "sinr_db")
+        self.COL_UE_ID = getattr(c, "UE_ID", "ue_id")  # The UE ID is standardized if present in constants.
 
         self.cell_ids = self.site_config_df_initial[self.COL_CELL_ID].unique().tolist()
         self.num_cells = len(self.cell_ids)
@@ -97,20 +96,22 @@ class TickAwareEnergyEnv(gym.Env):
         self.tilt_state = new_tilt_state
         self.site_config_df_state[self.COL_CELL_EL_DEG] = self.tilt_state
 
-    def _run_local_simulation(self, config_df: pd.DataFrame, ue_data_template: pd.DataFrame) -> Optional[pd.DataFrame]:
+    def _run_local_simulation(self, ue_data_template: pd.DataFrame) -> Optional[pd.DataFrame]:
         """
         A local simulation is performed using the current configuration and UE data template.
         Predictions are generated for each active cell using the corresponding BDT predictor.
         The results are combined and the attachment procedure is performed.
         """
-        if ue_data_template is None or ue_data_template.empty: return None
+        if ue_data_template is None or ue_data_template.empty:
+            return None
         all_cell_predictions = []
         active_cell_ids = self.site_config_df_state[self.on_off_state == 1][self.COL_CELL_ID].tolist()
-        
+
         for cell_id in active_cell_ids:
             bdt_predictor = self.bdt_predictors.get(cell_id)
-            if not bdt_predictor: continue
-            
+            if not bdt_predictor:
+                continue
+
             current_cell_config = self.site_config_df_state[self.site_config_df_state[self.COL_CELL_ID] == cell_id]
             pred_frames = BayesianDigitalTwin.create_prediction_frames(
                 site_config_df=current_cell_config, prediction_frame_template=ue_data_template
@@ -120,16 +121,19 @@ class TickAwareEnergyEnv(gym.Env):
                 bdt_predictor.predict_distributed_gpmodel(prediction_dfs=[df_to_predict_on])
                 all_cell_predictions.append(df_to_predict_on)
 
-        if not all_cell_predictions: return pd.DataFrame()
+        if not all_cell_predictions:
+            return pd.DataFrame()
         combined_rf = pd.concat(all_cell_predictions, ignore_index=True)
-        return perform_attachment(combined_rf, self.site_config_df_state[self.site_config_df_state[self.COL_CELL_ID].isin(active_cell_ids)])
+        return perform_attachment(
+            combined_rf, self.site_config_df_state[self.site_config_df_state[self.COL_CELL_ID].isin(active_cell_ids)]
+        )
 
     def _calculate_reward(self, cell_selected_rf_df: Optional[pd.DataFrame]) -> Tuple[float, Dict]:
         """
-        The reward is calculated based on coverage, load balance, QoS, and energy saving.
+        The reward is calculated based on coverage_capacity (CCO), load balance, and energy saving.
         If no RF data is available, a penalty is applied unless all cells are off.
         """
-        info = {"coverage_score": 0.0, "load_balance_score": 0.0, "qos_score": 0.0, "energy_saving_score": 0.0}
+        info = {"cco_score": 0.0, "load_balance_score": 0.0, "energy_saving_score": 0.0}
         num_active_cells = np.sum(self.on_off_state)
         info["energy_saving_score"] = (1.0 - (num_active_cells / self.num_cells)) * 100 if self.num_cells > 0 else 100
 
@@ -137,31 +141,44 @@ class TickAwareEnergyEnv(gym.Env):
             if num_active_cells == 0:
                 logger.debug("All cells off. Reward is based purely on energy saving.")
             else:
-                logger.warning(f"Tick {self.current_tick_of_day}: No RF data for reward calc. High penalty on other metrics.")
-                info["coverage_score"] = -100.0
-                info["qos_score"] = -100.0
+                logger.warning(
+                    f"Tick {self.current_tick_of_day}: No RF data for reward calc. High penalty on other metrics."
+                )
+                info["cco_score"] = -100.0
         else:
             try:
                 cov_df = CcoEngine.rf_to_coverage_dataframe(
-                    cell_selected_rf_df, weak_coverage_threshold=self.weak_coverage_threshold,
-                    over_coverage_threshold=self.over_coverage_threshold
+                    cell_selected_rf_df,
+                    weak_coverage_threshold=self.weak_coverage_threshold,
+                    over_coverage_threshold=self.over_coverage_threshold,
                 )
-                info["coverage_score"] = (1.0 - cov_df['weakly_covered'].mean()) * 100
-                
+
+                active_cell_ids = self.site_config_df_state[self.on_off_state == 1][self.COL_CELL_ID].tolist()
+
+                info["cco_score"] = CcoEngine.get_cco_objective_value(
+                    cov_df, active_ids_list=active_cell_ids, id_field=self.COL_CELL_ID
+                )
+
                 active_topo = self.site_config_df_state[self.on_off_state == 1]
+
                 if not active_topo.empty:
-                    ue_counts = cell_selected_rf_df[self.COL_CELL_ID].value_counts().reindex(active_topo[self.COL_CELL_ID], fill_value=0)
+                    ue_counts = (
+                        cell_selected_rf_df[self.COL_CELL_ID]
+                        .value_counts()
+                        .reindex(active_topo[self.COL_CELL_ID], fill_value=0)
+                    )
                     info["load_balance_score"] = -ue_counts.std() if len(ue_counts) > 1 else 0.0
+
                 else:
-                    info["load_balance_score"] = 0.0 # Perfect balance is assumed if no active cells are present.
-                
-                if self.COL_SINR_DB in cell_selected_rf_df.columns:
-                    info["qos_score"] = (cell_selected_rf_df[self.COL_SINR_DB] >= self.qos_sinr_threshold).mean() * 100
+                    info["load_balance_score"] = 0.0  # Perfect balance is assumed if no active cells are present.
+
             except Exception as e:
-                logger.exception(f"Error during reward calculation: {e}"); return -500.0, info
-        
+                logger.exception(f"Error during reward calculation: {e}")
+                return -500.0, info
+
         reward = sum(self.reward_weights.get(k, 1.0) * v for k, v in info.items() if k in self.reward_weights)
         info["reward_total"] = reward
+
         return reward, info
 
     def reset(self, seed: Optional[int] = None, options: Optional[Dict] = None):
@@ -184,27 +201,30 @@ class TickAwareEnergyEnv(gym.Env):
         """
         self._take_action(action)
         ue_data_df_list = self.ue_data_per_tick.get(self.current_tick_of_day)
-        
+
         if not ue_data_df_list:
             reward, info = -1000.0, {"error": f"No UE data for tick {self.current_tick_of_day}"}
         else:
             # A random index is used to select a DataFrame from the list for the current tick.
             random_day_index = np.random.randint(0, len(ue_data_df_list))
             ue_data_df = ue_data_df_list[random_day_index]
-            
-            active_config = self.site_config_df_state[self.on_off_state == 1]
-            cell_selected_rf = self._run_local_simulation(active_config, ue_data_df)
+
+            # active_config = self.site_config_df_state[self.on_off_state == 1]
+            cell_selected_rf = self._run_local_simulation(ue_data_df)
             reward, info = self._calculate_reward(cell_selected_rf)
 
         info["tick"] = self.current_tick_of_day
         self.current_step_in_episode += 1
         self.current_tick_of_day = (self.current_tick_of_day + 1) % 24
         next_observation = self.current_tick_of_day
-        
+
         terminated = self.current_step_in_episode >= self.horizon
         truncated = False
-        
+
         return next_observation, reward, terminated, truncated, info
-    
-    def render(self): pass
-    def close(self): pass
+
+    def render(self):
+        pass
+
+    def close(self):
+        pass
