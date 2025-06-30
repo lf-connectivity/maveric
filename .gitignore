@@ -74,3 +74,7 @@ notebooks/data/energy_saving_data/
 
 # lock files
 *.lock
+
+# app data
+apps/energy_saving_app/data
+apps/energy_saving_app/generated_data
