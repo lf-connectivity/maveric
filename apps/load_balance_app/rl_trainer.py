@@ -18,7 +18,7 @@ try:
     from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin
     from radp.digital_twin.utils import constants as c
     # The environment is imported from its new file.
-    from cco_rl_env import CCO_RL_Env
+    from apps.load_balance_app.cco_rl_env import CCO_RL_Env
 except ImportError as e:
     print(f"FATAL: Error importing necessary libraries for RL Trainer: {e}. Ensure all dependencies are installed and paths are correct.")
     sys.exit(1)

@@ -70,6 +70,8 @@ srv/
 # notebook data
 notebooks/data/sim_data/
 notebooks/data/mro_data/
+notebooks/data/energy_saving_data/
+notebooks/data/load_balancing_data/
 
 # lock files
 *.lock
