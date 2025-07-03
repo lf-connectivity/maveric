@@ -1,6 +1,6 @@
 # rl_trainer.py
 """
-This module is designed to initialize and train/update an RL agent for energy-saving applications.
+This module is designed to initialize and train an RL agent for energy-saving applications.
 The env is set up using site configuration data, user equipment (UE) data, and a Bayesian Digital Twin (BDT) model.
 The RL agent is trained using the Proximal Policy Optimization (PPO) algorithm from Stable Baselines3.
 Logging is configured for monitoring the training process, and checkpoints are saved periodically.
@@ -22,7 +22,7 @@ try:
     from stable_baselines3 import PPO
     from stable_baselines3.common.callbacks import CheckpointCallback
     from stable_baselines3.common.monitor import Monitor
-
+    from apps.energy_saving_app.rl_energy_saving_env import TickAwareEnergyEnv
     from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin
 except ImportError as e:
     print(f"FATAL: Error importing libraries: {e}")

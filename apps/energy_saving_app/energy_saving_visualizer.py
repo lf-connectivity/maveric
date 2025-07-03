@@ -4,6 +4,7 @@ import sys
 
 import matplotlib.pyplot as plt
 import pandas as pd
+from scipy.spatial import ConvexHull
 
 try:
     from stable_baselines3 import PPO
@@ -129,14 +130,37 @@ class EnergySavingVisualizer:
 
         for site in unique_sites:
             site_ues = served_ues[served_ues["site_id"] == site]
-            ax.scatter(
-                site_ues[self.COL_LON],
-                site_ues[self.COL_LAT],
-                color=color_map[site],
-                s=10,
-                alpha=0.8,
-                label=f"UEs (site_{site.split('_')[1]})",
-            )
+            color = color_map[site]
+
+            for cell_id in site_ues["serving_cell_id"].unique():
+                cell_ues = site_ues[site_ues["serving_cell_id"] == cell_id]
+
+                # Plot UEs
+                ax.scatter(
+                    cell_ues[self.COL_LON],
+                    cell_ues[self.COL_LAT],
+                    color=color,
+                    s=10,
+                    alpha=0.8,
+                    label=f"UEs ({cell_id})",
+                )
+
+                # Plot convex hull if enough points
+                if len(cell_ues) >= 3:
+                    points = cell_ues[[self.COL_LON, self.COL_LAT]].to_numpy()
+                    try:
+                        hull = ConvexHull(points)
+                        for simplex in hull.simplices:
+                            ax.plot(points[simplex, 0], points[simplex, 1], color=color, linewidth=1.5)
+                        # Close polygon
+                        ax.plot(
+                            [points[hull.vertices[-1], 0], points[hull.vertices[0], 0]],
+                            [points[hull.vertices[-1], 1], points[hull.vertices[0], 1]],
+                            color=color,
+                            linewidth=1.5,
+                        )
+                    except Exception as e:
+                        logger.warning(f"Could not plot convex hull for {cell_id}: {e}")
 
         no_serve_ues = plot_df[plot_df["serving_cell_id"].isna()]
         ax.scatter(
