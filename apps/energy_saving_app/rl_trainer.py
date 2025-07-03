@@ -1,7 +1,7 @@
 # rl_trainer.py
 """
-This module is designed to initialize and train a reinforcement learning (RL) agent for energy-saving applications.
-Environment is set up using site configuration data, user equipment (UE) data, and a Bayesian Digital Twin (BDT) model.
+This module is designed to initialize and train an RL agent for energy-saving applications.
+The env is set up using site configuration data, user equipment (UE) data, and a Bayesian Digital Twin (BDT) model.
 The RL agent is trained using the Proximal Policy Optimization (PPO) algorithm from Stable Baselines3.
 Logging is configured for monitoring the training process, and checkpoints are saved periodically.
 """
@@ -18,10 +18,10 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(APP_DIR))
 sys.path.insert(0, PROJECT_ROOT)
 
 try:
+    from rl_energy_saving_env import TickAwareEnergyEnv
     from stable_baselines3 import PPO
     from stable_baselines3.common.callbacks import CheckpointCallback
     from stable_baselines3.common.monitor import Monitor
-
     from apps.energy_saving_app.rl_energy_saving_env import TickAwareEnergyEnv
     from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin
 except ImportError as e:
@@ -105,7 +105,7 @@ def run_rl_training(
         return
 
     try:
-        reward_weights = {"coverage": 0.2, "load_balance": 0.1, "qos": 0.2, "energy_saving": 1.0}
+        reward_weights = {"cco_score": 0.2, "load_balance_score": 0.1, "energy_saving_score": 1.0}
         env = TickAwareEnergyEnv(
             bayesian_digital_twins=bdt_model_map,
             site_config_df=site_config_df,
@@ -122,7 +122,21 @@ def run_rl_training(
         logger.exception(f"Failed to create RL environment: {e}")
         return
 
-    model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=log_dir)
+    # Define policy network architecture for more capacity
+    policy_kwargs = dict(net_arch=dict(pi=[128, 128], vf=[128, 128]))
+
+    # Define and train the agent with hyperparameters, tune where needed
+    model = PPO(
+        "MlpPolicy",
+        env,
+        learning_rate=5e-2,
+        ent_coef=0.001,
+        vf_coef=0.7,
+        policy_kwargs=policy_kwargs,
+        verbose=1,
+        tensorboard_log=log_dir,
+    )
+
     checkpoint_callback = CheckpointCallback(save_freq=10000, save_path=log_dir, name_prefix="energy_rl_model")
 
     logger.info(f"Starting RL training for {total_timesteps} timesteps...")

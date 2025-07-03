@@ -78,3 +78,9 @@ notebooks/data/energy_saving_data/
 # app data
 apps/energy_saving_app/data
 apps/energy_saving_app/generated_data
+
+# logs
+apps/energy_saving_app/rl_training_logs
+
+# rl agent
+apps/energy_saving_app/energy_saver_agent.zip
