@@ -145,7 +145,7 @@ python main_app.py --train-bdt --bdt-model-id "bdt_for_energy_saving" --containe
 Trains the PPO agent using preprocessed data and the BDT model.
 
 ```bash
-python main_app.py --train-rl --train-days 0 1 2 --total-timesteps 50000
+python main_app.py --train-rl --train-days 0 1 2 --total-timesteps 25000
 ```
 
 - **Inputs:** `bdt_model_map.pickle`, `generated_data/Day_*/ue_data_gym_ready/`, `topology.csv`, `config.csv`
@@ -189,7 +189,7 @@ python main_app.py --preprocess-data --train-days 0 1 2 --test-day 3
 python main_app.py --train-bdt --bdt-model-id "bdt_for_energy_saving" --container "radp_dev-training-1"
 
 # 3. Train the RL agent on the first 3 days of data
-python main_app.py --train-rl --train-days 0 1 2 --total-timesteps 50000
+python main_app.py --train-rl --train-days 0 1 2 --total-timesteps 25000
 
 # 4. Predict the optimal configuration for a late-night hour (e.g., 3 AM)
 python main_app.py --infer --tick 3
