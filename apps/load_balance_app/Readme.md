@@ -91,7 +91,7 @@ This step uses the locally saved BDT model and the preprocessed per-tick UE data
 
 #### Train on Days 0, 1, 2, 3 for 120,000 timesteps
 ```bash
-python main_app.py --train-rl --train-days 0 1 2 3 --total-timesteps 120000
+python main_app.py --train-rl --train-days 0 1 2 3 --total-timesteps 30000
 ```
 This loads ./bdt_model_map.pickle.
 
