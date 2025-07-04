@@ -175,6 +175,18 @@ class MobilityRobustnessOptimization(ABC):
         """
         Trains the Bayesian Digital Twins for each cell in the topology using the UE locations and features
         like log distance, relative bearing, and cell received power (Rx power).
+        
+        +---------+----------+-----------+----------------+--------------+-------------------+
+        | cell_id | latitude | longitude | cell_rxpwr_dbm | log_distance | relative_bearing  |
+        +=========+==========+===========+================+==============+===================+
+        |    1    | 90.412   | 23.810    |      -85       |   -2.546     |       25.0        |
+        |    1    | 90.413   | 23.811    |      -90       |   -2.850     |       45.0        |
+        |    2    | 90.415   | 23.812    |      -80       |   -2.268     |       60.0        |
+        |    2    | 90.416   | 23.813    |      -88       |   -2.547     |       90.0        |
+        |    3    | 90.417   | 23.814    |      -78       |   -2.120     |       30.0        |
+        |    3    | 90.418   | 23.815    |      -92       |   -2.760     |       75.0        |
+        +---------+----------+-----------+----------------+--------------+-------------------+
+
         """
         bayesian_digital_twins = {}
         loss_vs_iters = []
@@ -205,6 +217,18 @@ class MobilityRobustnessOptimization(ABC):
         strongest signals, reconfiguring the Gaussian Process with a Scale and RBF kernel, increasing observation
         noise via GaussianLikelihood, and using higher jitter to stabilize Cholesky decomposition before training
         on the processed data.
+        
+        +---------+----------+-----------+----------------+--------------+-------------------+
+        | cell_id | latitude | longitude | cell_rxpwr_dbm | log_distance | relative_bearing  |
+        +=========+==========+===========+================+==============+===================+
+        |    1    | 90.412   | 23.810    |      -85       |   -2.546     |       25.0        |
+        |    1    | 90.413   | 23.811    |      -90       |   -2.850     |       45.0        |
+        |    2    | 90.415   | 23.812    |      -80       |   -2.268     |       60.0        |
+        |    2    | 90.416   | 23.813    |      -88       |   -2.547     |       90.0        |
+        |    3    | 90.417   | 23.814    |      -78       |   -2.120     |       30.0        |
+        |    3    | 90.418   | 23.815    |      -92       |   -2.760     |       75.0        |
+        +---------+----------+-----------+----------------+--------------+-------------------+
+
         """
         # Remove near-duplicates in feature space
         df = df.drop_duplicates(subset=["log_distance", "relative_bearing"])
@@ -232,6 +256,17 @@ class MobilityRobustnessOptimization(ABC):
     def _prepare_train_or_update_data(self, df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         """
         Returnd key value pairs of cell_id and processed DataFrame for each cell_id.
+            
+        +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
+        | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
+        +========+==========+===========+======+=========+==========+==========+==============+========================+
+        |   0    | 90.412   | 23.810    |  0   |    1    | 90.410   | 23.809   |     120       |        1800           |
+        |   1    | 90.413   | 23.811    |  0   |    1    | 90.414   | 23.810   |     120       |        1800           |
+        |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240       |        2100           |
+        |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240       |        2100           |
+        +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
+
+        
         """
         required_columns = {"cell_lat", "cell_lon", "cell_az_deg"}
         if not required_columns.issubset(df.columns):
@@ -281,7 +316,16 @@ class MobilityRobustnessOptimization(ABC):
         """
         Predicts the received power for each User Equipment (UE) at different locations
         and ticks using Bayesian Digital Twins.
-
+          
+        +---------+-----------+------------+----------+
+        |  ue_id  | latitude  | longitude  |   tick   |
+        +=========+===========+============+==========+
+        |    1    | 90.412    | 23.810     |     0    |
+        |    2    | 90.413    | 23.811     |     0    |
+        |    1    | 90.415    | 23.812     |     1    |
+        |    2    | 90.416    | 23.813     |     1    |
+        +---------+-----------+------------+----------+
+        
         It then determines the best cell for each UE to attach based on the predicted power values.
         """
         # self.prediction_data = pred_data
@@ -323,7 +367,18 @@ class MobilityRobustnessOptimization(ABC):
             full_prediction_df["cell_id"] = full_prediction_df["cell_id"].apply(lambda x: f"cell_{x}")
         return predicted, full_prediction_df
 
-    def _preprocess_simulation_data(self, df) -> pd.DataFrame:
+    def _preprocess_simulation_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        '''
+        +------------+-------------+-------------+-------------+------------+------------+-------------------------+
+        | mock_ue_id | cell_id     | rxpower_dbm |  rxpower_stddev_dbm  |  log_distance | pred_means |     tick    |
+        +============+=============+=============+=====================+==============+=============+==============+
+        |     0      | "cell_1"    |   -85.0     |        1.2           |     0.305     |   -86.3     |     0      |
+        |     1      | "cell_2"    |   -88.5     |        1.5           |     0.422     |   -87.1     |     0      |
+        |     0      | "cell_2"    |   -82.1     |        1.1           |     0.207     |   -84.2     |     1      |
+        |     1      | "cell_3"    |   -90.4     |        1.3           |     0.499     |   -89.0     |     1      |
+        +------------+-------------+-------------+----------------------+--------------+-------------+-------------+
+
+        '''
         df.drop(
             columns=["rxpower_stddev_dbm", "rxpower_dbm", "cell_rxpwr_dbm"],
             inplace=True,
@@ -342,7 +397,7 @@ class MobilityRobustnessOptimization(ABC):
             df["cell_id"] = df["cell_id"].str.extract(r"(\d+)").astype(int)
         df = self._add_sinr_column(df)
         return df
-
+    # TODO: Use Utils version of this function
     def _add_sinr_column(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Adds a 'sinr_db' column to the input DataFrame, computing the Signal-to-Interference-plus-Noise Ratio (SINR)
@@ -353,21 +408,54 @@ class MobilityRobustnessOptimization(ABC):
 
         Returns:
             pd.DataFrame: Updated DataFrame with an additional 'sinr_db' column.
+               
+        +--------+---------+------------------+------------------------+
+        | ue_id  | cell_id | cell_rxpower_dbm | cell_carrier_freq_mhz  |
+        +========+=========+==================+========================+
+        |   0    |    1    |   -100.311970    |         2100.0         |
+        |   0    |    2    |    -99.841523    |         2100.0         |
+        |   1    |    1    |   -100.294405    |         2100.0         |
+        |   1    |    2    |   -100.132420    |         2100.0         |
+        |   2    |    1    |   -100.650003    |         2100.0         |
+        |   2    |    2    |   -100.456381    |         2100.0         |
+        |   3    |    1    |   -100.987321    |         2100.0         |
+        |   3    |    2    |   -100.864529    |         2100.0         |
+        +--------+---------+------------------+------------------------+
+        
         """
-
-        # Apply per UE and frequency
         df = df.copy()
-        df["sinr_db"] = (
-            df.groupby(["ue_id", "cell_carrier_freq_mhz"])
-            .apply(lambda group: group.apply(lambda row: _compute_row_level_sinr(row, group), axis=1))
-            .reset_index(level=[0, 1], drop=True)
-        )
+        sinr_column = []
+
+        # Group by location
+        for (_, group) in df.groupby(["ue_id", "tick"]):
+            # Group further by frequency layer within the same location
+            freq_groups = group.groupby("cell_carrier_freq_mhz")
+
+            # Create a temporary Series to store sinr values for current group
+            group_sinr_values = pd.Series(index=group.index, dtype=float)
+
+            for freq, freq_group in freq_groups:
+                # List of all rx powers in this frequency group
+                all_rxpowers = freq_group["cell_rxpower_dbm"].tolist()
+                noise_db = constants.LATENT_BACKGROUND_NOISE_DB
+
+                for idx, row in freq_group.iterrows():
+                    serving_power = row["cell_rxpower_dbm"]
+                    # Remove this row's signal from interference
+                    interference_others = [p for p in all_rxpowers if p != serving_power or all_rxpowers.count(p) > 1]
+                    sinr_db = _compute_row_level_sinr(serving_power, interference_others, noise_db)
+                    group_sinr_values.at[idx] = sinr_db
+
+            sinr_column.append(group_sinr_values)
+
+        # Combine all the sinr values and add to DataFrame
+        df["sinr_db"] = pd.concat(sinr_column).sort_index()
 
         return df
 
 
 # Compute SINR for each row (UE–cell pair), given its group
-def _compute_row_level_sinr(row: pd.Series, group: pd.DataFrame) -> float:
+def _compute_row_level_sinr(signal_dbm: float, interference_dbm_list: list, noise_db: float) -> float:
     """
         Computes the SINR for a single UE–cell pair by removing interference
         and noise from the received signal power.
@@ -393,17 +481,12 @@ def _compute_row_level_sinr(row: pd.Series, group: pd.DataFrame) -> float:
         Returns:
             float: The computed SINR value in decibels for the current UE–cell pair.
     """
-    signal_dbm = row["cell_rxpower_dbm"]
-    # Convert background noise from dB to linear scale
-    noise_linear = 10 ** (constants.LATENT_BACKGROUND_NOISE_DB / 10)
+    signal_linear = 10 ** (signal_dbm / 10)
+    interference_linear = sum(10 ** (p / 10) for p in interference_dbm_list)
+    noise_linear = 10 ** (noise_db / 10)
 
-    # Exclude the current row (serving cell) to compute interference
-    interference_linear = np.sum(10 ** (group.loc[group.index != row.name, "cell_rxpower_dbm"] / 10))
-    total_interference_plus_noise_linear = interference_linear + noise_linear
-
-    total_interference_plus_noise_dbm = 10 * np.log10(total_interference_plus_noise_linear)
-    sinr_db = signal_dbm - total_interference_plus_noise_dbm
-    return sinr_db
+    sinr_linear = signal_linear / (interference_linear + noise_linear)
+    return 10 * np.log10(sinr_linear)
 
 
 # Functions for MRO metrics and Handover events
