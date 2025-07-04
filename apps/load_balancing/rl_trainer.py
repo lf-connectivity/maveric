@@ -18,7 +18,7 @@ try:
     from stable_baselines3.common.monitor import Monitor
 
     # The environment is imported from its new file.
-    from apps.load_balance.cco_rl_env import CCO_RL_Env
+    from apps.load_balancing.cco_rl_env import CCO_RL_Env
     from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin
     from radp.digital_twin.utils import constants as c
 except ImportError as e:
