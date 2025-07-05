@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 
 try:
-    from radp.digital_twin.utils.traffic_demand_simulation import TrafficDemandModel
+    from traffic_demand_simulation import TrafficDemandModel
     from radp.digital_twin.utils import constants as c
 except ImportError:
     print("Error: Could not import TrafficDemandModel or RADP constants.")
