@@ -105,7 +105,7 @@ def run_rl_training(
     # The environment is instantiated.
     try:
         logger.info("Instantiating CCO RL Environment...")
-        reward_weights = {"coverage": 1.0, "load_balance": 2.0, "qos": 1.5}  # These weights are tunable.
+        reward_weights = {"cco": 1.0, "load_balance": 2.0}  # These weights are tunable.
         env = CCO_RL_Env(
             bdt_predictors=bdt_model_map,
             topology_df=site_config_df,  # The hydrated dataframe is passed.

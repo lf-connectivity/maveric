@@ -130,8 +130,8 @@ class CCO_RL_Env(gym.Env):
         return -ue_counts.std() if len(ue_counts) > 1 else 0.0
 
     def _calculate_reward(self, cell_selected_rf: Optional[pd.DataFrame]) -> Tuple[float, Dict]:
-        # The reward is calculated based on coverage, load balancing, and QoS metrics.
-        info = {"coverage_score": 0.0, "load_balance_score": 0.0, "qos_score": 0.0}
+        # The reward is calculated based on coverage_capacity (CCO), load balancing, and QoS metrics.
+        info = {"cco_score": 0.0, "load_balance_score": 0.0}
         if cell_selected_rf is None or cell_selected_rf.empty:
             logger.warning(f"Tick {self.current_tick}: Calculating reward based on empty RF data. High penalty.")
             return -200.0, info
@@ -142,14 +142,17 @@ class CCO_RL_Env(gym.Env):
                 weak_coverage_threshold=self.weak_coverage_threshold_reward,
                 over_coverage_threshold=self.over_coverage_threshold_reward,
             )
-            info["coverage_score"] = (1.0 - cov_df["weakly_covered"].mean()) * 100.0
+
+            active_cell_ids = self.cell_ids
+
+            info["cco_score"] = CcoEngine.get_cco_objective_value(
+                cov_df, active_ids_list=active_cell_ids, id_field=self.COL_CELL_ID
+            )
             info["load_balance_score"] = self._calculate_load_balancing_objective(cell_selected_rf)
-            info["qos_score"] = (cell_selected_rf[self.COL_SINR_DB] >= self.qos_sinr_threshold).mean() * 100.0
 
             reward = (
-                self.reward_weights.get("coverage", 1.0) * info["coverage_score"]
+                self.reward_weights.get("cco", 1.0) * info["cco_score"]
                 + self.reward_weights.get("load_balance", 1.0) * info["load_balance_score"]
-                + self.reward_weights.get("qos", 1.0) * info["qos_score"]
             )
         except Exception as e:
             logger.exception(f"Error during reward calculation: {e}")
