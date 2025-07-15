@@ -6,9 +6,9 @@
 import unittest
 
 import pandas as pd
-from apps.energy_savings.energy_savings_gym import EnergySavingsGym
 
 from apps.coverage_capacity_optimization.cco_engine import CcoEngine
+from apps.energy_savings.energy_savings_gym import EnergySavingsGym
 from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin
 from radp.digital_twin.utils.constants import (
     CELL_AZ_DEG,
