@@ -67,9 +67,29 @@ srv/
 # kmz files
 *.kmz
 
+# lock files
+*.lock
+
 # notebook data
 notebooks/data/sim_data/
 notebooks/data/mro_data/
+notebooks/data/energy_saving_data/
+notebooks/data/load_balancing_data/
 
-# lock files
-*.lock
+# app data
+apps/energy_savings/data
+apps/energy_savings/generated_data
+apps/load_balancing/data
+apps/load_balancing/generated_data
+
+# plots
+apps/energy_savings/plots
+apps/load_balancing/plots
+
+# logs
+apps/energy_savings/rl_training_logs
+apps/load_balancing/rl_training_logs
+
+# rl agent
+apps/energy_savings/energy_saver_agent.zip
+apps/load_balancing/cco_rl_agent_multiday.zip
