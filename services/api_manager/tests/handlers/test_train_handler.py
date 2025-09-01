@@ -7,14 +7,16 @@ from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 from api_manager.exceptions.invalid_parameter_exception import InvalidParameterException
+from api_manager.exceptions.validation_exception import ValidationException
 from api_manager.handlers.train_handler import TrainHandler
 
 valid_train_request_1 = {
     "model_id": "dummy_model",
+    "model_update": False,
     "params": {
-        "maxiter": 0,
-        "lr": 0,
-        "stopping_threshold": 0,
+        "maxiter": 100,
+        "lr": 0.05,
+        "stopping_threshold": 0.0001,
     },
 }
 
@@ -35,9 +37,9 @@ dummy_files = {
 
 class TestTrainHandler(TestCase):
     def test_handle_train_request__invalid_requests(self):
-        with self.assertRaises(InvalidParameterException):
+        with self.assertRaises(ValidationException):
             TrainHandler().handle_train_request(invalid_train_request_1, dummy_files)
-        with self.assertRaises(InvalidParameterException):
+        with self.assertRaises(ValidationException):
             TrainHandler().handle_train_request(invalid_train_request_2, dummy_files)
 
     @patch("builtins.open")
@@ -46,8 +48,10 @@ class TestTrainHandler(TestCase):
     @patch("api_manager.handlers.train_handler.Producer")
     @patch("api_manager.handlers.train_handler.RADPFileSystemHelper")
     @patch("api_manager.handlers.train_handler.produce_object_to_kafka_topic")
+    @patch("api_manager.handlers.train_handler.TrainingRequestValidator")
     def test_handle_train_request__missing_model_id(
         self,
+        mock_validator_class,
         mock_produce,
         mock_file_system_helper,
         mock_producer,
@@ -57,6 +61,11 @@ class TestTrainHandler(TestCase):
     ):
         mock_producer_instance = MagicMock
         mock_producer.return_value = mock_producer_instance
+        
+        # Mock validator
+        mock_validator_instance = MagicMock()
+        mock_validator_class.return_value = mock_validator_instance
+        
         mock_file_system_helper.gen_model_file_path.return_value = (
             "dummy_model_file_path"
         )
@@ -68,9 +77,9 @@ class TestTrainHandler(TestCase):
             "model_update": False,
             "model_id": "dummy_model",
             "training_params": {
-                "maxiter": 0,
-                "lr": 0,
-                "stopping_threshold": 0,
+                "maxiter": 100,
+                "lr": 0.05,
+                "stopping_threshold": 0.0001,
             },
             "model_file_path": "dummy_model_file_path",
             "ue_training_data_file_path": "dummy_ue_training_data_file_path",
