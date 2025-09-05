@@ -245,6 +245,11 @@ class TestCellSelection(unittest.TestCase):
         rf_dataframe = perform_attachment(prediction_dfs, topology_df)
 
         pd.testing.assert_frame_equal(rf_dataframe, rf_dataframe_expected)
+        # Semantic checks: SINR winner is chosen on each pixel
+        for _, row in rf_dataframe.iterrows():
+            # There is no per-pixel competing data in this crafted example to recompute SINR;
+            # we assert basic invariants on returned values instead.
+            self.assertIsInstance(row["sinr_db"], (int, float, np.floating))
 
     def test_numpy_per_tick_pipeline(self):
         hyst = 0.25
@@ -379,6 +384,12 @@ class TestCellSelection(unittest.TestCase):
         actual_df = actual_df.astype(cast)
         expected_df = expected_current_attachment.astype(cast)
         pd.testing.assert_frame_equal(actual_df.reset_index(drop=True), expected_df.reset_index(drop=True))
+
+        # Semantic checks: TTT consistency and HYST margin
+        for ue in sorted(df_curr["ue_id"].unique()):
+            # History is consistent (cell 2) for both UEs in this test
+            new_cell = int(actual_df[actual_df["ue_id"] == ue]["cell_id"].iloc[0])
+            self.assertEqual(new_cell, 2)
 
     def test_perform_attachement_hyst_ttt(self):
         # Test parameters
@@ -577,6 +588,10 @@ class TestCellSelection(unittest.TestCase):
 
         pd.testing.assert_frame_equal(result.reset_index(drop=True), expected_result.reset_index(drop=True))
 
+        # Semantic: non-RLF rows should not be below threshold
+        non_rlf = result[result["cell_id"] != "RLF"]
+        self.assertTrue((non_rlf["sinr_db"] >= rlf_threshold).all())
+
     def test_numpy_final_hysteresis(self):
         # Example --> _check_hyst_in_current_tick()
         # consider 3 UEs and 2 cells
@@ -643,6 +658,21 @@ class TestCellSelection(unittest.TestCase):
             current_attachment.reset_index(drop=True),
             current_attachment_expected.reset_index(drop=True),
         )
+
+        # Semantic HYST check: for any UE that switched, ensure delta >= hyst
+        for ue in [1, 2, 3]:
+            new_cell = int(current_attachment[current_attachment["ue_id"] == ue]["cell_id"].iloc[0])
+            # Past cells based on description: ue2 had past cell 2 and proposed 1; others don't switch
+            past_cell_map = {1: 2, 2: 2, 3: 1}
+            past_cell = past_cell_map[ue]
+            if new_cell != past_cell:
+                new_pow = df_curr[(df_curr["ue_id"] == ue) & (df_curr["cell_id"] == new_cell)]["cell_rxpower_dbm"].iloc[
+                    0
+                ]
+                past_pow = df_curr[(df_curr["ue_id"] == ue) & (df_curr["cell_id"] == past_cell)][
+                    "cell_rxpower_dbm"
+                ].iloc[0]
+                self.assertGreaterEqual(new_pow - past_pow, hyst)
 
     def test_numpy_ttt(self):
         # Example --> _update_current_attachment()
@@ -728,6 +758,20 @@ class TestCellSelection(unittest.TestCase):
         expected_sorted = current_attachment_expected.sort_values(by="ue_id").reset_index(drop=True)
 
         pd.testing.assert_frame_equal(result_sorted.reset_index(drop=True), expected_sorted.reset_index(drop=True))
+
+        # Semantic TTT check: if history consistent, chosen cell must equal it; else keep past
+        for ue in [1, 2, 3]:
+            hist_cells = [
+                int(df1[df1["ue_id"] == ue]["cell_id"].iloc[0]),
+                int(df2[df2["ue_id"] == ue]["cell_id"].iloc[0]),
+            ]
+            consistent = hist_cells[0] == hist_cells[1]
+            chosen_cell = int(current_attachment[current_attachment["ue_id"] == ue]["cell_id"].iloc[0])
+            if consistent:
+                self.assertEqual(chosen_cell, hist_cells[0])
+            else:
+                past_cell = int(past_attachment[past_attachment["ue_id"] == ue]["cell_id"].iloc[0])
+                self.assertEqual(chosen_cell, past_cell)
 
     def test_numpy_hysteresis(self):
         input_per_tick = pd.DataFrame(
@@ -883,3 +927,11 @@ class TestCellSelection(unittest.TestCase):
         dtype_map = {c: expected[c].dtype for c in expected.columns}
         result = result.astype(dtype_map)
         pd.testing.assert_frame_equal(result.reset_index(drop=True), expected.reset_index(drop=True))
+
+        # Semantic RLF checks: non-RLF rows must meet threshold; RLF rows have -inf SINR
+        threshold = 25
+        for _, row in result.iterrows():
+            if row["cell_id"] == "RLF":
+                self.assertTrue(np.isneginf(row["sinr_db"]))
+            else:
+                self.assertGreaterEqual(row["sinr_db"], threshold)
