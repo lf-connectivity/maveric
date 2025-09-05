@@ -1,11 +1,9 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
-from gpytorch.kernels import RBFKernel, ScaleKernel
 
-# import numpy as np
 from apps.mobility_robustness_optimization.mobility_robustness_optimization import (
     BayesianDigitalTwin,
     _count_handovers,
@@ -184,40 +182,6 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         result = calculate_mro_metric(self.df)
         self.assertEqual(result, 1.85)
 
-    def test_update(self):
-        # Mock the Bayesian Digital Twin and its methods
-        mock_twin = MagicMock()
-        self.mro.bayesian_digital_twins = {"cell_001": mock_twin}
-
-        # Create a sample DataFrame to pass to the _update method
-        df = pd.DataFrame(
-            {
-                "log_distance": [0.1, 0.2, 0.3, 0.4, 0.5],
-                "relative_bearing": [10, 20, 30, 40, 50],
-                "cell_rxpwr_dbm": [-80, -75, -70, -65, -60],
-            }
-        )
-
-        # Call the _update method
-        self.mro._update("cell_001", df)
-
-        # Assertions
-        # Ensure duplicates are removed
-        self.assertEqual(mock_twin.update_trained_gpmodel.call_count, 1)
-        processed_df = mock_twin.update_trained_gpmodel.call_args[0][0][0]
-        self.assertTrue(processed_df.equals(df.drop_duplicates(subset=["log_distance", "relative_bearing"])))
-
-        # Ensure the kernel is reconfigured
-        self.assertTrue(isinstance(mock_twin.model.covar_module, ScaleKernel))
-        self.assertTrue(isinstance(mock_twin.model.covar_module.base_kernel, RBFKernel))
-
-        # Ensure GaussianLikelihood is set up correctly
-        self.assertTrue(hasattr(mock_twin, "likelihood"))
-        self.assertEqual(mock_twin.likelihood.noise, 1e-2)
-
-        # Ensure cholesky_jitter context is used
-        mock_twin.update_trained_gpmodel.assert_called_once()
-
     def test_prepare_train_or_update_data(self):
         # Create a sample DataFrame for input
         input_data = pd.DataFrame(
@@ -311,3 +275,73 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         self.assertEqual(len(result_df["sinr_db"]), len(df))
         for val in result_df["sinr_db"]:
             self.assertTrue(np.isfinite(val))
+
+    def test_update_no_sampling_when_small(self):
+        # Arrange: small dataframe (<= 500 rows) with required columns
+        topology = pd.DataFrame({"cell_id": ["cell_1"]})
+        mro = SimpleMRO(
+            mobility_model_params={}, topology=topology, bdt={"cell_1": MagicMock(spec=BayesianDigitalTwin)}
+        )
+
+        n_rows = 100
+        df_small = pd.DataFrame(
+            {
+                "cell_id": ["cell_1"] * n_rows,
+                "log_distance": [float(i) for i in range(n_rows)],
+                "relative_bearing": [float((i * 3) % 180) for i in range(n_rows)],
+                "cell_rxpwr_dbm": [-80.0 - (i % 10) for i in range(n_rows)],
+            }
+        )
+
+        # Act & Assert: get_percell_data should NOT be called when <= 500 rows
+        with patch(
+            "apps.mobility_robustness_optimization.mobility_robustness_optimization.get_percell_data",
+            side_effect=AssertionError("get_percell_data should not be called for <= 500 rows"),
+        ):
+            mro._update("cell_1", df_small)
+
+    def test_update_sampling_and_dedup_when_large(self):
+        # Arrange: large dataframe (> 500 rows) with a deliberate duplicate pair
+        topology = pd.DataFrame({"cell_id": ["cell_1"]})
+        mro = SimpleMRO(
+            mobility_model_params={}, topology=topology, bdt={"cell_1": MagicMock(spec=BayesianDigitalTwin)}
+        )
+
+        n_rows = 502
+        log_dists = [float(i) for i in range(n_rows)]
+        bearings = [float((i * 7) % 180) for i in range(n_rows)]
+        # Introduce a duplicate for first two rows
+        log_dists[1] = log_dists[0]
+        bearings[1] = bearings[0]
+
+        df_large = pd.DataFrame(
+            {
+                "cell_id": ["cell_1"] * n_rows,
+                "log_distance": log_dists,
+                "relative_bearing": bearings,
+                "cell_rxpwr_dbm": [-70.0 - (i % 20) for i in range(n_rows)],
+            }
+        )
+
+        called = {"ok": False}
+
+        def fake_get_percell_data(
+            data_in, n_samples, choose_strongest_samples_percell=False, invalid_value=-500.0, seed=0
+        ):
+            # After dedup, there should be exactly one fewer row (501)
+            assert len(data_in) == 501, f"Expected 501 rows after dedup, got {len(data_in)}"
+            assert choose_strongest_samples_percell is True, "Expected strongest sampling for > 500 rows"
+            assert n_samples == 500, f"Expected n_samples=500, got {n_samples}"
+            called["ok"] = True
+            # Return the expected structure: (List[pd.DataFrame], List[pd.DataFrame])
+            return [data_in.iloc[:500].copy()], [pd.DataFrame()]
+
+        # Act
+        with patch(
+            "apps.mobility_robustness_optimization.mobility_robustness_optimization.get_percell_data",
+            side_effect=fake_get_percell_data,
+        ):
+            mro._update("cell_1", df_large)
+
+        # Assert
+        self.assertTrue(called["ok"], "Expected get_percell_data to be invoked with strongest sampling and dedup")

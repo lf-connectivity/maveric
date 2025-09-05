@@ -7,9 +7,6 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from gpytorch.kernels import RBFKernel, ScaleKernel
-from gpytorch.likelihoods import GaussianLikelihood
-from gpytorch.settings import cholesky_jitter
 from gpytorch.utils.warnings import NumericalWarning
 
 from notebooks.radp_library import (
@@ -175,7 +172,7 @@ class MobilityRobustnessOptimization(ABC):
         """
         Trains the Bayesian Digital Twins for each cell in the topology using the UE locations and features
         like log distance, relative bearing, and cell received power (Rx power).
-        
+
         +---------+----------+-----------+----------------+--------------+-------------------+
         | cell_id | latitude | longitude | cell_rxpwr_dbm | log_distance | relative_bearing  |
         +=========+==========+===========+================+==============+===================+
@@ -213,11 +210,10 @@ class MobilityRobustnessOptimization(ABC):
         """
         Updates the Bayesian Digital Twin (BDT) model for a specific cell.
 
-        Updates by deduplicating samples using 'log_distance' and 'relative_bearing', subsampling up to 500
-        strongest signals, reconfiguring the Gaussian Process with a Scale and RBF kernel, increasing observation
-        noise via GaussianLikelihood, and using higher jitter to stabilize Cholesky decomposition before training
-        on the processed data.
-        
+        Deduplicates samples using 'log_distance' and 'relative_bearing'. If more than 500
+        samples remain, subsamples the 500 strongest signals before updating the trained
+        GP model with the processed data.
+
         +---------+----------+-----------+----------------+--------------+-------------------+
         | cell_id | latitude | longitude | cell_rxpwr_dbm | log_distance | relative_bearing  |
         +=========+==========+===========+================+==============+===================+
@@ -240,23 +236,12 @@ class MobilityRobustnessOptimization(ABC):
             ][0]
 
         twin = self.bayesian_digital_twins[cell_id]
-
-        # Reconfigure the kernel to include scale + RBF
-        twin.model.covar_module = ScaleKernel(RBFKernel())
-
-        # Increase observation noise via GaussianLikelihood
-        if not hasattr(twin, "likelihood"):
-            twin.likelihood = GaussianLikelihood()  # type: ignore
-        twin.likelihood.noise = 1e-2  # type: ignore
-
-        # Use an increased jitter context
-        with cholesky_jitter(1e-1):
-            twin.update_trained_gpmodel([df])
+        twin.update_trained_gpmodel([df])
 
     def _prepare_train_or_update_data(self, df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         """
         Returnd key value pairs of cell_id and processed DataFrame for each cell_id.
-            
+
         +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
         | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
         +========+==========+===========+======+=========+==========+==========+==============+========================+
@@ -266,7 +251,7 @@ class MobilityRobustnessOptimization(ABC):
         |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240       |        2100           |
         +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
 
-        
+
         """
         required_columns = {"cell_lat", "cell_lon", "cell_az_deg"}
         if not required_columns.issubset(df.columns):
@@ -316,7 +301,7 @@ class MobilityRobustnessOptimization(ABC):
         """
         Predicts the received power for each User Equipment (UE) at different locations
         and ticks using Bayesian Digital Twins.
-          
+
         +---------+-----------+------------+----------+
         |  ue_id  | latitude  | longitude  |   tick   |
         +=========+===========+============+==========+
@@ -325,7 +310,7 @@ class MobilityRobustnessOptimization(ABC):
         |    1    | 90.415    | 23.812     |     1    |
         |    2    | 90.416    | 23.813     |     1    |
         +---------+-----------+------------+----------+
-        
+
         It then determines the best cell for each UE to attach based on the predicted power values.
         """
         # self.prediction_data = pred_data
@@ -368,7 +353,7 @@ class MobilityRobustnessOptimization(ABC):
         return predicted, full_prediction_df
 
     def _preprocess_simulation_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        '''
+        """
         +------------+-------------+-------------+-------------+------------+------------+-------------------------+
         | mock_ue_id | cell_id     | rxpower_dbm |  rxpower_stddev_dbm  |  log_distance | pred_means |     tick    |
         +============+=============+=============+=====================+==============+=============+==============+
@@ -378,7 +363,7 @@ class MobilityRobustnessOptimization(ABC):
         |     1      | "cell_3"    |   -90.4     |        1.3           |     0.499     |   -89.0     |     1      |
         +------------+-------------+-------------+----------------------+--------------+-------------+-------------+
 
-        '''
+        """
         df.drop(
             columns=["rxpower_stddev_dbm", "rxpower_dbm", "cell_rxpwr_dbm"],
             inplace=True,
@@ -397,6 +382,7 @@ class MobilityRobustnessOptimization(ABC):
             df["cell_id"] = df["cell_id"].str.extract(r"(\d+)").astype(int)
         df = self._add_sinr_column(df)
         return df
+
     # TODO: Use Utils version of this function
     def _add_sinr_column(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -408,7 +394,7 @@ class MobilityRobustnessOptimization(ABC):
 
         Returns:
             pd.DataFrame: Updated DataFrame with an additional 'sinr_db' column.
-               
+
         +--------+---------+------------------+------------------------+
         | ue_id  | cell_id | cell_rxpower_dbm | cell_carrier_freq_mhz  |
         +========+=========+==================+========================+
@@ -421,13 +407,13 @@ class MobilityRobustnessOptimization(ABC):
         |   3    |    1    |   -100.987321    |         2100.0         |
         |   3    |    2    |   -100.864529    |         2100.0         |
         +--------+---------+------------------+------------------------+
-        
+
         """
         df = df.copy()
         sinr_column = []
 
         # Group by location
-        for (_, group) in df.groupby(["ue_id", "tick"]):
+        for _, group in df.groupby(["ue_id", "tick"]):
             # Group further by frequency layer within the same location
             freq_groups = group.groupby("cell_carrier_freq_mhz")
 
