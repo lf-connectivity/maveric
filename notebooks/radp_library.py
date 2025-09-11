@@ -24,8 +24,11 @@ from shapely import geometry
 from radp.digital_twin.mobility.mobility import gauss_markov
 from radp.digital_twin.mobility.ue_tracks import UETracksGenerator
 from radp.digital_twin.mobility.ue_tracks_params import UETracksGenerationParams
-from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin, NormMethod
-from radp.digital_twin.utils.constants import RLF_THRESHOLD, TXPWR_DBM
+from radp.digital_twin.rf.bayesian.bayesian_engine import (
+    BayesianDigitalTwin,
+    NormMethod,
+)
+from radp.digital_twin.utils.constants import RLF_THRESHOLD, TXPWR_DBM, BOUNDS_PADDING
 from radp.digital_twin.utils.gis_tools import GISTools
 
 Boundary = Union[geometry.Polygon, geometry.MultiPolygon]
@@ -91,8 +94,12 @@ class ShapesKMLWriter(object):
             styles = []
 
         k = fastkml.KML()
-        doc = fastkml.Document(ns=KML_NS, name=(name or "Shapes"), description=(desc or ""), styles=styles)
-        doc = fastkml.Document(ns=KML_NS, name=(name or "Shapes"), description=(desc or ""), styles=styles)
+        doc = fastkml.Document(
+            ns=KML_NS, name=(name or "Shapes"), description=(desc or ""), styles=styles
+        )
+        doc = fastkml.Document(
+            ns=KML_NS, name=(name or "Shapes"), description=(desc or ""), styles=styles
+        )
         k.append(doc)
 
         return k, doc
@@ -130,7 +137,9 @@ class ShapesKMLWriter(object):
         """
         if desc is None:
             desc = name
-        shape_placemark = fastkml.Placemark(ns=KML_NS, name=name, description=desc, styles=styles)
+        shape_placemark = fastkml.Placemark(
+            ns=KML_NS, name=name, description=desc, styles=styles
+        )
         shape_placemark.geometry = shape
         folder.append(shape_placemark)
 
@@ -205,15 +214,21 @@ class ShapesKMLWriter(object):
                     obj_style = styles
 
                 if descriptions_dict is not None and name in descriptions_dict:
-                    obj_desc = ShapesKMLWriter._build_description_from_prop_dict(descriptions_dict[name])
+                    obj_desc = ShapesKMLWriter._build_description_from_prop_dict(
+                        descriptions_dict[name]
+                    )
                 else:
                     obj_desc = name
 
                 if isinstance(obj, geometry.base.BaseGeometry):
-                    cls._add_shape_to_folder(cur_folder, obj, name, styles=obj_style, desc=obj_desc)
+                    cls._add_shape_to_folder(
+                        cur_folder, obj, name, styles=obj_style, desc=obj_desc
+                    )
                 else:
                     # isinstance(obj, dict))
-                    child_folder = fastkml.Folder(ns=KML_NS, name=name, styles=obj_style)
+                    child_folder = fastkml.Folder(
+                        ns=KML_NS, name=name, styles=obj_style
+                    )
                     cur_folder.append(child_folder)
                     fringe.append((child_folder, obj))
 
@@ -235,8 +250,8 @@ def get_percell_data(
     """
     Prediction dataframe cleanup
     Dataframe should contain ['cell_id', 'log_distance', 'relative_bearing', 'cell_rxpwr_dbm'] cloumns.
-    
-    
+
+
     +---------+--------------+------------------+----------------+
     | cell_id | log_distance | relative_bearing | cell_rxpwr_dbm |
     +=========+==============+==================+================+
@@ -247,24 +262,29 @@ def get_percell_data(
     |   2     | 102.36       | 33.91            | -72.0          |
     |   3     | 102.08       | 33.83            | -78.7          |
     +---------+--------------+------------------+----------------+
-    
+
     """
     data_out = []
     data_stats = []
     data_in_sampled = data_in
 
-    data_in_sampled.columns = [col.replace("_1", "") if col.endswith("_1") else col for col in data_in_sampled.columns]
+    data_in_sampled.columns = [
+        col.replace("_1", "") if col.endswith("_1") else col
+        for col in data_in_sampled.columns
+    ]
 
     # filter out invalid values
     data_cell_valid = data_in_sampled[data_in_sampled.cell_rxpwr_dbm != invalid_value]
     if choose_strongest_samples_percell:
-        data_cell_sampled = data_cell_valid.sort_values("cell_rxpwr_dbm", ascending=False).head(
-            n=min(n_samples, len(data_cell_valid))
-        )
+        data_cell_sampled = data_cell_valid.sort_values(
+            "cell_rxpwr_dbm", ascending=False
+        ).head(n=min(n_samples, len(data_cell_valid)))
 
     else:
         # get n_samples independent random samples inside training groups
-        data_cell_sampled = data_cell_valid.sample(n=min(n_samples, len(data_cell_valid)), random_state=(seed))
+        data_cell_sampled = data_cell_valid.sample(
+            n=min(n_samples, len(data_cell_valid)), random_state=(seed)
+        )
 
     data_out.append(data_cell_sampled.reset_index(drop=True))
 
@@ -274,7 +294,9 @@ def get_percell_data(
     return data_out, data_stats
 
 
-def y_to_latitude(lower_bound: bool, y: float, zoom_factor: int, tile_pixels: int = 256) -> float:
+def y_to_latitude(
+    lower_bound: bool, y: float, zoom_factor: int, tile_pixels: int = 256
+) -> float:
     """
     Convert a y tile coordinate to a latitude coordinate.
 
@@ -296,7 +318,9 @@ def y_to_latitude(lower_bound: bool, y: float, zoom_factor: int, tile_pixels: in
     return -latitude_degrees
 
 
-def bing_tile_to_center(x: float, y: float, level: int, tile_pixels: int = 256) -> float:
+def bing_tile_to_center(
+    x: float, y: float, level: int, tile_pixels: int = 256
+) -> float:
     """Get the center coordinate as [latitude, longitude]
     for a given tile.
 
@@ -313,7 +337,11 @@ def bing_tile_to_center(x: float, y: float, level: int, tile_pixels: int = 256) 
     xwidth = 360.0 / zoom_factor
     out = []
     out.append(
-        (y_to_latitude(True, y, zoom_factor, tile_pixels) + y_to_latitude(False, y, zoom_factor, tile_pixels)) / 2
+        (
+            y_to_latitude(True, y, zoom_factor, tile_pixels)
+            + y_to_latitude(False, y, zoom_factor, tile_pixels)
+        )
+        / 2
     )
     out.append(xwidth * (x + 0.5) - 180)
     return out
@@ -333,7 +361,9 @@ def bing_tile_to_center_df_row(row: int, level: int) -> int:
     return row
 
 
-def longitude_to_world_pixel(longitude: float, zoom_factor: int, tile_pixels: int = 256) -> float:
+def longitude_to_world_pixel(
+    longitude: float, zoom_factor: int, tile_pixels: int = 256
+) -> float:
     """Convert degrees longitude to world pixel coordinates.
 
     World pixel coordinates span the whole range of longitude
@@ -354,7 +384,9 @@ def longitude_to_world_pixel(longitude: float, zoom_factor: int, tile_pixels: in
     return pixel_x
 
 
-def latitude_to_world_pixel(latitude: float, zoom_factor: int, tile_pixels: int = 256) -> float:
+def latitude_to_world_pixel(
+    latitude: float, zoom_factor: int, tile_pixels: int = 256
+) -> float:
     """Convert degrees latitude to world pixel coordinates.
 
     World pixel coordinates span the whole range of latitude
@@ -373,7 +405,9 @@ def latitude_to_world_pixel(latitude: float, zoom_factor: int, tile_pixels: int 
     latitude = map_clip(latitude, -85.05112878, 85.05112878)
     sin_latitude = np.sin(latitude * np.pi / 180.0)
 
-    pixel_y = (0.5 - np.log((1 + sin_latitude) / (1 - sin_latitude)) / (4 * np.pi)) * (tile_pixels * zoom_factor)
+    pixel_y = (0.5 - np.log((1 + sin_latitude) / (1 - sin_latitude)) / (4 * np.pi)) * (
+        tile_pixels * zoom_factor
+    )
     return pixel_y
 
 
@@ -391,7 +425,9 @@ def map_clip(val: float, min_val: float, max_val: float) -> float:
     return np.max([min_val, np.min([val, max_val])])
 
 
-def lon_lat_to_bing_tile(longitude: float, latitude: float, level: int, tile_pixels: int = 256) -> float:
+def lon_lat_to_bing_tile(
+    longitude: float, latitude: float, level: int, tile_pixels: int = 256
+) -> float:
     """
     Convert longitude and latitude to Bing tile coordinates.
     @param longitude: Longitude of the location in degrees.
@@ -422,7 +458,9 @@ def lon_lat_to_bing_tile_df_row(row: int, level: int) -> int:
     return row
 
 
-def get_lonlat_from_xy_idxs(xy: np.ndarray, lower_left: Tuple[float, float]) -> np.ndarray:
+def get_lonlat_from_xy_idxs(
+    xy: np.ndarray, lower_left: Tuple[float, float]
+) -> np.ndarray:
     """
     Convert x and y indices to longitude and latitude coordinates.
     @param xy: A numpy array of x and y indices.
@@ -440,7 +478,7 @@ def find_closest(data_df: pd.DataFrame, lat: float, lon: float) -> Optional[int]
     @param lat: Latitude of the target point.
     @param lon: Longitude of the target point.
     @returns: The index of the closest point if the minimum distance is less than 100, otherwise None.
-   
+
     +------------+------------+
     |  loc_x     |  loc_y     |
     +============+============+
@@ -450,9 +488,11 @@ def find_closest(data_df: pd.DataFrame, lat: float, lon: float) -> Optional[int]
     |  90.420000 | 23.820000  |
     |  90.405000 | 23.800000  |
     +------------+------------+
-    
+
     """
-    dist = data_df.apply(lambda row: GISTools.dist((row.loc_y, row.loc_x), (lat, lon)), axis=1)
+    dist = data_df.apply(
+        lambda row: GISTools.dist((row.loc_y, row.loc_x), (lat, lon)), axis=1
+    )
     if dist.min() < 100:
         return dist.idxmin()
     else:
@@ -472,7 +512,7 @@ def get_track_samples(
     @param num_UEs: Number of user equipment (UE) tracks to simulate.
     @param ticks: Number of time steps to simulate for the mobility model.
     @returns: A DataFrame containing the sampled track points mapped to the closest points in the input dataset.
-    
+
     +------------+------------+
     |  loc_x     |  loc_y     |
     +============+============+
@@ -515,8 +555,12 @@ def get_track_samples(
         xy_lonlat = get_lonlat_from_xy_idxs(xy, (min_lon, min_lat))
         xy_lonlat_ue_tracks.extend(xy_lonlat)
 
-    all_track_pts_df = pd.DataFrame(columns=["loc_x", "loc_y"], data=xy_lonlat_ue_tracks)
-    all_track_pts_sampled_df = all_track_pts_df.apply(lambda row: find_closest(data_df, row.loc_y, row.loc_x), axis=1)
+    all_track_pts_df = pd.DataFrame(
+        columns=["loc_x", "loc_y"], data=xy_lonlat_ue_tracks
+    )
+    all_track_pts_sampled_df = all_track_pts_df.apply(
+        lambda row: find_closest(data_df, row.loc_y, row.loc_x), axis=1
+    )
 
     return data_df.loc[all_track_pts_sampled_df]
 
@@ -607,7 +651,9 @@ def bdt(
         axs[1].set_yticks([])
     for i in range(len(desired_idxs)):
         train_cell_id = idx_cell_id_mapping[i + 1]
-        training_data[train_cell_id] = pd.concat([tilt_per_cell_df[i] for tilt_per_cell_df in percell_data_list])
+        training_data[train_cell_id] = pd.concat(
+            [tilt_per_cell_df[i] for tilt_per_cell_df in percell_data_list]
+        )
 
         if track_sampling:
             training_data[train_cell_id] = get_track_samples(
@@ -625,19 +671,27 @@ def bdt(
             )
     for train_cell_id, training_data_idx in training_data.items():
         training_data_idx["cell_id"] = train_cell_id
-        training_data_idx["cell_lat"] = site_config_df[site_config_df["cell_id"] == train_cell_id]["cell_lat"].values[0]
-        training_data_idx["cell_lon"] = site_config_df[site_config_df["cell_id"] == train_cell_id]["cell_lon"].values[0]
-        training_data_idx["cell_az_deg"] = site_config_df[site_config_df["cell_id"] == train_cell_id][
-            "cell_az_deg"
-        ].values[0]
-        training_data_idx["cell_txpwr_dbm"] = site_config_df[site_config_df["cell_id"] == train_cell_id][
-            "cell_txpwr_dbm"
-        ].values[0]
-        training_data_idx["hTx"] = site_config_df[site_config_df["cell_id"] == train_cell_id]["hTx"].values[0]
-        training_data_idx["hRx"] = site_config_df[site_config_df["cell_id"] == train_cell_id]["hRx"].values[0]
-        training_data_idx["cell_carrier_freq_mhz"] = site_config_df[site_config_df["cell_id"] == train_cell_id][
-            "cell_carrier_freq_mhz"
-        ].values[0]
+        training_data_idx["cell_lat"] = site_config_df[
+            site_config_df["cell_id"] == train_cell_id
+        ]["cell_lat"].values[0]
+        training_data_idx["cell_lon"] = site_config_df[
+            site_config_df["cell_id"] == train_cell_id
+        ]["cell_lon"].values[0]
+        training_data_idx["cell_az_deg"] = site_config_df[
+            site_config_df["cell_id"] == train_cell_id
+        ]["cell_az_deg"].values[0]
+        training_data_idx["cell_txpwr_dbm"] = site_config_df[
+            site_config_df["cell_id"] == train_cell_id
+        ]["cell_txpwr_dbm"].values[0]
+        training_data_idx["hTx"] = site_config_df[
+            site_config_df["cell_id"] == train_cell_id
+        ]["hTx"].values[0]
+        training_data_idx["hRx"] = site_config_df[
+            site_config_df["cell_id"] == train_cell_id
+        ]["hRx"].values[0]
+        training_data_idx["cell_carrier_freq_mhz"] = site_config_df[
+            site_config_df["cell_id"] == train_cell_id
+        ]["cell_carrier_freq_mhz"].values[0]
 
         training_data_idx["log_distance"] = [
             GISTools.get_log_distance(
@@ -683,8 +737,14 @@ def bdt(
         training_data_idx = training_data_idx.drop(
             training_data_idx[
                 (training_data_idx["cell_rxpwr_dbm"] < filter_out_samples_dbm_threshold)
-                & (training_data_idx["log_distance"] > np.log(1000 * filter_out_samples_kms_threshold))
-                & (training_data_idx["log_distance"] > np.log(1000 * filter_out_samples_kms_threshold))
+                & (
+                    training_data_idx["log_distance"]
+                    > np.log(1000 * filter_out_samples_kms_threshold)
+                )
+                & (
+                    training_data_idx["log_distance"]
+                    > np.log(1000 * filter_out_samples_kms_threshold)
+                )
             ].index
         )
         if plot_loss_vs_iter:
@@ -744,19 +804,27 @@ def bdt(
 
     for test_cell_id, test_data_idx in test_data.items():
         test_data_idx["cell_id"] = test_cell_id
-        test_data_idx["cell_lat"] = site_config_df[site_config_df["cell_id"] == test_cell_id]["cell_lat"].values[0]
-        test_data_idx["cell_lon"] = site_config_df[site_config_df["cell_id"] == test_cell_id]["cell_lon"].values[0]
-        test_data_idx["cell_az_deg"] = site_config_df[site_config_df["cell_id"] == test_cell_id]["cell_az_deg"].values[
-            0
-        ]
-        test_data_idx["cell_txpwr_dbm"] = site_config_df[site_config_df["cell_id"] == test_cell_id][
-            "cell_txpwr_dbm"
-        ].values[0]
-        test_data_idx["hTx"] = site_config_df[site_config_df["cell_id"] == test_cell_id]["hTx"].values[0]
-        test_data_idx["hRx"] = site_config_df[site_config_df["cell_id"] == test_cell_id]["hRx"].values[0]
-        test_data_idx["cell_carrier_freq_mhz"] = site_config_df[site_config_df["cell_id"] == test_cell_id][
-            "cell_carrier_freq_mhz"
-        ].values[0]
+        test_data_idx["cell_lat"] = site_config_df[
+            site_config_df["cell_id"] == test_cell_id
+        ]["cell_lat"].values[0]
+        test_data_idx["cell_lon"] = site_config_df[
+            site_config_df["cell_id"] == test_cell_id
+        ]["cell_lon"].values[0]
+        test_data_idx["cell_az_deg"] = site_config_df[
+            site_config_df["cell_id"] == test_cell_id
+        ]["cell_az_deg"].values[0]
+        test_data_idx["cell_txpwr_dbm"] = site_config_df[
+            site_config_df["cell_id"] == test_cell_id
+        ]["cell_txpwr_dbm"].values[0]
+        test_data_idx["hTx"] = site_config_df[
+            site_config_df["cell_id"] == test_cell_id
+        ]["hTx"].values[0]
+        test_data_idx["hRx"] = site_config_df[
+            site_config_df["cell_id"] == test_cell_id
+        ]["hRx"].values[0]
+        test_data_idx["cell_carrier_freq_mhz"] = site_config_df[
+            site_config_df["cell_id"] == test_cell_id
+        ]["cell_carrier_freq_mhz"].values[0]
 
         test_data_idx["log_distance"] = [
             GISTools.get_log_distance(
@@ -799,10 +867,16 @@ def bdt(
         test_data_percell = test_data_percell.drop(
             test_data_percell[
                 (test_data_percell["cell_rxpwr_dbm"] < filter_out_samples_dbm_threshold)
-                & (test_data_percell["log_distance"] > np.log(1000 * filter_out_samples_kms_threshold))
+                & (
+                    test_data_percell["log_distance"]
+                    > np.log(1000 * filter_out_samples_kms_threshold)
+                )
             ].index
         )
-        (pred_means_percell, _,) = bayesian_digital_twins[idx].predict_distributed_gpmodel(
+        (
+            pred_means_percell,
+            _,
+        ) = bayesian_digital_twins[idx].predict_distributed_gpmodel(
             prediction_dfs=[test_data_percell],
         )
         logging.info(f"merging cell at idx =  : {idx}")
@@ -813,11 +887,15 @@ def bdt(
         )
         full_prediction_frame = (
             pd.concat([full_prediction_frame, test_data_percell_bing_tile])
-            .groupby(["loc_x", "loc_y"], as_index=False)[["cell_rxpwr_dbm", "pred_means"]]
+            .groupby(["loc_x", "loc_y"], as_index=False)[
+                ["cell_rxpwr_dbm", "pred_means"]
+            ]
             .max()
         )
     # re-convert to lat/lon
-    full_prediction_frame = full_prediction_frame.apply(bing_tile_to_center_df_row, level=bing_tile_level, axis=1)
+    full_prediction_frame = full_prediction_frame.apply(
+        bing_tile_to_center_df_row, level=bing_tile_level, axis=1
+    )
 
     # compute RSRP as maximum over predicted rx powers
     pred_rsrp = np.array(full_prediction_frame.pred_means)
@@ -864,7 +942,9 @@ def bdt(
         axs[1].set_xticks([])
         axs[1].set_yticks([])
 
-        plt.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.0, hspace=0.1)
+        plt.subplots_adjust(
+            left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.0, hspace=0.1
+        )
         plt.show()
 
     return (
@@ -952,7 +1032,9 @@ def animate_predictions(
 
         plt.clf()
         _init_plt(axs)
-        pred_rsrp_points = axs[1].scatter(lons, lats, c=pred_rsrp_list[i], cmap=cmap, s=25)
+        pred_rsrp_points = axs[1].scatter(
+            lons, lats, c=pred_rsrp_list[i], cmap=cmap, s=25
+        )
         axs[1].set_title(
             f"Predicted RSRP \n MAE = {MAE_list[i]:0.1f} dB"
             f"\nmax_training_iterations = {maxiter_list[i]} | "
@@ -966,7 +1048,9 @@ def animate_predictions(
         return [true_rsrp_points, pred_rsrp_points]
 
     # call the animator.  blit=True means only re-draw the parts that have changed.
-    anim = animation.FuncAnimation(fig, animate, init_func=init, frames=len(pred_rsrp_list), blit=True)
+    anim = animation.FuncAnimation(
+        fig, animate, init_func=init, frames=len(pred_rsrp_list), blit=True
+    )
 
     writervideo = animation.FFMpegWriter(fps=4)
     anim.save(filename, writer=writervideo)
@@ -1045,7 +1129,9 @@ def get_ue_data(params: dict) -> pd.DataFrame:
         mobility_class_velocity_variances=ue_tracks_params.mobility_class_velocity_variances,
     ):
         # Append each batch to the main DataFrame
-        ue_tracks_generation = pd.concat([ue_tracks_generation, ue_tracks_generation_batch], ignore_index=True)
+        ue_tracks_generation = pd.concat(
+            [ue_tracks_generation, ue_tracks_generation_batch], ignore_index=True
+        )
 
     return ue_tracks_generation
 
@@ -1068,7 +1154,7 @@ def calculate_received_power(distance_km: float, frequency_mhz: int) -> float:
 def plot_ue_tracks(df: pd.DataFrame) -> None:
     """
     Plots the movement tracks of unique UE IDs on a grid of subplots.
-    
+
     +-------------+------+-----------+------------+
     | mock_ue_id  | tick |   lat     |    lon     |
     +=============+======+===========+============+
@@ -1159,7 +1245,7 @@ def plot_ue_tracks(df: pd.DataFrame) -> None:
 def plot_ue_tracks_side_by_side(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
     """
     Plots the movement tracks of unique UE IDs from two DataFrames side by side.
-    
+
     df1:
     +-------------+-----------+------------+
     | mock_ue_id  |   lat     |    lon     |
@@ -1169,8 +1255,8 @@ def plot_ue_tracks_side_by_side(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
     |     3       | 23.8110   | 90.4120    |
     |     4       | 23.8115   | 90.4130    |
     +-------------+-----------+------------+
-    
-    df2: 
+
+    df2:
     +-------------+-----------+------------+
     | mock_ue_id  |   lat     |    lon     |
     +=============+===========+============+
@@ -1198,7 +1284,7 @@ def plot_ue_tracks_side_by_side(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
 def plot_ue_tracks_on_axis(df: pd.DataFrame, ax, title: str) -> None:
     """
     Helper function to plot UE tracks on a given axis.
-    
+
     +-------------+-----------+------------+
     | mock_ue_id  |   lat     |    lon     |
     +=============+===========+============+
@@ -1210,7 +1296,7 @@ def plot_ue_tracks_on_axis(df: pd.DataFrame, ax, title: str) -> None:
     |     2       | 23.8130   | 90.4150    |
     +-------------+-----------+------------+
 
-    
+
     """
     data = df
     unique_ids = data["mock_ue_id"].unique()
@@ -1240,7 +1326,9 @@ def plot_ue_tracks_on_axis(df: pd.DataFrame, ax, title: str) -> None:
                 color=color_map(idx),
             )
 
-        ax.scatter(ue_data["lon"], ue_data["lat"], color=color_map(idx), label=f"UE {ue_id}")
+        ax.scatter(
+            ue_data["lon"], ue_data["lat"], color=color_map(idx), label=f"UE {ue_id}"
+        )
 
     ax.set_title(title)
     ax.legend()
@@ -1257,7 +1345,7 @@ def mro_plot_scatter(df: pd.DataFrame, topology: pd.DataFrame) -> None:
     @param df: DataFrame containing UE data with columns 'loc_x', 'loc_y', 'cell_id', and 'sinr_db'.
     @param topology: DataFrame containing cell tower data with columns 'cell_lon', 'cell_lat', and 'cell_id'.
     @returns: None. Displays a scatter plot with cell towers and UE locations.
-    
+
     df:
     +---------+--------+--------+----------+
     | cell_id | loc_x  | loc_y  | sinr_db  |
@@ -1288,7 +1376,9 @@ def mro_plot_scatter(df: pd.DataFrame, topology: pd.DataFrame) -> None:
 
     # Plot cell towers from the topology dataframe with 'X' markers and corresponding colors
     for _, row in topology.iterrows():
-        color = color_map.get(row["cell_id"], "black")  # Default to black if unknown cell_id
+        color = color_map.get(
+            row["cell_id"], "black"
+        )  # Default to black if unknown cell_id
         plt.scatter(
             row["cell_lon"],
             row["cell_lat"],
@@ -1300,7 +1390,9 @@ def mro_plot_scatter(df: pd.DataFrame, topology: pd.DataFrame) -> None:
 
     # Plot UEs from df without labels but with the same color coding
     for _, row in df.iterrows():
-        color = color_map.get(row["cell_id"], "black")  # Default to black if unknown cell_id
+        color = color_map.get(
+            row["cell_id"], "black"
+        )  # Default to black if unknown cell_id
         if row["sinr_db"] < RLF_THRESHOLD:  # REMOVE COMMENT WHEN sinr_db IS FIXED
             color = "grey"  # Change to grey if sinr_db < 2
 
@@ -1320,10 +1412,12 @@ def mro_plot_scatter(df: pd.DataFrame, topology: pd.DataFrame) -> None:
     plt.show()
 
 
-def get_ues_cells_cartesian_df(data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFrame:
+def get_ues_cells_cartesian_df(
+    data: pd.DataFrame, topology: pd.DataFrame
+) -> pd.DataFrame:
     """
     returns a cartesian dataframe of UE and cell data
-    
+
     df:
     +---------+-----------+------------+----------+
     |  ue_id  | latitude  | longitude  |   tick   |
@@ -1358,7 +1452,7 @@ def get_ues_cells_cartesian_df(data: pd.DataFrame, topology: pd.DataFrame) -> pd
 def calc_log_distance(cartesian_df: pd.DataFrame) -> pd.DataFrame:
     """
     adds a log distance column to the cartesian dataframe based on the lat/lon of the UE and cell
-    
+
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
     | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
     +========+==========+===========+======+=========+==========+==========+==============+========================+
@@ -1370,7 +1464,9 @@ def calc_log_distance(cartesian_df: pd.DataFrame) -> pd.DataFrame:
 
     """
     cartesian_df["log_distance"] = cartesian_df.apply(
-        lambda row: GISTools.get_log_distance(row["latitude"], row["longitude"], row["cell_lat"], row["cell_lon"]),
+        lambda row: GISTools.get_log_distance(
+            row["latitude"], row["longitude"], row["cell_lat"], row["cell_lon"]
+        ),
         axis=1,
     )
     return cartesian_df
@@ -1380,8 +1476,8 @@ def calc_rx_power(cartesian_df: pd.DataFrame) -> pd.DataFrame:
     """
     adds a cell_rxpwr_dbm column to the cartesian dataframe,
     based on the log distance and cell frequency using fspl
-    
-    
+
+
     +--------+----------+-----------+------+---------+----------+----------+--------------+--------------+------------------------+
     | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  | log_distance |
     +========+==========+===========+======+=========+==========+==========+==============+========================+==============+
@@ -1393,7 +1489,9 @@ def calc_rx_power(cartesian_df: pd.DataFrame) -> pd.DataFrame:
 
     """
     cartesian_df["cell_rxpwr_dbm"] = cartesian_df.apply(
-        lambda row: calculate_received_power(row["log_distance"], row["cell_carrier_freq_mhz"]),
+        lambda row: calculate_received_power(
+            row["log_distance"], row["cell_carrier_freq_mhz"]
+        ),
         axis=1,
     )
     return cartesian_df
@@ -1403,7 +1501,7 @@ def calc_relative_bearing(cartesian_df: pd.DataFrame) -> pd.DataFrame:
     """
     adds a relative_bearing column to the cartesian dataframe,
     based on the lat/lon of the UE and cell and az_deg of the cell
-    
+
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
     | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
     +========+==========+===========+======+=========+==========+==========+==============+========================+
@@ -1412,7 +1510,7 @@ def calc_relative_bearing(cartesian_df: pd.DataFrame) -> pd.DataFrame:
     |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240      |         2100           |
     |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240      |         2100           |
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
-    
+
     """
     cartesian_df["relative_bearing"] = cartesian_df.apply(
         lambda row: GISTools.get_relative_bearing(
@@ -1430,8 +1528,9 @@ def calc_relative_bearing(cartesian_df: pd.DataFrame) -> pd.DataFrame:
 def preprocess_ue_data(data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFrame:
     """
     creates a cartesian dataframe of UE and cell data, adds log distance and rx power columns
-    
+
     df:
+
     +---------+-----------+------------+----------+
     |  ue_id  | latitude  | longitude  |   tick   |
     +=========+===========+============+==========+
@@ -1442,6 +1541,7 @@ def preprocess_ue_data(data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFra
     +---------+-----------+------------+----------+
 
     topology:
+
     +---------+----------+----------+--------------+------------------------+
     | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
     +=========+==========+==========+==============+========================+
@@ -1458,7 +1558,7 @@ def preprocess_ue_data(data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFra
 def normalize_cell_ids(df: pd.DataFrame) -> pd.DataFrame:
     """
     Normalizes the 'cell_id' column in the DataFrame by ensuring all IDs follow the 'cell_<integer>' format.
-    
+
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
     | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
     +========+==========+===========+======+=========+==========+==========+==============+========================+
@@ -1467,18 +1567,20 @@ def normalize_cell_ids(df: pd.DataFrame) -> pd.DataFrame:
     |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240      |         2100           |
     |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240      |         2100           |
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
-    
+
     """
 
     df = df.copy()
-    df["cell_id"] = df["cell_id"].apply(lambda x: f"cell_{int(float(x))}" if not str(x).startswith("cell_") else str(x))
+    df["cell_id"] = df["cell_id"].apply(
+        lambda x: f"cell_{int(float(x))}" if not str(x).startswith("cell_") else str(x)
+    )
     return df
 
 
 def check_cartesian_format(df: pd.DataFrame, topology: pd.DataFrame) -> bool:
     """
     Validates that the DataFrame has the expected cartesian format for cell IDs per pixel.
-    
+
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
     | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
     +========+==========+===========+======+=========+==========+==========+==============+========================+
@@ -1487,7 +1589,7 @@ def check_cartesian_format(df: pd.DataFrame, topology: pd.DataFrame) -> bool:
     |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240      |         2100           |
     |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240      |         2100           |
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
-    
+
     """
     expected_cells = list(topology["cell_id"])
     expected_cell_set = set(expected_cells)
@@ -1500,7 +1602,9 @@ def check_cartesian_format(df: pd.DataFrame, topology: pd.DataFrame) -> bool:
         extra_cells = actual_cell_set - expected_cell_set
 
         raise ValueError(
-            f"Cell ID mismatch detected:\n" f"  Missing cells: {missing_cells}\n" f"  Extra cells: {extra_cells}"
+            f"Cell ID mismatch detected:\n"
+            f"  Missing cells: {missing_cells}\n"
+            f"  Extra cells: {extra_cells}"
         )
 
     # Group by pixel
@@ -1546,13 +1650,15 @@ def check_cartesian_format(df: pd.DataFrame, topology: pd.DataFrame) -> bool:
     return True
 
 
-def add_cell_info(new_data_with_rx_data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFrame:
+def add_cell_info(
+    new_data_with_rx_data: pd.DataFrame, topology: pd.DataFrame
+) -> pd.DataFrame:
     """
     Adds cell information ['cell_id', 'cell_lat', 'cell_lon', 'cell_az_deg']
     to the DataFrame based on cell_id.
 
     Converts integer cell_id to string format like 'cell_1' to match topology.
-    
+
     df:
     +---------+-----------+------------+----------+----------------+
     | ue_id   | latitude  | longitude  | tick     | cell_rxpwr_dbm |
@@ -1571,11 +1677,13 @@ def add_cell_info(new_data_with_rx_data: pd.DataFrame, topology: pd.DataFrame) -
     |    2    | 90.414   | 23.810   |     240      |         2100           |
     +---------+----------+----------+--------------+------------------------+
 
-    
+
     """
     # Convert int to str format matching topology: 'cell_1', 'cell_2', etc.
     if new_data_with_rx_data["cell_id"].dtype == int:
-        new_data_with_rx_data["cell_id"] = new_data_with_rx_data["cell_id"].apply(lambda x: f"cell_{x}")
+        new_data_with_rx_data["cell_id"] = new_data_with_rx_data["cell_id"].apply(
+            lambda x: f"cell_{x}"
+        )
 
     # Merge using consistent cell_id format
     new_data_topology_merged = new_data_with_rx_data.merge(
@@ -1601,7 +1709,7 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
     df2 (pd.DataFrame): All candidate cell data: 'ue_id', 'tick', 'cell_id', 'sinr_db'.
     topology (pd.DataFrame): Not used.
     ue_id (int): UE to plot.
-    
+
     +--------+------+----------+----------+
     | ue_id  | tick | cell_id  | sinr_db  |
     +========+======+==========+==========+
@@ -1613,8 +1721,8 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
     |   0    |  1   |    2     |  12.3    |
     |   1    |  1   |    1     |  -2.0    |
     |   1    |  1   |    2     |  -4.3    |
-    +--------+------+----------+----------+ 
-    
+    +--------+------+----------+----------+
+
     """
     ue_df = df[df["ue_id"] == ue_id].sort_values("tick").reset_index(drop=True)
     ue_df2 = df2[df2["ue_id"] == ue_id].sort_values("tick")
@@ -1625,18 +1733,16 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
 
     # Base + dynamic color map
     base_colors = {1.0: "red", 2.0: "green", 3.0: "blue"}
-    all_cell_ids = pd.concat([
-        ue_df2["cell_id"],
-        ue_df[ue_df["cell_id"] != "RLF"]["cell_id"]
-    ]).unique()
+    all_cell_ids = pd.concat(
+        [ue_df2["cell_id"], ue_df[ue_df["cell_id"] != "RLF"]["cell_id"]]
+    ).unique()
     missing_ids = [cid for cid in all_cell_ids if cid not in base_colors]
     extra_colors = cm.get_cmap("tab10", len(missing_ids))
     dynamic_colors = {cid: extra_colors(i) for i, cid in enumerate(missing_ids)}
     full_color_map = {**base_colors, **dynamic_colors}
 
     min_sinr = min(
-        ue_df2["sinr_db"].min(),
-        ue_df[ue_df["cell_id"] != "RLF"]["sinr_db"].min()
+        ue_df2["sinr_db"].min(), ue_df[ue_df["cell_id"] != "RLF"]["sinr_db"].min()
     )
     drop_value = min_sinr - 5
 
@@ -1689,7 +1795,7 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
                 [drop_value],
                 "ko",
                 markersize=8,
-                label="RLF" if "RLF" not in legend_cells else None
+                label="RLF" if "RLF" not in legend_cells else None,
             )
             legend_cells.add("RLF")
 
@@ -1704,6 +1810,7 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
     plt.legend(title=None, bbox_to_anchor=(1.05, 1), loc="upper left")
     plt.tight_layout()
     plt.show()
+
 
 def mro_score_3d_plot(df: pd.DataFrame) -> None:
     """
@@ -1730,3 +1837,67 @@ def mro_score_3d_plot(df: pd.DataFrame) -> None:
     fig.update_traces(marker=dict(size=5))
     fig.update_layout(margin=dict(l=0, r=0, b=0, t=30))
     fig.show()
+
+
+def find_sim_boundary(
+    topology: pd.DataFrame, client_ue_data: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Find the lat/lon bounds of the simulation area, given the cell tower locations and all UE locations.
+
+    topology:
+
+    +---------+----------+----------+--------------+------------------------+
+    | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
+    +=========+==========+==========+==============+========================+
+    |    1    | 90.410   | 23.809   |     120      |         1800           |
+    |    2    | 90.414   | 23.810   |     240      |         2100           |
+    +---------+----------+----------+--------------+------------------------+
+
+    client_ue_data:
+
+    +-----------+----------+---------+----------------+
+    | longitude | latitude | cell_id | cell_rxpwr_dbm |
+    +===========+==========+=========+================+
+    | -22.6329  | 59.7982  |    1    |     -100.3     |
+    | -22.6329  | 59.7982  |    2    |     -99.8      |
+    | 119.7574  | 54.8535  |    1    |     -100.1     |
+    | 119.7574  | 54.8535  |    2    |     -99.52     |
+    +-----------+----------+---------+----------------+
+
+    """
+
+    topology_lat = pd.to_numeric(topology["cell_lat"], errors="coerce")
+    topology_lon = pd.to_numeric(topology["cell_lon"], errors="coerce")
+
+    T_MIN_LAT, T_MAX_LAT = topology_lat.min(skipna=True), topology_lat.max(skipna=True)
+    T_MIN_LON, T_MAX_LON = topology_lon.min(skipna=True), topology_lon.max(skipna=True)
+
+    # Calculate min and max latitudes and longitudes with padding
+    if isinstance(client_ue_data, pd.DataFrame) and not client_ue_data.empty:
+        ue_data_lat = pd.to_numeric(client_ue_data["latitude"], errors="coerce")
+        ue_data_lon = pd.to_numeric(client_ue_data["longitude"], errors="coerce")
+
+        UE_MIN_LAT, UE_MAX_LAT = ue_data_lat.min(skipna=True), ue_data_lat.max(
+            skipna=True
+        )
+        UE_MIN_LON, UE_MAX_LON = ue_data_lon.min(skipna=True), ue_data_lon.max(
+            skipna=True
+        )
+
+        bounds = {
+            "min_lat": min(UE_MIN_LAT, T_MIN_LAT) - BOUNDS_PADDING,
+            "max_lat": max(UE_MAX_LAT, T_MAX_LAT) + BOUNDS_PADDING,
+            "min_lon": min(UE_MIN_LON, T_MIN_LON) - BOUNDS_PADDING,
+            "max_lon": max(UE_MAX_LON, T_MAX_LON) + BOUNDS_PADDING,
+        }
+
+    else:
+        bounds = {
+            "min_lat": T_MIN_LAT - BOUNDS_PADDING,
+            "max_lat": T_MAX_LAT + BOUNDS_PADDING,
+            "min_lon": T_MIN_LON - BOUNDS_PADDING,
+            "max_lon": T_MAX_LON + BOUNDS_PADDING,
+        }
+
+    return bounds

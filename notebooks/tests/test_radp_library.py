@@ -11,6 +11,7 @@ from notebooks.radp_library import (
     calc_rx_power,
     calculate_received_power,
     check_cartesian_format,
+    find_sim_boundary,
     get_ues_cells_cartesian_df,
     normalize_cell_ids,
     preprocess_ue_data,
@@ -23,12 +24,16 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         dummy_distance = 1
         dummy_freq = 1800
         expected_power = -74.55545010206612
-        power = calculate_received_power(distance_km=dummy_distance, frequency_mhz=dummy_freq)
+        power = calculate_received_power(
+            distance_km=dummy_distance, frequency_mhz=dummy_freq
+        )
         self.assertEqual(expected_power, power)
 
     def test_add_cell_info(self):
         # Input data
-        new_data_with_rx_data = pd.DataFrame({"cell_id": [1, 2], "rx_power": [-80, -85]})
+        new_data_with_rx_data = pd.DataFrame(
+            {"cell_id": [1, 2], "rx_power": [-80, -85]}
+        )
         topology = pd.DataFrame(
             {
                 "cell_id": ["cell_1", "cell_2"],
@@ -37,6 +42,10 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
                 "cell_az_deg": [90, 180],
             }
         )
+
+        # Convert cell_id types to match before merging
+        new_data_with_rx_data["cell_id"] = new_data_with_rx_data["cell_id"].astype(str)
+        new_data_with_rx_data["cell_id"] = "cell_" + new_data_with_rx_data["cell_id"]
 
         # Expected output
         expected_output = pd.DataFrame(
@@ -69,7 +78,13 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         # Test should pass without raising an exception
         self.assertTrue(check_cartesian_format(df, topology))
         # Input data with missing cell_id
-        df = pd.DataFrame({"latitude": [10.0, 20.0], "longitude": [30.0, 40.0], "cell_id": ["cell_1", "cell_1"]})
+        df = pd.DataFrame(
+            {
+                "latitude": [10.0, 20.0],
+                "longitude": [30.0, 40.0],
+                "cell_id": ["cell_1", "cell_1"],
+            }
+        )
         topology = pd.DataFrame({"cell_id": ["cell_1", "cell_2"]})
         # Input data with extra cell_id
         df = pd.DataFrame(
@@ -138,7 +153,12 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         )
 
         topology_data = pd.DataFrame(
-            {"cell_id": ["cell_1"], "cell_lat": [0.0], "cell_lon": [1.0], "cell_carrier_freq_mhz": [1800]}
+            {
+                "cell_id": ["cell_1"],
+                "cell_lat": [0.0],
+                "cell_lon": [1.0],
+                "cell_carrier_freq_mhz": [1800],
+            }
         )
 
         # Act: Run full preprocessing
@@ -170,7 +190,9 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
             }
         )
         result1 = calc_relative_bearing(df1)
-        self.assertTrue(math.isclose(result1["relative_bearing"].iloc[0], 0.0, abs_tol=1e-2))
+        self.assertTrue(
+            math.isclose(result1["relative_bearing"].iloc[0], 0.0, abs_tol=1e-2)
+        )
 
         # Case 2: UE directly east (relative bearing should be ~90)
         df2 = pd.DataFrame(
@@ -183,7 +205,9 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
             }
         )
         result2 = calc_relative_bearing(df2)
-        self.assertTrue(math.isclose(result2["relative_bearing"].iloc[0], 90.0, abs_tol=1e-2))
+        self.assertTrue(
+            math.isclose(result2["relative_bearing"].iloc[0], 90.0, abs_tol=1e-2)
+        )
 
         # Case 3: UE directly south (relative bearing should be ~180)
         df3 = pd.DataFrame(
@@ -196,7 +220,9 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
             }
         )
         result3 = calc_relative_bearing(df3)
-        self.assertTrue(math.isclose(result3["relative_bearing"].iloc[0], 180.0, abs_tol=1e-2))
+        self.assertTrue(
+            math.isclose(result3["relative_bearing"].iloc[0], 180.0, abs_tol=1e-2)
+        )
 
         # Case 4: UE directly west of cell facing east (relative bearing ~180)
         df4 = pd.DataFrame(
@@ -209,7 +235,9 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
             }
         )
         result4 = calc_relative_bearing(df4)
-        self.assertTrue(math.isclose(result4["relative_bearing"].iloc[0], 180.0, abs_tol=1e-2))
+        self.assertTrue(
+            math.isclose(result4["relative_bearing"].iloc[0], 180.0, abs_tol=1e-2)
+        )
 
     def test_calc_rx_power(self):
         # Arrange: Create a minimal DataFrame with known values
@@ -228,7 +256,9 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
 
         # Assert
         self.assertIn("cell_rxpwr_dbm", result_df.columns)
-        self.assertAlmostEqual(result_df["cell_rxpwr_dbm"].iloc[0], expected_power, places=3)
+        self.assertAlmostEqual(
+            result_df["cell_rxpwr_dbm"].iloc[0], expected_power, places=3
+        )
 
     def test_calc_log_distance(self):
         # Arrange: Create a minimal DataFrame with known values
@@ -251,7 +281,9 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         self.assertIn("log_distance", result_df.columns)
 
         # Assert: Check if the computed log distance is as expected
-        self.assertAlmostEqual(result_df["log_distance"].iloc[0], expected_log_distance, places=3)
+        self.assertAlmostEqual(
+            result_df["log_distance"].iloc[0], expected_log_distance, places=3
+        )
 
     def test_get_ues_cells_cartesian_df(self):
         # Arrange: Create sample data and topology DataFrames
@@ -283,3 +315,108 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         # Assert: Ensure cell_id was converted from string to integer correctly
         self.assertEqual(result_df["cell_id"].iloc[0], 1)
         self.assertEqual(result_df["cell_id"].iloc[1], 2)
+
+    def test_find_sim_boundary(self):
+        # Test case 1: With both topology and UE data
+        topology = pd.DataFrame(
+            {
+                "cell_lat": [-90.00, 0.00, 90.00],
+                "cell_lon": [-180.00, 0.00, 180.00],
+                "cell_id": ["cell_1", "cell_2", "cell_3"],
+                "cell_az_deg": [0, 120, 240],
+                "cell_carrier_freq_mhz": [2100, 2100, 2100],
+            }
+        )
+
+        client_ue_data = pd.DataFrame(
+            {
+                "longitude": [-22.63, 119.76, 72.11, -67.52],
+                "latitude": [59.80, 54.85, -20.24, -38.10],
+                "cell_id": [1, 2, 3, 1],
+                "cell_rxpwr_dbm": [-100.31, -99.84, -99.43, -100.29],
+            }
+        )
+
+        bounds = find_sim_boundary(topology, client_ue_data)
+
+        # Expected bounds with 10 unit padding
+        expected_min_lat = (
+            -100.00
+        )  # min(-90.00, 0.00, 90.00, 59.80, 54.85, -20.24, -38.10) - 10
+        expected_max_lat = (
+            100.00  # max(-90.00, 0.00, 90.00, 59.80, 54.85, -20.24, -38.10) + 10
+        )
+        expected_min_lon = (
+            -190.00
+        )  # min(-180.00, 0.00, 180.00, -22.63, 119.76, 72.11, -67.52) - 10
+        expected_max_lon = (
+            190.00  # max(-180.00, 0.00, 180.00, -22.63, 119.76, 72.11, -67.52) + 10
+        )
+
+        self.assertAlmostEqual(bounds["min_lat"], expected_min_lat, places=2)
+        self.assertAlmostEqual(bounds["max_lat"], expected_max_lat, places=2)
+        self.assertAlmostEqual(bounds["min_lon"], expected_min_lon, places=2)
+        self.assertAlmostEqual(bounds["max_lon"], expected_max_lon, places=2)
+
+        # Test case 2: With empty UE data
+        empty_ue_data = pd.DataFrame()
+        bounds_empty = find_sim_boundary(topology, empty_ue_data)
+
+        # Should use only topology bounds with padding
+        expected_min_lat_empty = -100.00  # -90.0 - 10
+        expected_max_lat_empty = 100.00  # 90.0 + 10
+        expected_min_lon_empty = -190.00  # -180.0 - 10
+        expected_max_lon_empty = 190.00  # 180.0 + 10
+
+        self.assertAlmostEqual(
+            bounds_empty["min_lat"], expected_min_lat_empty, places=2
+        )
+        self.assertAlmostEqual(
+            bounds_empty["max_lat"], expected_max_lat_empty, places=2
+        )
+        self.assertAlmostEqual(
+            bounds_empty["min_lon"], expected_min_lon_empty, places=2
+        )
+        self.assertAlmostEqual(
+            bounds_empty["max_lon"], expected_max_lon_empty, places=2
+        )
+
+        # Test case 3: Small area test
+        small_topology = pd.DataFrame(
+            {
+                "cell_lat": [23.81, 23.82],
+                "cell_lon": [90.41, 90.42],
+                "cell_id": ["cell_1", "cell_2"],
+                "cell_az_deg": [0, 120],
+                "cell_carrier_freq_mhz": [2100, 2100],
+            }
+        )
+
+        small_ue_data = pd.DataFrame(
+            {
+                "longitude": [90.41, 90.42],
+                "latitude": [23.81, 23.82],
+                "cell_id": [1, 2],
+                "cell_rxpwr_dbm": [-85.50, -88.20],
+            }
+        )
+
+        bounds_small = find_sim_boundary(small_topology, small_ue_data)
+
+        expected_min_lat_small = 13.81  # min(23.81, 23.82) - 10
+        expected_max_lat_small = 33.82  # max(23.81, 23.82) + 10
+        expected_min_lon_small = 80.41  # min(90.41, 90.42) - 10
+        expected_max_lon_small = 100.42  # max(90.41, 90.42) + 10
+
+        self.assertAlmostEqual(
+            bounds_small["min_lat"], expected_min_lat_small, places=2
+        )
+        self.assertAlmostEqual(
+            bounds_small["max_lat"], expected_max_lat_small, places=2
+        )
+        self.assertAlmostEqual(
+            bounds_small["min_lon"], expected_min_lon_small, places=2
+        )
+        self.assertAlmostEqual(
+            bounds_small["max_lon"], expected_max_lon_small, places=2
+        )
