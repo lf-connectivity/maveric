@@ -56,6 +56,7 @@ class BayesianDigitalTwin:
         norm_method: NormMethod = NormMethod.MINMAX,
         x_max: Optional[Dict[str, float]] = None,
         x_min: Optional[Dict[str, float]] = None,
+        device: Optional[torch.device] = None,
     ):
         """
         `data_in` is a list of Pandas dataframes, where each one corresponds to
@@ -72,10 +73,13 @@ class BayesianDigitalTwin:
 
         `data_in` and `stats` may be constructed using `get_percell_data`.
         """
-        self.is_cuda = False
-        if torch.cuda.is_available():
-            torch.cuda.set_device(0)
-            self.is_cuda = True
+        # self.is_cuda = False
+        # if torch.cuda.is_available():
+        #     torch.cuda.set_device(0)
+        #     self.is_cuda = True
+        
+        self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.is_cuda = self.device.type == "cuda"
 
         self.cell_ids = [data_in_cell.cell_id.unique()[0] for data_in_cell in data_in]
         self.num_cells = len(self.cell_ids)
@@ -129,11 +133,18 @@ class BayesianDigitalTwin:
         n_train = data_in[0].shape[0]
 
         # Get train_X and train_Y, create training tensors
-        train_X = torch.zeros(
-            [self.num_cells, n_train, self.num_features], dtype=torch.float32
-        )
+        
+        # train_X = torch.zeros(
+        #     [self.num_cells, n_train, self.num_features], dtype=torch.float32
+        # )
 
-        train_Y = torch.zeros([self.num_cells, n_train], dtype=torch.float32)
+        # train_Y = torch.zeros([self.num_cells, n_train], dtype=torch.float32)
+        
+        train_X = torch.zeros(
+            [self.num_cells, n_train, self.num_features], dtype=torch.float32, device=self.device
+        )
+        
+        train_Y = torch.zeros([self.num_cells, n_train], dtype=torch.float32, device=self.device)
 
         for m in range(self.num_cells):
             if self.norm_method == NormMethod.MINMAX:
@@ -145,14 +156,21 @@ class BayesianDigitalTwin:
                     data_in[m][self.x_columns] - self.xmeans[m]
                 ) / self.xstds[m]
 
+            # train_X_cell = torch.tensor(
+            #     train_x_cell.iloc[:, :].values, dtype=torch.float32
+            # )
+            
             train_X_cell = torch.tensor(
                 train_x_cell.iloc[:, :].values, dtype=torch.float32
-            )
+            ).to(self.device)
 
             train_y_cell = (data_in[m][self.y_columns] - self.ymeans[m]) / self.ystds[m]
+            # train_Y_cell = torch.tensor(
+            #     train_y_cell.iloc[:, :].values, dtype=torch.float32
+            # )
             train_Y_cell = torch.tensor(
                 train_y_cell.iloc[:, :].values, dtype=torch.float32
-            )
+            ).to(self.device)
 
             train_X[m] = train_X_cell.reshape(shape=(1, -1, self.num_features))
             train_Y[m] = torch.transpose(train_Y_cell, 0, 1)
@@ -475,10 +493,10 @@ class BayesianDigitalTwin:
 
             if self.is_cuda:
                 logger.info("Cuda enabled for training data.")
-                train_X = [train_X[0].cuda()]
-                train_Y = train_Y.cuda()
-                self.model = self.model.cuda()
-                mll = mll.cuda()
+                train_X = [train_X[0].to(self.device)]
+                train_Y = train_Y.to(self.device)
+                self.model = self.model.to(self.device)
+                mll = mll.to(self.device)
 
             last_loss = float("-inf")
             for i in range(maxiter):
@@ -533,6 +551,9 @@ class BayesianDigitalTwin:
 
         # Create Training Tensors
         train_X, train_Y = self._create_training_tensors(data_in)
+        
+        train_X = train_X.to(self.device)
+        train_Y = train_Y.to(self.device)
 
         self.model = self.model.get_fantasy_model(inputs=train_X, targets=train_Y)
 
@@ -563,8 +584,11 @@ class BayesianDigitalTwin:
         num_locations = prediction_dfs[0].shape[0]
         pred_means = torch.zeros([num_locations, self.num_cells], dtype=torch.float32)
         pred_stds = torch.zeros([num_locations, self.num_cells], dtype=torch.float32)
+        # predict_X = torch.zeros(
+        #     [self.num_cells, num_locations, self.num_features], dtype=torch.float32
+        # )
         predict_X = torch.zeros(
-            [self.num_cells, num_locations, self.num_features], dtype=torch.float32
+            [self.num_cells, num_locations, self.num_features], dtype=torch.float32, device=self.device
         )
 
         for m in range(self.num_cells):
@@ -577,9 +601,14 @@ class BayesianDigitalTwin:
                     prediction_dfs[m][self.x_columns] - self.xmeans[m]
                 ) / self.xstds[m]
 
+            # predict_X_cell = torch.tensor(
+            #     predict_x_cell.iloc[:, :].values, dtype=torch.float32
+            # )
+            
             predict_X_cell = torch.tensor(
                 predict_x_cell.iloc[:, :].values, dtype=torch.float32
-            )
+            ).to(self.device)
+            
             predict_X[m] = predict_X_cell.reshape(shape=(1, -1, self.num_features))
 
         if self.is_cuda:

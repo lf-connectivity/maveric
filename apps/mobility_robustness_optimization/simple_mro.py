@@ -1,5 +1,6 @@
 import warnings
 from typing import Any, Dict, Optional
+import logging
 
 import numpy as np
 import pandas as pd
@@ -12,6 +13,8 @@ from radp.digital_twin.utils.constants import RLF_THRESHOLD
 
 from .mobility_robustness_optimization import MobilityRobustnessOptimization, calculate_mro_metric
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 class SimpleMRO(MobilityRobustnessOptimization):
     """
@@ -37,7 +40,7 @@ class SimpleMRO(MobilityRobustnessOptimization):
         if not self.bayesian_digital_twins:
             raise ValueError("Bayesian Digital Twins are not trained. Train the models before calculating metrics.")
 
-        # Generate and preprocess simulation data
+        # Generate and preprocess simulation data    
         self.simulation_data = get_ue_data(self.mobility_model_params)
         self.simulation_data = self.simulation_data.rename(columns={"lat": "latitude", "lon": "longitude"})
 
@@ -67,8 +70,8 @@ class SimpleMRO(MobilityRobustnessOptimization):
         self.score = pd.DataFrame(columns=["hyst", "ttt", "score"])
 
         header = f"{'Epoch':<6} {'Hyst':<14} {'TTT':<6} {'MRO Metric':<12}"
-        print(header)
-        print("-" * len(header))
+        logger.info(header)
+        logger.info("-" * len(header))
         self.score.loc[len(self.score)] = [hyst, ttt, calculate_mro_metric(attached_df)]
         for i in range(epochs):
             while True:
@@ -82,10 +85,10 @@ class SimpleMRO(MobilityRobustnessOptimization):
 
             # Store the data in the score DataFrame
             self.score.loc[len(self.score)] = [hyst, ttt, mro_metric]
-            print(f"{i:<6} {hyst:<14.10f} {ttt:<6} {mro_metric:<12.6f}")
+            logger.info(f"{i:<6} {hyst:<14.10f} {ttt:<6} {mro_metric:<12.6f}")
 
-        print(f"\nOptimized Hyst: {self.score.loc[self.score['score'].idxmax(), 'hyst']}")
-        print(f"Optimized TTT: {int(self.score.loc[self.score['score'].idxmax(), 'ttt'])}")
+        logger.info(f"\nOptimized Hyst: {self.score.loc[self.score['score'].idxmax(), 'hyst']}")
+        logger.info(f"Optimized TTT: {int(self.score.loc[self.score['score'].idxmax(), 'ttt'])}")
         return self.score.loc[self.score["score"].idxmax(), "hyst"], int(
             self.score.loc[self.score["score"].idxmax(), "ttt"]
         )

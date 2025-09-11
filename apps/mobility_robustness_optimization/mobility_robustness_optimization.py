@@ -1,10 +1,12 @@
 import os
 import pickle
 import warnings
+import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import torch
 import numpy as np
 import pandas as pd
 from gpytorch.utils.warnings import NumericalWarning
@@ -25,6 +27,9 @@ from radp.digital_twin.utils.cell_selection import perform_attachment
 # Suppress the specific NumericalWarning from gpytorch
 warnings.filterwarnings("ignore", category=NumericalWarning)
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
 
 class MobilityRobustnessOptimization(ABC):
     """
@@ -35,12 +40,15 @@ class MobilityRobustnessOptimization(ABC):
         self,
         mobility_model_params: Dict[str, Dict],
         topology: pd.DataFrame,
+        new_data: Optional[pd.DataFrame] = None,
         bdt: Optional[Dict[str, BayesianDigitalTwin]] = None,
     ):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.topology = topology
         self.bayesian_digital_twins = bdt if bdt is not None else {}
         self.mobility_model_params = mobility_model_params
         self.simulation_data = None
+        self.new_data = new_data
 
     def train_or_update_rf_twins(self, new_data: pd.DataFrame) -> None:
         """
@@ -64,45 +72,47 @@ class MobilityRobustnessOptimization(ABC):
 
         """
         try:
+            self.new_data = new_data
+            
             if not isinstance(new_data, pd.DataFrame):
-                raise TypeError("The input 'new_data' must be a pandas DataFrame.")
+                logger.error(f"The input 'new_data' must be a pandas DataFrame.")
 
-            expected_columns = {"longitude", "latitude", "cell_id", "cell_rxpwr_dbm"}
-            if not expected_columns.issubset(new_data.columns):
-                raise ValueError(f"The input DataFrame must contain the following columns: {expected_columns}")
+            expected_columns = {f"longitude", "latitude", "cell_id", "cell_rxpwr_dbm"}
+            if not expected_columns.issubset(self.new_data.columns):
+                logger.error(f"The input DataFrame must contain the following columns: {expected_columns}")
 
             # normalize cell_id format - regardless of dtype
             self.topology = normalize_cell_ids(self.topology)
-            new_data = normalize_cell_ids(new_data)
+            self.new_data = normalize_cell_ids(self.new_data)
 
             # Check if the new data is in the expected cartesian format
-            check_cartesian_format(new_data, self.topology)
+            check_cartesian_format(self.new_data, self.topology)
 
             # Prepare the new data for training or updating
-            prepared_data = self._prepare_train_or_update_data(new_data)
+            prepared_data = self._prepare_train_or_update_data(self.new_data)
 
             # update if bayesian digital twins exist already
             if self.bayesian_digital_twins:
-                print("Updating existing Bayesian Digital Twins with new data.")
+                logger.info("Updating existing Bayesian Digital Twins with new data.")
 
                 for cell_id, df in prepared_data.items():
                     self._update(cell_id, df)
-                print("Bayesian Digital Twins updated successfully.")
+                logger.info("Bayesian Digital Twins updated successfully.")
 
             # If no Bayesian Digital Twins exist, train from scratch
             else:
-                print("No Bayesian Digital Twins available for update. Training from scratch.")
+                logger.info("No Bayesian Digital Twins available for update. Training from scratch.")
                 self._training(maxiter=100, train_data=prepared_data)
-                print("\nBayesian Digital Twins trained successfully.")
+                logger.info("\nBayesian Digital Twins trained successfully.")
 
         except TypeError as te:
-            print(f"TypeError: {te}")
+            logger.error(f"TypeError: {te}")
         except ValueError as ve:
-            print(f"ValueError: {ve}")
+            logger.error(f"ValueError: {ve}")
         except KeyError as ke:
-            print(f"KeyError: {ke}")
+            logger.error(f"KeyError: {ke}")
         except Exception as e:
-            print(f"An unexpected error occurred: {e}")
+            logger.exception(f"An unexpected error occurred: {e}")
 
     def save_bdt(self, file_relative_path="data/mro_data") -> bool:
         """
@@ -113,7 +123,7 @@ class MobilityRobustnessOptimization(ABC):
 
         try:
             if not isinstance(self.bayesian_digital_twins, dict):
-                raise TypeError("The attribute 'bayesian_digital_twins' must be a dictionary.")
+                logger.error("The attribute 'bayesian_digital_twins' must be a dictionary.")
 
             # Ensure the directory exists
             os.makedirs(file_relative_path, exist_ok=True)
@@ -121,20 +131,20 @@ class MobilityRobustnessOptimization(ABC):
             with open(filename, "wb") as fp:
                 pickle.dump(self.bayesian_digital_twins, fp)
 
-            print(f"Twins Saved Successfully as Pickle at: {filename}")
+            logger.info(f"Twins Saved Successfully as Pickle at: {filename}")
 
             return True  # Indicate successful save
 
         except TypeError as te:
-            print(f"TypeError: {te}")
+            logger.error(f"TypeError: {te}")
             return False
 
         except OSError as oe:
-            print(f"OSError: {oe}")
+            logger.error(f"OSError: {oe}")
             return False
 
         except Exception as e:
-            print(f"An unexpected error occurred: {e}")
+            logger.exception(f"An unexpected error occurred: {e}")
             return False
 
     def load_bdt(self, file_relative_path="data/mro_data/digital_twins.pkl") -> bool:
@@ -147,16 +157,16 @@ class MobilityRobustnessOptimization(ABC):
         try:
             with open(filename, "rb") as fp:
                 self.bayesian_digital_twins = pickle.load(fp)
-            print(f"Twins Loaded Successfully from Pickle at: {filename}")
+            logger.info(f"Twins Loaded Successfully from Pickle at: {filename}")
 
             return True  # Indicate successful load
 
         except FileNotFoundError as fnf:
-            print(f"FileNotFoundError: {fnf}")
+            logger.error(f"FileNotFoundError: {fnf}")
             return False
 
         except Exception as e:
-            print(f"An unexpected error occurred: {e}")
+            logger.exception(f"An unexpected error occurred: {e}")
             return False
 
     @abstractmethod
@@ -195,7 +205,8 @@ class MobilityRobustnessOptimization(ABC):
                 y_columns=["cell_rxpwr_dbm"],
                 norm_method=NormMethod.MINMAX,
             )
-
+                        
+            bayesian_digital_twins[train_cell_id].model = bayesian_digital_twins[train_cell_id].model.to(self.device)
             self.bayesian_digital_twins[train_cell_id] = bayesian_digital_twins[train_cell_id]
 
             loss_vs_iters.append(
@@ -342,7 +353,7 @@ class MobilityRobustnessOptimization(ABC):
 
                 else:
                     # Handle missing models, e.g., log a warning or initialize a default model
-                    print(f"No model available for cell_id {cell_id}, skipping prediction.")
+                    logger.error(f"No model available for cell_id {cell_id}, skipping prediction.")
 
         full_prediction_df = full_prediction_df.rename(columns={"latitude": "loc_y", "longitude": "loc_x"})
         if full_prediction_df["cell_id"].dtype == object:

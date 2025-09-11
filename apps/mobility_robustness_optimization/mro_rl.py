@@ -1,4 +1,5 @@
 from typing import Optional
+import logging
 
 import numpy as np
 import pandas as pd
@@ -15,6 +16,8 @@ from radp.digital_twin.utils.constants import RLF_THRESHOLD
 
 from .mobility_robustness_optimization import MobilityRobustnessOptimization, calculate_mro_metric
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 class ReinforcedMRO(MobilityRobustnessOptimization):
     """
@@ -35,7 +38,6 @@ class ReinforcedMRO(MobilityRobustnessOptimization):
         """
         if not self.bayesian_digital_twins:
             raise ValueError("Bayesian Digital Twins are not trained. Train the models before calculating metrics.")
-
         # Load and prepare simulation data
         self.simulation_data = get_ue_data(self.mobility_model_params)
         self.simulation_data = self.simulation_data.rename(columns={"lat": "latitude", "lon": "longitude"})
@@ -67,7 +69,7 @@ class ReinforcedMRO(MobilityRobustnessOptimization):
         # Ensure ttt is an integer
         hyst, ttt = action[0]
         ttt = int(round(ttt))
-        print(f"\nOptimized Hyst: {hyst},\nOptimized TTT: {ttt}")
+        logger.info(f"\nOptimized Hyst: {hyst},\nOptimized TTT: {ttt}")
         return hyst, ttt
 
 
@@ -107,14 +109,14 @@ class ReinforcedMROEnv(Env):
         terminated = self.current_step >= self.max_steps
         truncated = False  # Can be customized if needed
 
-        print(
+        logger.info(
             f"Episode: {self.episode_num}, Timestep: {self.current_step}, "
             f"Hyst: {hyst:.6f}, TTT: {ttt}, Reward: {reward:.6f}, Done: {terminated}"
         )
 
         if terminated:
             avg_reward = self.episode_reward / self.max_steps
-            print(f"Episode {self.episode_num} average reward: {avg_reward:.6f}\n")
+            logger.info(f"Episode {self.episode_num} average reward: {avg_reward:.6f}\n")
             self.episode_num += 1
             self.episode_reward = 0.0
 
@@ -126,4 +128,4 @@ class ReinforcedMROEnv(Env):
         return self.state, {}
 
     def render(self):
-        print(f"Current State: {self.state}, Current Step: {self.current_step}")
+        logger.info(f"Current State: {self.state}, Current Step: {self.current_step}")
