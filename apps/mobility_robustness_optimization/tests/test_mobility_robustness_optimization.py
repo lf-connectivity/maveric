@@ -345,3 +345,4 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
 
         # Assert
         self.assertTrue(called["ok"], "Expected get_percell_data to be invoked with strongest sampling and dedup")
+

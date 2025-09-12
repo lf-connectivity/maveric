@@ -262,7 +262,6 @@ class MobilityRobustnessOptimization(ABC):
         |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240       |        2100           |
         +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
 
-
         """
         required_columns = {"cell_lat", "cell_lon", "cell_az_deg"}
         if not required_columns.issubset(df.columns):
@@ -364,7 +363,7 @@ class MobilityRobustnessOptimization(ABC):
         return predicted, full_prediction_df
 
     def _preprocess_simulation_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
+      ]
         +------------+-------------+-------------+-------------+------------+------------+-------------------------+
         | mock_ue_id | cell_id     | rxpower_dbm |  rxpower_stddev_dbm  |  log_distance | pred_means |     tick    |
         +============+=============+=============+=====================+==============+=============+==============+
@@ -374,7 +373,7 @@ class MobilityRobustnessOptimization(ABC):
         |     1      | "cell_3"    |   -90.4     |        1.3           |     0.499     |   -89.0     |     1      |
         +------------+-------------+-------------+----------------------+--------------+-------------+-------------+
 
-        """
+
         df.drop(
             columns=["rxpower_stddev_dbm", "rxpower_dbm", "cell_rxpwr_dbm"],
             inplace=True,
@@ -425,6 +424,7 @@ class MobilityRobustnessOptimization(ABC):
 
         # Group by location
         for _, group in df.groupby(["ue_id", "tick"]):
+
             # Group further by frequency layer within the same location
             freq_groups = group.groupby("cell_carrier_freq_mhz")
 

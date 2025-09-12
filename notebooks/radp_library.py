@@ -236,7 +236,6 @@ def get_percell_data(
     Prediction dataframe cleanup
     Dataframe should contain ['cell_id', 'log_distance', 'relative_bearing', 'cell_rxpwr_dbm'] cloumns.
 
-
     +---------+--------------+------------------+----------------+
     | cell_id | log_distance | relative_bearing | cell_rxpwr_dbm |
     +=========+==============+==================+================+
@@ -1171,6 +1170,7 @@ def plot_ue_tracks_side_by_side(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
     +-------------+-----------+------------+
 
     df2:
+
     +-------------+-----------+------------+
     | mock_ue_id  |   lat     |    lon     |
     +=============+===========+============+
@@ -1209,7 +1209,6 @@ def plot_ue_tracks_on_axis(df: pd.DataFrame, ax, title: str) -> None:
     |     2       | 23.8125   | 90.4145    |
     |     2       | 23.8130   | 90.4150    |
     +-------------+-----------+------------+
-
 
     """
     data = df
@@ -1396,6 +1395,7 @@ def calc_rx_power(cartesian_df: pd.DataFrame) -> pd.DataFrame:
     |        |          |           |      |         |          |          |              |   -2.547     |
     +--------+----------+-----------+------+---------+----------+----------+--------------+--------------+
 
+
     """
     cartesian_df["cell_rxpwr_dbm"] = cartesian_df.apply(
         lambda row: calculate_received_power(row["log_distance"], row["cell_carrier_freq_mhz"]),
@@ -1578,7 +1578,6 @@ def add_cell_info(new_data_with_rx_data: pd.DataFrame, topology: pd.DataFrame) -
     |    2    | 90.414   | 23.810   |     240      |         2100           |
     +---------+----------+----------+--------------+------------------------+
 
-
     """
     # Convert int to str format matching topology: 'cell_1', 'cell_2', etc.
     if new_data_with_rx_data["cell_id"].dtype == int:
@@ -1633,12 +1632,14 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
     # Base + dynamic color map
     base_colors = {1.0: "red", 2.0: "green", 3.0: "blue"}
     all_cell_ids = pd.concat([ue_df2["cell_id"], ue_df[ue_df["cell_id"] != "RLF"]["cell_id"]]).unique()
+
     missing_ids = [cid for cid in all_cell_ids if cid not in base_colors]
     extra_colors = cm.get_cmap("tab10", len(missing_ids))
     dynamic_colors = {cid: extra_colors(i) for i, cid in enumerate(missing_ids)}
     full_color_map = {**base_colors, **dynamic_colors}
 
     min_sinr = min(ue_df2["sinr_db"].min(), ue_df[ue_df["cell_id"] != "RLF"]["sinr_db"].min())
+
     drop_value = min_sinr - 5
 
     plt.figure(figsize=(12, 6))
@@ -1659,6 +1660,7 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
         )
 
     # --- Plot connected UE SINR as a continuous line, color-coded per cell_id ---
+
     for i in range(len(ue_df) - 1):
         tick1, tick2 = ue_df.loc[i, "tick"], ue_df.loc[i + 1, "tick"]
         sinr1, sinr2 = ue_df.loc[i, "sinr_db"], ue_df.loc[i + 1, "sinr_db"]
@@ -1690,6 +1692,7 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
                 "ko",
                 markersize=8,
                 label="RLF" if "RLF" not in legend_cells else None,
+
             )
             legend_cells.add("RLF")
 
@@ -1704,7 +1707,6 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
     plt.legend(title=None, bbox_to_anchor=(1.05, 1), loc="upper left")
     plt.tight_layout()
     plt.show()
-
 
 def mro_score_3d_plot(df: pd.DataFrame) -> None:
     """
