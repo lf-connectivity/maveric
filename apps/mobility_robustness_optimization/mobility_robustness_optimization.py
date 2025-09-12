@@ -363,7 +363,9 @@ class MobilityRobustnessOptimization(ABC):
         return predicted, full_prediction_df
 
     def _preprocess_simulation_data(self, df: pd.DataFrame) -> pd.DataFrame:
-      ]
+        """Preprocess simulation data for MRO analysis.
+
+        Expected input format:
         +------------+-------------+-------------+-------------+------------+------------+-------------------------+
         | mock_ue_id | cell_id     | rxpower_dbm |  rxpower_stddev_dbm  |  log_distance | pred_means |     tick    |
         +============+=============+=============+=====================+==============+=============+==============+
@@ -372,8 +374,7 @@ class MobilityRobustnessOptimization(ABC):
         |     0      | "cell_2"    |   -82.1     |        1.1           |     0.207     |   -84.2     |     1      |
         |     1      | "cell_3"    |   -90.4     |        1.3           |     0.499     |   -89.0     |     1      |
         +------------+-------------+-------------+----------------------+--------------+-------------+-------------+
-
-
+        """
         df.drop(
             columns=["rxpower_stddev_dbm", "rxpower_dbm", "cell_rxpwr_dbm"],
             inplace=True,
