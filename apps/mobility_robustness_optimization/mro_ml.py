@@ -64,7 +64,10 @@ class BayesianMRO(MobilityRobustnessOptimization):
 
         # Determine simulation boundaries
         bounds = find_sim_boundary(self.topology, self.new_data)
-        self.mobility_model_params["ue_tracks_generation"]["params"]["lat_lon_boundaries"].update(bounds)
+        if "ue_tracks_generation" in self.mobility_model_params:
+            if "params" in self.mobility_model_params["ue_tracks_generation"]:
+                if "lat_lon_boundaries" in self.mobility_model_params["ue_tracks_generation"]["params"]:
+                    self.mobility_model_params["ue_tracks_generation"]["params"]["lat_lon_boundaries"].update(bounds)
 
         self.simulation_data = get_ue_data(self.mobility_model_params)
         self.simulation_data = self.simulation_data.rename(columns={"lat": "latitude", "lon": "longitude"})
