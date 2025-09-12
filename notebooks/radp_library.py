@@ -25,7 +25,7 @@ from radp.digital_twin.mobility.mobility import gauss_markov
 from radp.digital_twin.mobility.ue_tracks import UETracksGenerator
 from radp.digital_twin.mobility.ue_tracks_params import UETracksGenerationParams
 from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin, NormMethod
-from radp.digital_twin.utils.constants import RLF_THRESHOLD, TXPWR_DBM
+from radp.digital_twin.utils.constants import BOUNDS_PADDING, RLF_THRESHOLD, TXPWR_DBM
 from radp.digital_twin.utils.gis_tools import GISTools
 
 Boundary = Union[geometry.Polygon, geometry.MultiPolygon]
@@ -235,8 +235,8 @@ def get_percell_data(
     """
     Prediction dataframe cleanup
     Dataframe should contain ['cell_id', 'log_distance', 'relative_bearing', 'cell_rxpwr_dbm'] cloumns.
-    
-    
+
+
     +---------+--------------+------------------+----------------+
     | cell_id | log_distance | relative_bearing | cell_rxpwr_dbm |
     +=========+==============+==================+================+
@@ -247,7 +247,7 @@ def get_percell_data(
     |   2     | 102.36       | 33.91            | -72.0          |
     |   3     | 102.08       | 33.83            | -78.7          |
     +---------+--------------+------------------+----------------+
-    
+
     """
     data_out = []
     data_stats = []
@@ -440,7 +440,7 @@ def find_closest(data_df: pd.DataFrame, lat: float, lon: float) -> Optional[int]
     @param lat: Latitude of the target point.
     @param lon: Longitude of the target point.
     @returns: The index of the closest point if the minimum distance is less than 100, otherwise None.
-   
+
     +------------+------------+
     |  loc_x     |  loc_y     |
     +============+============+
@@ -450,7 +450,7 @@ def find_closest(data_df: pd.DataFrame, lat: float, lon: float) -> Optional[int]
     |  90.420000 | 23.820000  |
     |  90.405000 | 23.800000  |
     +------------+------------+
-    
+
     """
     dist = data_df.apply(lambda row: GISTools.dist((row.loc_y, row.loc_x), (lat, lon)), axis=1)
     if dist.min() < 100:
@@ -472,7 +472,7 @@ def get_track_samples(
     @param num_UEs: Number of user equipment (UE) tracks to simulate.
     @param ticks: Number of time steps to simulate for the mobility model.
     @returns: A DataFrame containing the sampled track points mapped to the closest points in the input dataset.
-    
+
     +------------+------------+
     |  loc_x     |  loc_y     |
     +============+============+
@@ -1068,7 +1068,7 @@ def calculate_received_power(distance_km: float, frequency_mhz: int) -> float:
 def plot_ue_tracks(df: pd.DataFrame) -> None:
     """
     Plots the movement tracks of unique UE IDs on a grid of subplots.
-    
+
     +-------------+------+-----------+------------+
     | mock_ue_id  | tick |   lat     |    lon     |
     +=============+======+===========+============+
@@ -1159,7 +1159,7 @@ def plot_ue_tracks(df: pd.DataFrame) -> None:
 def plot_ue_tracks_side_by_side(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
     """
     Plots the movement tracks of unique UE IDs from two DataFrames side by side.
-    
+
     df1:
     +-------------+-----------+------------+
     | mock_ue_id  |   lat     |    lon     |
@@ -1169,8 +1169,8 @@ def plot_ue_tracks_side_by_side(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
     |     3       | 23.8110   | 90.4120    |
     |     4       | 23.8115   | 90.4130    |
     +-------------+-----------+------------+
-    
-    df2: 
+
+    df2:
     +-------------+-----------+------------+
     | mock_ue_id  |   lat     |    lon     |
     +=============+===========+============+
@@ -1198,7 +1198,7 @@ def plot_ue_tracks_side_by_side(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
 def plot_ue_tracks_on_axis(df: pd.DataFrame, ax, title: str) -> None:
     """
     Helper function to plot UE tracks on a given axis.
-    
+
     +-------------+-----------+------------+
     | mock_ue_id  |   lat     |    lon     |
     +=============+===========+============+
@@ -1210,7 +1210,7 @@ def plot_ue_tracks_on_axis(df: pd.DataFrame, ax, title: str) -> None:
     |     2       | 23.8130   | 90.4150    |
     +-------------+-----------+------------+
 
-    
+
     """
     data = df
     unique_ids = data["mock_ue_id"].unique()
@@ -1257,7 +1257,7 @@ def mro_plot_scatter(df: pd.DataFrame, topology: pd.DataFrame) -> None:
     @param df: DataFrame containing UE data with columns 'loc_x', 'loc_y', 'cell_id', and 'sinr_db'.
     @param topology: DataFrame containing cell tower data with columns 'cell_lon', 'cell_lat', and 'cell_id'.
     @returns: None. Displays a scatter plot with cell towers and UE locations.
-    
+
     df:
     +---------+--------+--------+----------+
     | cell_id | loc_x  | loc_y  | sinr_db  |
@@ -1323,7 +1323,7 @@ def mro_plot_scatter(df: pd.DataFrame, topology: pd.DataFrame) -> None:
 def get_ues_cells_cartesian_df(data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFrame:
     """
     returns a cartesian dataframe of UE and cell data
-    
+
     df:
     +---------+-----------+------------+----------+
     |  ue_id  | latitude  | longitude  |   tick   |
@@ -1358,7 +1358,7 @@ def get_ues_cells_cartesian_df(data: pd.DataFrame, topology: pd.DataFrame) -> pd
 def calc_log_distance(cartesian_df: pd.DataFrame) -> pd.DataFrame:
     """
     adds a log distance column to the cartesian dataframe based on the lat/lon of the UE and cell
-    
+
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
     | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
     +========+==========+===========+======+=========+==========+==========+==============+========================+
@@ -1378,18 +1378,23 @@ def calc_log_distance(cartesian_df: pd.DataFrame) -> pd.DataFrame:
 
 def calc_rx_power(cartesian_df: pd.DataFrame) -> pd.DataFrame:
     """
-    adds a cell_rxpwr_dbm column to the cartesian dataframe,
-    based on the log distance and cell frequency using fspl
-    
-    
-    +--------+----------+-----------+------+---------+----------+----------+--------------+--------------+------------------------+
-    | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  | log_distance |
-    +========+==========+===========+======+=========+==========+==========+==============+========================+==============+
-    |   0    | 90.412   | 23.810    |  0   |    1    | 90.410   | 23.809   |     120       |        1800           |   -2.546     |
-    |   1    | 90.413   | 23.811    |  0   |    1    | 90.414   | 23.810   |     120       |        1800           |   -2.850     |
-    |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240       |        2100           |   -2.268     |
-    |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240       |        2100           |   -2.547     |
-    +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+--------------+
+        adds a cell_rxpwr_dbm column to the cartesian dataframe,
+        based on the log distance and cell frequency using fspl
+
+    +--------+----------+-----------+------+---------+----------+----------+--------------+--------------+
+    | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier |
+    |        |          |           |      |         |          |          |              | _freq_mhz   |
+    |        |          |           |      |         |          |          |              | log_distance |
+    +========+==========+===========+======+=========+==========+==========+==============+==============+
+    |   0    | 90.412   | 23.810    |  0   |    1    | 90.410   | 23.809   |     120       |        1800  |
+    |        |          |           |      |         |          |          |              |   -2.546     |
+    |   1    | 90.413   | 23.811    |  0   |    1    | 90.414   | 23.810   |     120       |        1800  |
+    |        |          |           |      |         |          |          |              |   -2.850     |
+    |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240       |        2100  |
+    |        |          |           |      |         |          |          |              |   -2.268     |
+    |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240       |        2100  |
+    |        |          |           |      |         |          |          |              |   -2.547     |
+    +--------+----------+-----------+------+---------+----------+----------+--------------+--------------+
 
     """
     cartesian_df["cell_rxpwr_dbm"] = cartesian_df.apply(
@@ -1403,7 +1408,7 @@ def calc_relative_bearing(cartesian_df: pd.DataFrame) -> pd.DataFrame:
     """
     adds a relative_bearing column to the cartesian dataframe,
     based on the lat/lon of the UE and cell and az_deg of the cell
-    
+
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
     | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
     +========+==========+===========+======+=========+==========+==========+==============+========================+
@@ -1412,7 +1417,7 @@ def calc_relative_bearing(cartesian_df: pd.DataFrame) -> pd.DataFrame:
     |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240      |         2100           |
     |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240      |         2100           |
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
-    
+
     """
     cartesian_df["relative_bearing"] = cartesian_df.apply(
         lambda row: GISTools.get_relative_bearing(
@@ -1430,8 +1435,9 @@ def calc_relative_bearing(cartesian_df: pd.DataFrame) -> pd.DataFrame:
 def preprocess_ue_data(data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFrame:
     """
     creates a cartesian dataframe of UE and cell data, adds log distance and rx power columns
-    
+
     df:
+
     +---------+-----------+------------+----------+
     |  ue_id  | latitude  | longitude  |   tick   |
     +=========+===========+============+==========+
@@ -1442,6 +1448,7 @@ def preprocess_ue_data(data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFra
     +---------+-----------+------------+----------+
 
     topology:
+
     +---------+----------+----------+--------------+------------------------+
     | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
     +=========+==========+==========+==============+========================+
@@ -1458,7 +1465,7 @@ def preprocess_ue_data(data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFra
 def normalize_cell_ids(df: pd.DataFrame) -> pd.DataFrame:
     """
     Normalizes the 'cell_id' column in the DataFrame by ensuring all IDs follow the 'cell_<integer>' format.
-    
+
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
     | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
     +========+==========+===========+======+=========+==========+==========+==============+========================+
@@ -1467,7 +1474,7 @@ def normalize_cell_ids(df: pd.DataFrame) -> pd.DataFrame:
     |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240      |         2100           |
     |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240      |         2100           |
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
-    
+
     """
 
     df = df.copy()
@@ -1478,7 +1485,7 @@ def normalize_cell_ids(df: pd.DataFrame) -> pd.DataFrame:
 def check_cartesian_format(df: pd.DataFrame, topology: pd.DataFrame) -> bool:
     """
     Validates that the DataFrame has the expected cartesian format for cell IDs per pixel.
-    
+
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
     | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
     +========+==========+===========+======+=========+==========+==========+==============+========================+
@@ -1487,7 +1494,7 @@ def check_cartesian_format(df: pd.DataFrame, topology: pd.DataFrame) -> bool:
     |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240      |         2100           |
     |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240      |         2100           |
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
-    
+
     """
     expected_cells = list(topology["cell_id"])
     expected_cell_set = set(expected_cells)
@@ -1552,7 +1559,7 @@ def add_cell_info(new_data_with_rx_data: pd.DataFrame, topology: pd.DataFrame) -
     to the DataFrame based on cell_id.
 
     Converts integer cell_id to string format like 'cell_1' to match topology.
-    
+
     df:
     +---------+-----------+------------+----------+----------------+
     | ue_id   | latitude  | longitude  | tick     | cell_rxpwr_dbm |
@@ -1571,7 +1578,7 @@ def add_cell_info(new_data_with_rx_data: pd.DataFrame, topology: pd.DataFrame) -
     |    2    | 90.414   | 23.810   |     240      |         2100           |
     +---------+----------+----------+--------------+------------------------+
 
-    
+
     """
     # Convert int to str format matching topology: 'cell_1', 'cell_2', etc.
     if new_data_with_rx_data["cell_id"].dtype == int:
@@ -1601,7 +1608,7 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
     df2 (pd.DataFrame): All candidate cell data: 'ue_id', 'tick', 'cell_id', 'sinr_db'.
     topology (pd.DataFrame): Not used.
     ue_id (int): UE to plot.
-    
+
     +--------+------+----------+----------+
     | ue_id  | tick | cell_id  | sinr_db  |
     +========+======+==========+==========+
@@ -1613,8 +1620,8 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
     |   0    |  1   |    2     |  12.3    |
     |   1    |  1   |    1     |  -2.0    |
     |   1    |  1   |    2     |  -4.3    |
-    +--------+------+----------+----------+ 
-    
+    +--------+------+----------+----------+
+
     """
     ue_df = df[df["ue_id"] == ue_id].sort_values("tick").reset_index(drop=True)
     ue_df2 = df2[df2["ue_id"] == ue_id].sort_values("tick")
@@ -1625,19 +1632,13 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
 
     # Base + dynamic color map
     base_colors = {1.0: "red", 2.0: "green", 3.0: "blue"}
-    all_cell_ids = pd.concat([
-        ue_df2["cell_id"],
-        ue_df[ue_df["cell_id"] != "RLF"]["cell_id"]
-    ]).unique()
+    all_cell_ids = pd.concat([ue_df2["cell_id"], ue_df[ue_df["cell_id"] != "RLF"]["cell_id"]]).unique()
     missing_ids = [cid for cid in all_cell_ids if cid not in base_colors]
     extra_colors = cm.get_cmap("tab10", len(missing_ids))
     dynamic_colors = {cid: extra_colors(i) for i, cid in enumerate(missing_ids)}
     full_color_map = {**base_colors, **dynamic_colors}
 
-    min_sinr = min(
-        ue_df2["sinr_db"].min(),
-        ue_df[ue_df["cell_id"] != "RLF"]["sinr_db"].min()
-    )
+    min_sinr = min(ue_df2["sinr_db"].min(), ue_df[ue_df["cell_id"] != "RLF"]["sinr_db"].min())
     drop_value = min_sinr - 5
 
     plt.figure(figsize=(12, 6))
@@ -1658,7 +1659,6 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
         )
 
     # --- Plot connected UE SINR as a continuous line, color-coded per cell_id ---
-    previous_idx = None
     for i in range(len(ue_df) - 1):
         tick1, tick2 = ue_df.loc[i, "tick"], ue_df.loc[i + 1, "tick"]
         sinr1, sinr2 = ue_df.loc[i, "sinr_db"], ue_df.loc[i + 1, "sinr_db"]
@@ -1689,7 +1689,7 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
                 [drop_value],
                 "ko",
                 markersize=8,
-                label="RLF" if "RLF" not in legend_cells else None
+                label="RLF" if "RLF" not in legend_cells else None,
             )
             legend_cells.add("RLF")
 
@@ -1704,6 +1704,7 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
     plt.legend(title=None, bbox_to_anchor=(1.05, 1), loc="upper left")
     plt.tight_layout()
     plt.show()
+
 
 def mro_score_3d_plot(df: pd.DataFrame) -> None:
     """
@@ -1730,3 +1731,61 @@ def mro_score_3d_plot(df: pd.DataFrame) -> None:
     fig.update_traces(marker=dict(size=5))
     fig.update_layout(margin=dict(l=0, r=0, b=0, t=30))
     fig.show()
+
+
+def find_sim_boundary(topology: pd.DataFrame, client_ue_data: pd.DataFrame) -> pd.DataFrame:
+    """
+    Find the lat/lon bounds of the simulation area, given the cell tower locations and all UE locations.
+
+    topology:
+
+    +---------+----------+----------+--------------+------------------------+
+    | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
+    +=========+==========+==========+==============+========================+
+    |    1    | 90.410   | 23.809   |     120      |         1800           |
+    |    2    | 90.414   | 23.810   |     240      |         2100           |
+    +---------+----------+----------+--------------+------------------------+
+
+    client_ue_data:
+
+    +-----------+----------+---------+----------------+
+    | longitude | latitude | cell_id | cell_rxpwr_dbm |
+    +===========+==========+=========+================+
+    | -22.6329  | 59.7982  |    1    |     -100.3     |
+    | -22.6329  | 59.7982  |    2    |     -99.8      |
+    | 119.7574  | 54.8535  |    1    |     -100.1     |
+    | 119.7574  | 54.8535  |    2    |     -99.52     |
+    +-----------+----------+---------+----------------+
+
+    """
+
+    topology_lat = pd.to_numeric(topology["cell_lat"], errors="coerce")
+    topology_lon = pd.to_numeric(topology["cell_lon"], errors="coerce")
+
+    T_MIN_LAT, T_MAX_LAT = topology_lat.min(skipna=True), topology_lat.max(skipna=True)
+    T_MIN_LON, T_MAX_LON = topology_lon.min(skipna=True), topology_lon.max(skipna=True)
+
+    # Calculate min and max latitudes and longitudes with padding
+    if isinstance(client_ue_data, pd.DataFrame) and not client_ue_data.empty:
+        ue_data_lat = pd.to_numeric(client_ue_data["latitude"], errors="coerce")
+        ue_data_lon = pd.to_numeric(client_ue_data["longitude"], errors="coerce")
+
+        UE_MIN_LAT, UE_MAX_LAT = ue_data_lat.min(skipna=True), ue_data_lat.max(skipna=True)
+        UE_MIN_LON, UE_MAX_LON = ue_data_lon.min(skipna=True), ue_data_lon.max(skipna=True)
+
+        bounds = {
+            "min_lat": min(UE_MIN_LAT, T_MIN_LAT) - BOUNDS_PADDING,
+            "max_lat": max(UE_MAX_LAT, T_MAX_LAT) + BOUNDS_PADDING,
+            "min_lon": min(UE_MIN_LON, T_MIN_LON) - BOUNDS_PADDING,
+            "max_lon": max(UE_MAX_LON, T_MAX_LON) + BOUNDS_PADDING,
+        }
+
+    else:
+        bounds = {
+            "min_lat": T_MIN_LAT - BOUNDS_PADDING,
+            "max_lat": T_MAX_LAT + BOUNDS_PADDING,
+            "min_lon": T_MIN_LON - BOUNDS_PADDING,
+            "max_lon": T_MAX_LON + BOUNDS_PADDING,
+        }
+
+    return bounds
