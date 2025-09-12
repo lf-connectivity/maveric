@@ -25,7 +25,7 @@ class BayesianMRO(MobilityRobustnessOptimization):
         bdt: Optional[Dict[str, BayesianDigitalTwin]] = None,
         model_type: str = "gpr",
     ):
-        super().__init__(mobility_model_params, topology, bdt)
+        super().__init__(mobility_model_params, topology, new_data=None, bdt=bdt)
         self.model_type = model_type
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -52,7 +52,7 @@ class BayesianMRO(MobilityRobustnessOptimization):
             )
             return GaussianProcessRegressor(kernel=kernel, normalize_y=True)
 
-    def training(self, init_samples: int = 5):
+    def solve(self, n_epochs=20, init_samples: int = 5):
         if not self.bayesian_digital_twins:
             raise ValueError("Bayesian Digital Twins are not trained. Train the models before calculating metrics.")
 
@@ -68,45 +68,37 @@ class BayesianMRO(MobilityRobustnessOptimization):
         rlf_threshold = RLF_THRESHOLD
         max_diff = find_hyst_diff(self.simulation_data)
         num_ticks = self.simulation_data["tick"].nunique()
-        self.hyst_range = [0, max_diff]
-        self.ttt_range = [2, num_ticks + 1]
-        self.rlf_threshold = rlf_threshold
+        hyst_range = [0, max_diff]
+        ttt_range = [2, max(3, num_ticks + 1)]  # Ensure ttt_range[1] > ttt_range[0]
 
         self.score = pd.DataFrame(columns=["hyst", "ttt", "score"])
 
         X, y = [], []
         for _ in range(init_samples):
-            hyst = np.random.uniform(self.hyst_range[0], self.hyst_range[1])
-            ttt = np.random.randint(self.ttt_range[0], self.ttt_range[1])
+            hyst = np.random.uniform(hyst_range[0], hyst_range[1])
+            ttt = np.random.randint(ttt_range[0], ttt_range[1])
             attached_df = perform_attachment_hyst_ttt(self.simulation_data, hyst, ttt, rlf_threshold)
             metric = calculate_mro_metric(attached_df)
             X.append([hyst, ttt])
             y.append(metric)
             self.score.loc[len(self.score)] = [hyst, ttt, metric]
 
-        self.X_train = np.array(X)
-        self.y_train = np.array(y)
-
-    def inference(self, n_epochs=20):
-        if not hasattr(self, 'X_train') or not hasattr(self, 'y_train'):
-            raise ValueError("Model not trained. Call training() method first.")
-
-        X = self.X_train.copy()
-        y = self.y_train.copy()
+        X = np.array(X)
+        y = np.array(y)
         model = self._init_model()
         best_y = y.max()
         best_idx = y.argmax()
 
         for _ in range(n_epochs):
             model.fit(X, y)
-            cand_hyst = np.random.uniform(self.hyst_range[0], self.hyst_range[1], size=100)
-            cand_ttt = np.random.randint(self.ttt_range[0], self.ttt_range[1], size=100)
+            cand_hyst = np.random.uniform(hyst_range[0], hyst_range[1], size=100)
+            cand_ttt = np.random.randint(ttt_range[0], ttt_range[1], size=100)
             candidates = np.column_stack([cand_hyst, cand_ttt])
             scores = self._expected_improvement(candidates, model, best_y)
             idx = int(np.argmax(scores))
             hyst, ttt = candidates[idx]
             ttt = int(round(ttt))
-            attached_df = perform_attachment_hyst_ttt(self.simulation_data, hyst, ttt, self.rlf_threshold)
+            attached_df = perform_attachment_hyst_ttt(self.simulation_data, hyst, ttt, rlf_threshold)
             metric = calculate_mro_metric(attached_df)
             X = np.vstack([X, [hyst, ttt]])
             y = np.append(y, metric)
@@ -119,4 +111,3 @@ class BayesianMRO(MobilityRobustnessOptimization):
         best_ttt = int(round(X[best_idx, 1]))
         print(f"\nOptimized Hyst: {best_hyst},\nOptimized TTT: {best_ttt}")
         return best_hyst, best_ttt
-
