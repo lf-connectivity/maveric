@@ -8,7 +8,7 @@ from scipy.stats import norm
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import ConstantKernel, Matern, WhiteKernel
 
-from notebooks.radp_library import get_ue_data
+from notebooks.radp_library import find_sim_boundary, get_ue_data
 from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin
 from radp.digital_twin.utils.cell_selection import find_hyst_diff, perform_attachment_hyst_ttt
 from radp.digital_twin.utils.constants import RLF_THRESHOLD
@@ -61,6 +61,10 @@ class BayesianMRO(MobilityRobustnessOptimization):
     def solve(self, n_epochs=20, init_samples: int = 5):
         if not self.bayesian_digital_twins:
             raise ValueError("Bayesian Digital Twins are not trained. Train the models before calculating metrics.")
+
+        # Determine simulation boundaries
+        bounds = find_sim_boundary(self.topology, self.new_data)
+        self.mobility_model_params["ue_tracks_generation"]["params"]["lat_lon_boundaries"].update(bounds)
 
         self.simulation_data = get_ue_data(self.mobility_model_params)
         self.simulation_data = self.simulation_data.rename(columns={"lat": "latitude", "lon": "longitude"})
