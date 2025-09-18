@@ -47,6 +47,6 @@ repos:
       - id: jupyter-nb-clear-output
         name: jupyter-nb-clear-output
         files: \.ipynb$
-        stages: [pre-commit]
+        stages: [commit]
         language: system
         entry: jupyter nbconvert --clear-output
