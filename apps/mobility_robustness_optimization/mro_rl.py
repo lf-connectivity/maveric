@@ -96,6 +96,7 @@ class ReinforcedMROEnv(Env):
             dtype=np.float64,
         )
         self.observation_space = Box(low=0, high=1, shape=(1,), dtype=np.float64)
+        self.logger = logging.getLogger(__name__)
 
         self.state = np.array([0.0])
         self.current_step = 0
