@@ -1,4 +1,5 @@
 """Geocoding utilities using geopy/Nominatim."""
+import math
 from typing import Optional
 
 from geopy.exc import GeocoderServiceError, GeocoderTimedOut
@@ -51,7 +52,7 @@ class GeocodingService:
             # 1 degree of latitude ≈ 111 km
             # 1 degree of longitude ≈ 111 km * cos(latitude)
             lat_offset = bounds_size_km / 111.0
-            lon_offset = bounds_size_km / (111.0 * abs(lat))
+            lon_offset = bounds_size_km / (111.0 * abs(math.cos(math.radians(lat))))
 
             min_lat = lat - lat_offset
             max_lat = lat + lat_offset

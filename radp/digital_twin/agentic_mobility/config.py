@@ -11,7 +11,7 @@ class Config:
 
     # LLM Configuration
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-    GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-70b-versatile")
+    GROQ_MODEL = os.getenv("GROQ_MODEL")
 
     # Geocoding Configuration
     GEOCODING_CACHE_ENABLED = os.getenv("GEOCODING_CACHE_ENABLED", "true").lower() == "true"

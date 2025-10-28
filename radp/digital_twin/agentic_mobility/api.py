@@ -62,6 +62,7 @@ class AgenticMobilityGenerator:
                 "metadata": {
                     "retry_count": result["retry_count"],
                     "query_intent": result["query_intent"],
+                    "location_data": result["location_data"],
                     "validation_warnings": None,
                 },
             }
@@ -78,7 +79,12 @@ class AgenticMobilityGenerator:
                 "radp_params": radp_params,
                 "warnings": result["validation_result"].get("validation_errors", []),
                 "failure_reasons": result["validation_result"].get("failure_reasons", {}),
-                "metadata": {"retry_count": result["retry_count"], "validation_status": "failed_but_accepted"},
+                "metadata": {
+                    "retry_count": result["retry_count"],
+                    "query_intent": result["query_intent"],
+                    "location_data": result["location_data"],
+                    "validation_status": "failed_but_accepted",
+                },
             }
 
     def visualize_graph(self, output_path: str = "workflow_graph.png"):
