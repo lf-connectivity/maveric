@@ -1,0 +1,72 @@
+# Agentic MRO Configuration File
+
+# ==============================================================================
+# LLM Provider Configurations
+# ==============================================================================
+
+default_provider: "groq"
+
+providers:
+  groq:
+    provider: "groq"
+    model: "openai/gpt-oss-120b"
+    temperature: 0.2
+    max_tokens: 2000
+    api_key: "gsk_YOUR_ACTUAL_KEY_HERE"  # Replace with your actual key
+
+  bedrock:
+    provider: "bedrock"
+    model: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    region: "us-east-1"
+    temperature: 0.2
+    max_tokens: 2000
+    # Uses AWS default credentials (AWS CLI configured)
+
+  openai:
+    provider: "openai"
+    model: "gpt-4"
+    temperature: 0.2
+    max_tokens: 2000
+    # Set OPENAI_API_KEY environment variable or pass api_key explicitly
+
+# ==============================================================================
+# MRO Optimization Parameters
+# ==============================================================================
+
+optimization:
+  # Target MRO score for early stopping (in seconds of effective operational time)
+  # Max possible = 50 seconds (total simulation time)
+  # Target 48 = 96% efficiency (allowing 2 seconds for handover interruptions)
+  target_score: 50.0
+
+  # Maximum number of optimization iterations (coordinator loop)
+  max_iterations: 3
+
+  # Radio Link Failure threshold in dB
+  rlf_threshold: -4.0
+
+  # Plateau detection threshold (percentage improvement)
+  plateau_threshold: 0.01  # 1%
+
+# ==============================================================================
+# Data Paths (Example - adjust to your setup)
+# ==============================================================================
+
+data:
+  # Input CSV with UE data
+  input_csv: "notebooks/simulation_data_initial.csv"
+
+  # Topology CSV with cell information
+  topology_csv: "apps/coverage_capacity_optimization/data/topology.csv"
+
+  # Output directory for results
+  output_dir: "outputs/"
+
+# ==============================================================================
+# Logging Configuration
+# ==============================================================================
+
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  save_logs: true
+  log_dir: "logs/"
