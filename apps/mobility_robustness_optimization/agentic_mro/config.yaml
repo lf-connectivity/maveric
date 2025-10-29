@@ -43,7 +43,7 @@ optimization:
   max_iterations: 3
 
   # Radio Link Failure threshold in dB
-  rlf_threshold: -4.0
+  rlf_threshold: -2.0
 
   # Plateau detection threshold (percentage improvement)
   plateau_threshold: 0.01  # 1%
@@ -54,7 +54,7 @@ optimization:
 
 data:
   # Input CSV with UE data
-  input_csv: "notebooks/simulation_data_initial.csv"
+  input_csv: "notebooks/simulation_data_agentic.csv"
 
   # Topology CSV with cell information
   topology_csv: "apps/coverage_capacity_optimization/data/topology.csv"

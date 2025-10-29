@@ -170,7 +170,11 @@ def coordinator_node(state: AgenticMROState) -> AgenticMROState:
     if state.get('best_hyst') is not None:
         print(f"  Best so far: {state['best_score']:.4f} (hyst={state.get('best_hyst'):.4f}, ttt={state.get('best_ttt')})")
     else:
-        print(f"  Best so far: {state['best_score']:.4f} (No valid parameters found yet)")
+        # Handle -inf case
+        if state['best_score'] == float('-inf'):
+            print(f"  Best so far: No valid parameters found yet")
+        else:
+            print(f"  Best so far: {state['best_score']:.4f} (No valid parameters found yet)")
     print("="*60)
 
     return state

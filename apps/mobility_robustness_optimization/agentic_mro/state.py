@@ -134,7 +134,7 @@ def create_initial_state(
         # Coordinator state (initialized)
         iteration_count=0,
         tested_parameters=[],
-        best_score=0.0,
+        best_score=float('-inf'),  # Initialize to -inf so even negative scores are tracked
         best_hyst=None,
         best_ttt=None,
 
