@@ -147,6 +147,22 @@ Query: "Generate 10 UEs in small village"
 → azimuth: 'omnidirectional' (simple single site)
 → placement: 'grid' (center placement)
 → reasoning: "Very small deployment (10 UEs) only needs single omnidirectional cell for adequate coverage. Cost-effective solution for low-density area."
+
+Example 6: User explicitly requests tower count
+Query: "Give me 5 cell towers for Tokyo suburban area with 200 UEs"
+→ num_cells: 15 (USER REQUESTED 5 towers, sectored = 5 sites × 3 sectors = 15 cells)
+→ frequency: 2100 MHz
+→ azimuth: 'sectored' (standard)
+→ placement: 'grid'
+→ reasoning: "User explicitly requested 5 towers. Using sectored deployment (industry standard), this becomes 15 total cells (5 sites × 3 sectors each). 2100 MHz appropriate for suburban."
+
+Example 7: User requests specific cell count
+Query: "Deploy 20 cells in downtown area with 300 UEs"
+→ num_cells: 20 (USER REQUESTED 20 cells, use exactly this number)
+→ frequency: 2600 MHz (dense urban)
+→ azimuth: 'sectored' (will create ~7 sites if sectored)
+→ placement: 'cluster'
+→ reasoning: "User explicitly requested 20 cells. This will create approximately 7 sites with 3 sectors each (21 cells), adjusted to 20. High frequency for dense urban capacity."
 """
 
 
@@ -201,12 +217,17 @@ Generate cell topology parameters for:
 - Raw query: "{raw_query}"
 
 IMPORTANT:
-1. Calculate appropriate num_cells based on area size ({area_km2:.2f} km²) and area type ({area_type})
-2. Consider UE count ({num_ues}) for capacity planning
-3. Analyze raw query for any specific context about density, coverage needs, or technology requirements
-4. Choose frequency band appropriate for area type and any context clues
-5. Select azimuth strategy based on num_cells and area type
-6. Choose placement strategy based on query context and area characteristics
+1. **CHECK RAW QUERY FIRST** for explicit tower/cell/site count requests:
+   - Look for phrases like: "5 towers", "10 cells", "3 sites", "15 cell towers"
+   - If user specifies a number, USE THAT NUMBER as num_cells (don't calculate automatically)
+   - If sectored (3 sectors per site): user says "5 towers" = 15 cells (5 sites × 3 sectors)
+   - If omnidirectional: user says "5 towers" = 5 cells
+2. If NO explicit count in query, calculate num_cells based on area size ({area_km2:.2f} km²) and area type ({area_type})
+3. Consider UE count ({num_ues}) for capacity planning
+4. Analyze raw query for any specific context about density, coverage needs, or technology requirements
+5. Choose frequency band appropriate for area type and any context clues
+6. Select azimuth strategy based on num_cells and area type
+7. Choose placement strategy based on query context and area characteristics
 
 Output must include:
 1. num_cells (int, >= 1)

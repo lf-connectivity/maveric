@@ -143,9 +143,18 @@ def main():
     print("Natural Language → Parameters → Simulation → DataFrame → Topology → Plot")
     print("=" * 80)
 
+    # You can specify the number of cell towers in the query!
+    # Examples of queries with explicit tower counts:
+    # - "Give me 5 cell towers for Tokyo suburban area with 200 devices"
+    # - "Deploy 10 towers in Tokyo with lots of pedestrians and cars"
+    # - "I need exactly 20 cells for Tokyo"
+    # If you don't specify, LLM calculates optimal count based on area and UE density
+
     query1 = (
         "Give me for Tokyo. consider it as a suburban area with lots of pedestrians and cars. "
         "There are so many motorbikes, consider them as cyclists. Have two hundreds total devices."
+        # Add tower count here if desired, e.g.: 
+        " Deploy 2 cell towers."
     )
 
     print(f"Query: '{query1}'\nProcessing...")
