@@ -28,7 +28,11 @@ class AgenticMobilityIntegration:
         Returns:
             Tuple containing:
             - pd.DataFrame: UE mobility tracks with columns [ue_id, longitude, latitude, tick]
-            - Dict: Metadata including query_intent, retry_count, validation_warnings
+            - Dict: Metadata including:
+                - query_intent: Parsed query information
+                - retry_count: Number of generation retries
+                - validation_warnings: Any validation issues
+                - spatial_bounds: Requested and actual lat/lon boundaries
 
         Example:
             >>> df, metadata = AgenticMobilityIntegration.generate_from_natural_language(
@@ -71,6 +75,28 @@ class AgenticMobilityIntegration:
         ):
             # Append each batch to the main DataFrame
             ue_tracks_df = pd.concat([ue_tracks_df, ue_tracks_generation_batch], ignore_index=True)
+
+        # Step 4: Calculate spatial bounds and add to metadata
+        spatial_bounds = {
+            "requested": {
+                "min_lat": float(ue_tracks_params.min_lat),
+                "max_lat": float(ue_tracks_params.max_lat),
+                "min_lon": float(ue_tracks_params.min_lon),
+                "max_lon": float(ue_tracks_params.max_lon),
+            },
+            "actual": None,
+        }
+
+        # Calculate actual bounds from generated data
+        if not ue_tracks_df.empty:
+            spatial_bounds["actual"] = {
+                "min_lat": float(ue_tracks_df["lat"].min()),
+                "max_lat": float(ue_tracks_df["lat"].max()),
+                "min_lon": float(ue_tracks_df["lon"].min()),
+                "max_lon": float(ue_tracks_df["lon"].max()),
+            }
+
+        metadata["spatial_bounds"] = spatial_bounds
 
         return ue_tracks_df, metadata
 

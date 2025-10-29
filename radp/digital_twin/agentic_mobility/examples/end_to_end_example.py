@@ -1,5 +1,6 @@
 """End-to-end example: Natural language → Mobility simulation."""
 import json
+from pathlib import Path
 
 from radp.digital_twin.agentic_mobility.integration import AgenticMobilityIntegration
 
@@ -7,16 +8,22 @@ from radp.digital_twin.agentic_mobility.integration import AgenticMobilityIntegr
 def main():
     """Demonstrate complete pipeline from natural language to mobility DataFrame."""
 
+    # Create output directory for generated UEs
+    output_dir = Path(__file__).parent / "generated_ues"
+    output_dir.mkdir(exist_ok=True)
+
     print("=" * 80)
     print("Agentic Mobility Generation - End-to-End Example")
     print("Natural Language → Parameters → Simulation → DataFrame")
+    print("=" * 80)
+    print(f"\nOutput directory: {output_dir}")
     print("=" * 80)
 
     # Example 1: Urban scenario
     print("\nExample 1: Urban scenario")
     print("-" * 80)
 
-    query1 = "Give me for Dhaka. consider it as an suburban area with lots of cars. have two hundereds total devices. make the it for 30 ticks"
+    query1 = "Create 20 devices in any city of Argentica"
     print(f"Query: '{query1}'")
     print("\nProcessing...")
 
@@ -42,9 +49,21 @@ def main():
     print("\n  Metadata:")
     print(json.dumps(metadata1, indent=2))
 
-    df1.to_csv(
+    # Save CSV to generated_ues directory
+    csv_filename = (
         f"agentic_mobility_{metadata1['query_intent']['num_ues']}UE_{metadata1['query_intent']['num_ticks']}ticks.csv"
     )
+    csv_path = output_dir / csv_filename
+    df1.to_csv(csv_path, index=False)
+
+    # Save metadata as JSON
+    metadata_filename = f"agentic_mobility_{metadata1['query_intent']['num_ues']}UE_{metadata1['query_intent']['num_ticks']}ticks_metadata.json"
+    metadata_path = output_dir / metadata_filename
+    with open(metadata_path, "w") as f:
+        json.dump(metadata1, f, indent=2)
+
+    print(f"\n✓ Saved CSV to: {csv_path}")
+    print(f"✓ Saved metadata to: {metadata_path}")
 
     # # Example 2: Highway scenario
     # print("\n\n2. Highway Scenario: I-95 Boston")

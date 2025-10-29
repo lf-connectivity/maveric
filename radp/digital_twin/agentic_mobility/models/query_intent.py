@@ -1,6 +1,6 @@
 """Query intent data models."""
 from enum import Enum
-from typing import Dict, Optional
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -32,9 +32,16 @@ class DistributionSource(str, Enum):
 
 
 class UEDistribution(BaseModel):
-    """UE distribution with source tracking."""
+    """UE distribution with source tracking.
 
-    distribution: Dict[MobilityClass, float]
+    The distribution values (stationary, pedestrian, cyclist, car) are stored
+    directly at the top level alongside the source field.
+    """
+
+    stationary: float = Field(default=0.0, ge=0.0, le=1.0)
+    pedestrian: float = Field(default=0.0, ge=0.0, le=1.0)
+    cyclist: float = Field(default=0.0, ge=0.0, le=1.0)
+    car: float = Field(default=0.0, ge=0.0, le=1.0)
     source: DistributionSource
 
 

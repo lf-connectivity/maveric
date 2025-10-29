@@ -96,6 +96,7 @@ apps/load_balancing/cco_rl_agent_multiday.zip
 
 # agent dev
 agentic_mobility_docs
+radp/digital_twin/agentic_mobility/examples/generated_ues
 
 # pre-commit hook
 .flake8

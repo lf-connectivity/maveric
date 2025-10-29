@@ -49,7 +49,7 @@ FEW_SHOT_EXAMPLES = [
             "location": "Chicago",
             "num_ues": 50,
             "num_ticks": 100,
-            "ue_distribution": {"distribution": {"pedestrian": 0.6, "car": 0.3, "cyclist": 0.1}, "source": "parsed"},
+            "ue_distribution": {"pedestrian": 0.6, "car": 0.3, "cyclist": 0.1, "stationary": 0.0, "source": "parsed"},
             "raw_query": "Create 50 UEs in suburban Chicago with 60% pedestrians, 30% cars, 10% cyclists for 100 time steps",
         },
     },

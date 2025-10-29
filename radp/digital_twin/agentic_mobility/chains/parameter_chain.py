@@ -2,12 +2,7 @@
 from typing import Tuple
 
 from radp.digital_twin.agentic_mobility.models.generation_params import GenParams
-from radp.digital_twin.agentic_mobility.models.query_intent import (
-    DistributionSource,
-    MobilityClass,
-    QueryIntent,
-    UEDistribution,
-)
+from radp.digital_twin.agentic_mobility.models.query_intent import DistributionSource, QueryIntent, UEDistribution
 from radp.digital_twin.agentic_mobility.prompts.parameter_prompts import PARAMETER_SYSTEM_PROMPT, get_parameter_prompt
 from radp.digital_twin.agentic_mobility.utils.llm_client import LLMClient
 
@@ -37,7 +32,12 @@ class ParameterChain:
         # Convert ue_distribution from UEDistribution to dict if provided
         ue_dist_dict = None
         if query_intent.ue_distribution:
-            ue_dist_dict = {k.value: v for k, v in query_intent.ue_distribution.distribution.items()}
+            ue_dist_dict = {
+                "stationary": query_intent.ue_distribution.stationary,
+                "pedestrian": query_intent.ue_distribution.pedestrian,
+                "cyclist": query_intent.ue_distribution.cyclist,
+                "car": query_intent.ue_distribution.car,
+            }
 
         prompt = get_parameter_prompt(
             scenario_type=query_intent.scenario_type.value,
@@ -55,11 +55,14 @@ class ParameterChain:
         updated_query_intent = query_intent
         if query_intent.ue_distribution is None:
             # LLM generated the distribution - mark as "predicted"
-            predicted_distribution = {MobilityClass(k): v for k, v in gen_params.ue_class_distribution.items()}
             updated_query_intent = query_intent.copy(
                 update={
                     "ue_distribution": UEDistribution(
-                        distribution=predicted_distribution, source=DistributionSource.PREDICTED
+                        stationary=gen_params.ue_class_distribution.get("stationary", 0.0),
+                        pedestrian=gen_params.ue_class_distribution.get("pedestrian", 0.0),
+                        cyclist=gen_params.ue_class_distribution.get("cyclist", 0.0),
+                        car=gen_params.ue_class_distribution.get("car", 0.0),
+                        source=DistributionSource.PREDICTED,
                     )
                 }
             )

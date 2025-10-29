@@ -1,4 +1,5 @@
 """System prompts for parameter generation."""
+from typing import Optional
 
 PARAMETER_SYSTEM_PROMPT = """You are an expert in mobility simulation parameter generation.
 
@@ -92,7 +93,7 @@ Example 5: Highway + any context
 
 
 def get_parameter_prompt(
-    scenario_type: str, num_ues: int, num_ticks: int, raw_query: str, ue_distribution: dict = None
+    scenario_type: str, num_ues: int, num_ticks: int, raw_query: str, ue_distribution: Optional[dict] = None
 ) -> str:
     """Get parameter generation prompt.
 
