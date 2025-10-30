@@ -355,3 +355,115 @@ def _plot_on_axis(
     if not zoom_to_ues and full_lon_bounds and full_lat_bounds:
         ax.set_xlim(full_lon_bounds[0], full_lon_bounds[1])
         ax.set_ylim(full_lat_bounds[0], full_lat_bounds[1])
+
+
+def plot_ue_tracks_with_topology(
+    df: pd.DataFrame,
+    topology_df: pd.DataFrame,
+    figsize: Tuple[int, int] = (12, 8),
+    title: Optional[str] = None,
+    arrow_width: float = 0.002,
+) -> None:
+    """
+    Plot UE movement tracks with cell tower topology overlay.
+
+    This function handles batched data and plots UE tracks with directional
+    arrows along with cell tower locations.
+
+    Args:
+        df: DataFrame with columns ['mock_ue_id', 'tick', 'lat', 'lon']
+        topology_df: DataFrame with columns ['cell_lat', 'cell_lon']
+        figsize: Figure size as (width, height) tuple
+        title: Custom title for the plot. If None, auto-generate title
+        arrow_width: Width of movement arrows (default: 0.002)
+
+    Example:
+        >>> df, metadata = AgenticMobilityIntegration.generate_from_natural_language(query)
+        >>> topology_df = TopologyGenerator.generate_from_llm(...)
+        >>> plot_ue_tracks_with_topology(df, topology_df)
+        >>> plt.savefig("output.png")
+    """
+    # Detect batches (where tick resets to 0)
+    batch_indices = []
+    for i in range(1, len(df)):
+        if df.loc[i, "tick"] == 0 and df.loc[i - 1, "tick"] != 0:
+            batch_indices.append(i)
+    batch_indices.append(len(df))
+
+    start_idx = 0
+    for batch_num, end_idx in enumerate(batch_indices):
+        batch_data = df.iloc[start_idx:end_idx]
+        plt.figure(figsize=figsize)
+
+        # Plot UE tracks with arrows
+        color_map = cm.get_cmap("tab20", len(batch_data["mock_ue_id"].unique()))
+        for idx, ue_id in enumerate(batch_data["mock_ue_id"].unique()):
+            ue_data = batch_data[batch_data["mock_ue_id"] == ue_id]
+            color = color_map(idx)
+
+            # Draw arrows for movement
+            for i in range(len(ue_data) - 1):
+                x_start = ue_data.iloc[i]["lon"]
+                y_start = ue_data.iloc[i]["lat"]
+                x_end = ue_data.iloc[i + 1]["lon"]
+                y_end = ue_data.iloc[i + 1]["lat"]
+                dx = x_end - x_start
+                dy = y_end - y_start
+                plt.quiver(
+                    x_start,
+                    y_start,
+                    dx,
+                    dy,
+                    angles="xy",
+                    scale_units="xy",
+                    scale=1,
+                    color=color,
+                    width=arrow_width,
+                    headwidth=3,
+                    headlength=5,
+                    alpha=0.6,
+                )
+
+            # Mark starting point
+            plt.scatter(
+                ue_data["lon"].iloc[0],
+                ue_data["lat"].iloc[0],
+                color=color,
+                s=30,
+                alpha=0.6,
+            )
+
+        # Plot cell towers as red triangles
+        plt.scatter(
+            topology_df["cell_lon"],
+            topology_df["cell_lat"],
+            color="red",
+            marker="^",
+            s=150,
+            edgecolors="darkred",
+            linewidths=1,
+            zorder=10,
+            label="Cell Towers",
+        )
+
+        # Set title
+        if title:
+            plot_title = title
+        else:
+            num_ues = len(batch_data["mock_ue_id"].unique())
+            num_towers = len(topology_df.groupby(["cell_lat", "cell_lon"]))
+            if len(batch_indices) > 1:
+                plot_title = (
+                    f"UE Tracks with Cell Towers (Batch {batch_num + 1})\n{num_ues} UEs, {num_towers} Cell Sites"
+                )
+            else:
+                plot_title = f"UE Tracks with Cell Towers\n{num_ues} UEs, {num_towers} Cell Sites"
+
+        plt.title(plot_title)
+        plt.xlabel("Longitude")
+        plt.ylabel("Latitude")
+        plt.grid(True, alpha=0.3)
+        plt.legend(loc="upper right")
+        plt.tight_layout()
+
+        start_idx = end_idx

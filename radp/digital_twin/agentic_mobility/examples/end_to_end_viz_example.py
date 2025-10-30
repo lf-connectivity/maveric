@@ -5,12 +5,11 @@ import os
 import matplotlib
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 
 from radp.digital_twin.agentic_mobility.integration import AgenticMobilityIntegration
 from radp.digital_twin.agentic_mobility.topology_generator import TopologyGenerator
-from radp.digital_twin.mobility.param_regression import get_predicted_alpha, preprocess_ue_data
+from radp.digital_twin.agentic_mobility.visualization.tracks import plot_ue_tracks_with_topology
 
 matplotlib.use("Agg")
 
@@ -21,78 +20,6 @@ OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "generated_ues")
 # ----------------------------------------------------------------------
 # Visualization functions
 # ----------------------------------------------------------------------
-def plot_ue_tracks_with_topology(df: pd.DataFrame, topology_df: pd.DataFrame) -> None:
-    """Plots the movement tracks of unique UE IDs with cell tower locations."""
-    batch_indices = []
-    for i in range(1, len(df)):
-        if df.loc[i, "tick"] == 0 and df.loc[i - 1, "tick"] != 0:
-            batch_indices.append(i)
-    batch_indices.append(len(df))
-
-    start_idx = 0
-    for batch_num, end_idx in enumerate(batch_indices):
-        batch_data = df.iloc[start_idx:end_idx]
-        plt.figure(figsize=(12, 8))
-
-        # Plot UE tracks
-        color_map = cm.get_cmap("tab20", len(batch_data["mock_ue_id"].unique()))
-        for idx, ue_id in enumerate(batch_data["mock_ue_id"].unique()):
-            ue_data = batch_data[batch_data["mock_ue_id"] == ue_id]
-            color = color_map(idx)
-            for i in range(len(ue_data) - 1):
-                x_start = ue_data.iloc[i]["lon"]
-                y_start = ue_data.iloc[i]["lat"]
-                x_end = ue_data.iloc[i + 1]["lon"]
-                y_end = ue_data.iloc[i + 1]["lat"]
-                dx = x_end - x_start
-                dy = y_end - y_start
-                plt.quiver(
-                    x_start,
-                    y_start,
-                    dx,
-                    dy,
-                    angles="xy",
-                    scale_units="xy",
-                    scale=1,
-                    color=color,
-                    width=0.002,
-                    headwidth=3,
-                    headlength=5,
-                    alpha=0.6,
-                )
-            plt.scatter(
-                ue_data["lon"].iloc[0],
-                ue_data["lat"].iloc[0],
-                color=color,
-                s=30,
-                alpha=0.6,
-            )
-
-        # Plot cell towers - simple triangles only
-        plt.scatter(
-            topology_df["cell_lon"],
-            topology_df["cell_lat"],
-            color="red",
-            marker="^",
-            s=150,
-            edgecolors="darkred",
-            linewidths=1,
-            zorder=10,
-            label="Cell Towers",
-        )
-
-        plt.title(f"UE Tracks with Cell Towers for Batch {batch_num + 1}")
-        plt.xlabel("Longitude")
-        plt.ylabel("Latitude")
-        plt.grid(True, alpha=0.3)
-        plt.legend(loc="upper right")
-        plt.tight_layout()
-
-        # Save to output directory
-        viz_path = os.path.join(OUTPUT_DIR, "ue_tracks_with_topology.png")
-        plt.savefig(viz_path, dpi=150)
-        print(f"Saved visualization to: {viz_path}")
-        start_idx = end_idx
 
 
 def plot_ue_tracks(df: pd.DataFrame) -> None:
@@ -213,8 +140,8 @@ def main():
         min_lon=location_data.get("min_lon", df1["lon"].min()),
         max_lon=location_data.get("max_lon", df1["lon"].max()),
         raw_query=query1,
-        mobility_df=df1,                # NEW: Pass mobility data for SINR calculation
-        use_genetic_algorithm=True,     # NEW: Enable GA optimization
+        mobility_df=df1,  # NEW: Pass mobility data for SINR calculation
+        use_genetic_algorithm=True,  # NEW: Enable GA optimization
     )
 
     print(f"✓ Generated {len(topology_df)} cells with optimized locations and azimuths")
