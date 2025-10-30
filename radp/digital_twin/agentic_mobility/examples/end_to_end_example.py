@@ -23,7 +23,7 @@ def main():
     print("\nExample 1: Urban scenario")
     print("-" * 80)
 
-    query1 = "Create 20 devices in any city of Argentica"
+    query1 = "Create 25 devices in Austin, Texas. Generate for 20 ticks"
     print(f"Query: '{query1}'")
     print("\nProcessing...")
 
