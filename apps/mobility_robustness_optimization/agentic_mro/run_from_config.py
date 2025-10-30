@@ -14,8 +14,14 @@ import pandas as pd
 import yaml
 from main import run_agentic_mro
 
-from notebooks.radp_library import mro_plot_scatter, plot_sinr_db_by_ue
+from apps.mobility_robustness_optimization.agentic_mro.utils.visuals import (
+    add_sinr_column,
+    mro_plot_scatter,
+    plot_sinr_db_by_ue,
+)
+from notebooks.radp_library import preprocess_ue_data
 from radp.digital_twin.utils.cell_selection import perform_attachment_hyst_ttt
+from radp.digital_twin.utils.constants import RLF_THRESHOLD
 
 
 def load_config(config_path="config.yaml"):
@@ -56,7 +62,6 @@ def main():
     print(f"Model: {provider_config.get('model')}")
     print(f"CSV: {csv_path_from_config}")
     print(f"Resolved path: {csv_path}")
-    print(f"Target Score: {opt_config.get('target_score', 0.80)}")
     print(f"Max Iterations: {opt_config.get('max_iterations', 3)}")
     print("=" * 70 + "\n")
 
@@ -66,9 +71,39 @@ def main():
         print("Please edit config.yaml and replace 'PUT_YOUR_GROQ_API_KEY_HERE' with your actual Groq API key.")
         return
 
+    print("=" * 70)
+    print("Preprocessing Data...")
+    print("=" * 70)
+
+    opt_config["rlf_threshold"] = RLF_THRESHOLD
+
+    ue_data = pd.read_csv(csv_path)
+    topology = pd.read_csv(config["data"]["topology_csv"])
+
+    ue_data = ue_data.rename(columns={"lat": "latitude", "lon": "longitude"})
+
+    sim_data = preprocess_ue_data(ue_data, topology)
+    sim_data = sim_data.rename(
+        columns={"longitude": "loc_x", "latitude": "loc_y", "mock_ue_id": "ue_id", "cell_rxpwr_dbm": "cell_rxpower_dbm"}
+    )
+
+    sim_data = add_sinr_column(sim_data)
+    sim_data.to_csv("apps/mobility_robustness_optimization/agentic_mro/data/sim_data.csv", index=False)
+    print(sim_data.head(10))
+
+
+    ticks = len(sim_data["tick"].unique())
+    # Assuming each tick represents 50ms (this value may need to be adjusted based on actual data characteristics)
+    tick_duration_seconds = 1  # 1 second per tick
+    T = ticks * tick_duration_seconds
+    opt_config["target_score"] = T
+
+    print("Data Preprocessing Complete.")
+    print("=" * 70)
+
     # Run optimization
     result = run_agentic_mro(
-        csv_path=csv_path,
+        csv_path="apps/mobility_robustness_optimization/agentic_mro/data/sim_data.csv",
         llm_config=provider_config,
         target_score=opt_config.get("target_score", 0.80),
         max_iterations=opt_config.get("max_iterations", 3),
@@ -89,20 +124,22 @@ def main():
     print("Attempting Visualization")
     print("=" * 70)
 
-    rlf = float(opt_config["rlf_threshold"])
-
-    sim_data = pd.read_csv(csv_path)
-    topology = pd.read_csv(config["data"]["topology_csv"])
-
     optimal_data = perform_attachment_hyst_ttt(
-        sim_data, hyst=result["best_hysteresis"], ttt=result["best_ttt"], rlf_threshold=rlf
+        sim_data, hyst=result["best_hysteresis"], ttt=result["best_ttt"], rlf_threshold=RLF_THRESHOLD
     )
 
-    mro_plot_scatter(optimal_data, topology, rlf_threshold=rlf)
+    mro_plot_scatter(
+        optimal_data, topology, save_path="apps/mobility_robustness_optimization/agentic_mro/plots/mro_plot_scatter.png"
+    )
 
     unique_ue_ids = optimal_data["ue_id"].unique()
     for ue_id in unique_ue_ids:
-        plot_sinr_db_by_ue(optimal_data, sim_data, ue_id, rlf_threshold=rlf)
+        plot_sinr_db_by_ue(
+            optimal_data,
+            sim_data,
+            ue_id,
+            save_path=f"apps/mobility_robustness_optimization/agentic_mro/plots/sinr_db_by_ue_{ue_id}.png",
+        )
 
 
 if __name__ == "__main__":

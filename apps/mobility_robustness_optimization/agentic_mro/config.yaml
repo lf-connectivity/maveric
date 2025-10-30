@@ -12,7 +12,7 @@ providers:
     model: "openai/gpt-oss-120b"
     temperature: 0.2
     max_tokens: 2000
-    api_key: "gsk_YOUR_ACTUAL_KEY_HERE"  # Replace with your actual key
+    api_key: "PUT_YOUR_GROQ_API_KEY_HERE"  # Replace with your actual key
 
   bedrock:
     provider: "bedrock"
@@ -37,13 +37,13 @@ optimization:
   # Target MRO score for early stopping (in seconds of effective operational time)
   # Max possible = 50 seconds (total simulation time)
   # Target 48 = 96% efficiency (allowing 2 seconds for handover interruptions)
-  target_score: 50.0
+  target_score: 100.0
 
   # Maximum number of optimization iterations (coordinator loop)
-  max_iterations: 3
+  max_iterations: 20
 
   # Radio Link Failure threshold in dB
-  rlf_threshold: -2.0
+  rlf_threshold: -4.0
 
   # Plateau detection threshold (percentage improvement)
   plateau_threshold: 0.01  # 1%
@@ -54,10 +54,10 @@ optimization:
 
 data:
   # Input CSV with UE data
-  input_csv: "notebooks/simulation_data_agentic.csv"
+  input_csv: "data/agentic_data/mro/ue_mobility_data.csv"
 
   # Topology CSV with cell information
-  topology_csv: "apps/coverage_capacity_optimization/data/topology.csv"
+  topology_csv: "data/agentic_data/mro/cell_topology.csv"
 
   # Output directory for results
   output_dir: "outputs/"
