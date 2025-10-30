@@ -1,3 +1,4 @@
+import logging
 import warnings
 from typing import Any, Dict, Optional
 
@@ -5,7 +6,7 @@ import numpy as np
 import pandas as pd
 from gpytorch.utils.warnings import NumericalWarning
 
-from notebooks.radp_library import get_ue_data
+from notebooks.radp_library import find_sim_boundary, get_ue_data
 from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin
 from radp.digital_twin.utils.cell_selection import find_hyst_diff, perform_attachment_hyst_ttt
 from radp.digital_twin.utils.constants import RLF_THRESHOLD
@@ -25,9 +26,15 @@ class SimpleMRO(MobilityRobustnessOptimization):
         self,
         mobility_model_params: Dict[str, Dict[str, Any]],
         topology: pd.DataFrame,
+        new_data: Optional[pd.DataFrame] = None,
         bdt: Optional[Dict[str, BayesianDigitalTwin]] = None,
     ):
-        super().__init__(mobility_model_params, topology, bdt)
+        super().__init__(mobility_model_params, topology, new_data, bdt)
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
+        self.logger = logging.getLogger(__name__)
 
     def solve(self, n_epochs=100):
         """
@@ -36,6 +43,10 @@ class SimpleMRO(MobilityRobustnessOptimization):
         # Ensure Bayesian Digital Twins are trained before proceeding
         if not self.bayesian_digital_twins:
             raise ValueError("Bayesian Digital Twins are not trained. Train the models before calculating metrics.")
+
+        # Determine simulation boundaries
+        bounds = find_sim_boundary(self.topology, self.new_data)
+        self.mobility_model_params["ue_tracks_generation"]["params"]["lat_lon_boundaries"].update(bounds)
 
         # Generate and preprocess simulation data
         self.simulation_data = get_ue_data(self.mobility_model_params)
@@ -67,8 +78,8 @@ class SimpleMRO(MobilityRobustnessOptimization):
         self.score = pd.DataFrame(columns=["hyst", "ttt", "score"])
 
         header = f"{'Epoch':<6} {'Hyst':<14} {'TTT':<6} {'MRO Metric':<12}"
-        print(header)
-        print("-" * len(header))
+        self.logger.info(header)
+        self.logger.info("-" * len(header))
         self.score.loc[len(self.score)] = [hyst, ttt, calculate_mro_metric(attached_df)]
         for i in range(epochs):
             while True:
@@ -82,12 +93,10 @@ class SimpleMRO(MobilityRobustnessOptimization):
 
             # Store the data in the score DataFrame
             self.score.loc[len(self.score)] = [hyst, ttt, mro_metric]
-            print(f"{i:<6} {hyst:<14.10f} {ttt:<6} {mro_metric:<12.6f}")
+            self.logger.info(f"{i:<6} {hyst:<14.10f} {ttt:<6} {mro_metric:<12.6f}")
 
-        print(
-            f"""\nOptimized Hyst: {self.score.loc[self.score['score'].idxmax(), 'hyst']},
-            Optimized TTT: {int(self.score.loc[self.score['score'].idxmax(), 'ttt'])}"""
-        )
+        self.logger.info(f"\nOptimized Hyst: {self.score.loc[self.score['score'].idxmax(), 'hyst']}")
+        self.logger.info(f"Optimized TTT: {int(self.score.loc[self.score['score'].idxmax(), 'ttt'])}")
         return self.score.loc[self.score["score"].idxmax(), "hyst"], int(
             self.score.loc[self.score["score"].idxmax(), "ttt"]
         )
