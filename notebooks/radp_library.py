@@ -1053,9 +1053,17 @@ def get_ue_data(params: dict) -> pd.DataFrame:
 def calculate_received_power(distance_km: float, frequency_mhz: int) -> float:
     """
     Calculate received power using the Free-Space Path Loss (FSPL) model.
+
+    Note: Applies a minimum distance threshold to prevent log10(0) errors
+    when UE is at or very close to cell tower location.
     """
     # Convert distance from kilometers to meters
     distance_m = distance_km * 1000
+
+    # Apply minimum distance threshold (1 meter) to prevent log10(0)
+    # This handles cases where UE is at or very close to cell tower coordinates
+    MIN_DISTANCE_M = 1.0
+    distance_m = max(distance_m, MIN_DISTANCE_M)
 
     # Calculate Free-Space Path Loss (FSPL) in dB
     fspl_db = 20 * np.log10(distance_m) + 20 * np.log10(frequency_mhz) - 27.55

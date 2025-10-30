@@ -121,7 +121,7 @@ def get_rsrp_dbm_sinr_db_by_layer(
 
         # calculate prediction interference by subtracting
         # the strongest rx power from total sum of rx powers
-        pred_interference = sum(10 ** (p / 10) for i, p in rx_powers) - (
+        pred_interference = sum(10 ** (p / 10) for _, p in rx_powers) - (
             10 ** (rsrp_dbm_by_layer[cell_carrier_freq_mhz][1] / 10)
         )
         pred_interference_noise_dBm = 10 * np.log10(pred_interference + pred_noise)
@@ -576,12 +576,15 @@ def _check_rlf_threshold(
         target_indices = updated_df.index[updated_df["ue_id"] == ue_id]
         if not target_indices.empty:
             target_idx = target_indices[0]
+            # Use a very low but finite value instead of -inf for better visualization
+            # This represents a severe signal degradation but allows calculations to continue
+            RLF_FALLBACK_VALUE = rlf_threshold - 10  # 10 dB below threshold
             if "sinr_db" in updated_df.columns:
-                updated_df.at[target_idx, "sinr_db"] = -np.inf
+                updated_df.at[target_idx, "sinr_db"] = RLF_FALLBACK_VALUE
             if "cell_id" in updated_df.columns:
                 updated_df.at[target_idx, "cell_id"] = "RLF"
             if "cell_rxpower_dbm" in updated_df.columns:
-                updated_df.at[target_idx, "cell_rxpower_dbm"] = -np.inf
+                updated_df.at[target_idx, "cell_rxpower_dbm"] = RLF_FALLBACK_VALUE
 
     return updated_df
 
@@ -643,7 +646,8 @@ def _check_hyst_in_current_tick(
                 & (ue_data_for_current_tick["cell_id"] == prev["cell_id"])
             ]["cell_rxpower_dbm"].values[0]
         except:
-            prev_attachment_rxpower = -np.inf
+            # Use a very low but finite value instead of -inf
+            prev_attachment_rxpower = -150  # Extremely weak signal but not infinite
         # * hysteresis check & revert if failed
         if curr_attachment_rxpower < prev_attachment_rxpower + hyst:
             current_attachment.at[i, "cell_id"] = prev["cell_id"]

@@ -84,7 +84,19 @@ def plot_sinr_db_by_ue(
             continue
 
         # Calculate drop value for RLF markers
-        min_sinr = min(ue_df2["sinr_db"].min(), ue_df[ue_df["cell_id"] != "RLF"]["sinr_db"].min())
+        # Filter out -inf and NaN values when calculating min_sinr
+        valid_sinr_df = ue_df[ue_df["cell_id"] != "RLF"]["sinr_db"].replace([-np.inf, np.inf], np.nan).dropna()
+        valid_sinr_df2 = ue_df2["sinr_db"].replace([-np.inf, np.inf], np.nan).dropna()
+
+        if len(valid_sinr_df) > 0 and len(valid_sinr_df2) > 0:
+            min_sinr = min(valid_sinr_df2.min(), valid_sinr_df.min())
+        elif len(valid_sinr_df2) > 0:
+            min_sinr = valid_sinr_df2.min()
+        elif len(valid_sinr_df) > 0:
+            min_sinr = valid_sinr_df.min()
+        else:
+            min_sinr = rlf_threshold  # Fallback to RLF threshold if no valid data
+
         drop_value = min_sinr - 5
 
         trace_count = 0
@@ -353,7 +365,7 @@ def add_sinr_column(df: pd.DataFrame) -> pd.DataFrame:
         # Create a temporary Series to store sinr values for current group
         group_sinr_values = pd.Series(index=group.index, dtype=float)
 
-        for freq, freq_group in freq_groups:
+        for _, freq_group in freq_groups:
             # List of all rx powers in this frequency group
             all_rxpowers = freq_group["cell_rxpower_dbm"].tolist()
             noise_db = LATENT_BACKGROUND_NOISE_DB
@@ -399,10 +411,19 @@ def _compute_row_level_sinr(signal_dbm: float, interference_dbm_list: list, nois
 
         Returns:
             float: The computed SINR value in decibels for the current UE–cell pair.
+
+        Note: Applies a minimum SINR threshold to prevent log10(0) errors
+        when signal is zero or extremely weak.
     """
     signal_linear = 10 ** (signal_dbm / 10)
     interference_linear = sum(10 ** (p / 10) for p in interference_dbm_list)
     noise_linear = 10 ** (noise_db / 10)
 
     sinr_linear = signal_linear / (interference_linear + noise_linear)
+
+    # Apply minimum threshold to prevent log10(0) or log10(negative)
+    # This handles cases where signal is zero or calculations produce invalid values
+    MIN_SINR_LINEAR = 1e-15  # Corresponds to approximately -150 dB
+    sinr_linear = max(sinr_linear, MIN_SINR_LINEAR)
+
     return 10 * np.log10(sinr_linear)
