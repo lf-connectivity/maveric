@@ -2,136 +2,130 @@
 
 Transform RADP's mobility generator from **parameter-driven JSON** to **natural language queries** using LLM-powered workflows.
 
-## Overview
-
-**Before:** Complex JSON configuration with 15+ parameters
-**After:** `"Generate 100 UEs in urban Tokyo during morning rush hour"`
-
-### What It Does
-
-Converts natural language → Valid RADP mobility parameters → Mobility simulation DataFrame
-
-```python
-from radp.digital_twin.agentic_mobility.api import generate_mobility_params
-
-result = generate_mobility_params("Generate 100 UEs in urban Tokyo")
-# Returns: RADP-compatible JSON ready for UETracksGenerator
-```
-
----
-
-## Key Features
-
-| Feature                                    | Description                                                                      |
-| ------------------------------------------ | -------------------------------------------------------------------------------- |
-| **🗣️ Natural Language Parsing**            | Extract scenario, location, UE count from plain text                             |
-| **🌍 Auto-Geocoding**                      | Location names → lat/lon bounds (cached, 15min TTL)                              |
-| **🧠 Context-Aware Generation**            | LLM infers realistic distributions from context (e.g., "rush hour" → high car %) |
-| **📊 Distribution Source Tracking** ✨ NEW | Tracks if distribution was "parsed" from query or "predicted" by LLM             |
-| **🔄 Self-Correction**                     | Auto-validates + retries with LLM suggestions (max 2 retries)                    |
-| **⚡ Parallel Execution**                  | Location resolver + parameter agent run simultaneously (~35% faster)             |
-| **✅ End-to-End Integration**              | Complete pipeline: NL → DataFrame (not just NL → JSON)                           |
-
----
-
 ## Quick Start
 
-### 1. Install Dependencies
+### 1. Install & Configure
 
 ```bash
+# Install dependencies
 pip install -r radp/digital_twin/requirements.txt
-```
 
-### 2. Configure API Key
-
-```bash
-# Create .env file in project root
+# Set up API key
 cp radp/digital_twin/agentic_mobility/.env.example .env
-
-# Edit .env and add:
-GROQ_API_KEY=your_api_key_here
+# Edit .env and add: GROQ_API_KEY=your_key_here
 ```
 
-### 3. Basic Usage
-
-```python
-from radp.digital_twin.agentic_mobility.api import generate_mobility_params
-
-# Generate parameters
-result = generate_mobility_params(
-    "Generate 100 UEs in urban Tokyo during morning rush hour"
-)
-
-print(result["status"])        # "success"
-print(result["radp_params"])   # RADP JSON format
-print(result["metadata"])      # Query intent + retry count + distribution source
-```
-
-### 4. End-to-End: Natural Language → DataFrame
+### 2. Basic Usage
 
 ```python
 from radp.digital_twin.agentic_mobility.integration import AgenticMobilityIntegration
 
-# Complete pipeline in one call
+# Natural language → mobility DataFrame
 df, metadata = AgenticMobilityIntegration.generate_from_natural_language(
-    "Generate 100 UEs in urban Tokyo"
+    "Generate 100 UEs in urban Tokyo during morning rush hour"
 )
 
-print(df.head())  # pandas DataFrame with mobility tracks
-# Columns: mock_ue_id, lon, lat, tick
+print(df.head())  # pandas DataFrame: mock_ue_id, lon, lat, tick
 ```
 
 ---
 
 ## Examples
 
-### Implicit Distribution (LLM-Predicted)
+Run these from the project root:
 
+### 1. Agentic Mobility Pipeline
+```bash
+python3 radp/digital_twin/agentic_mobility/examples/gen_mobility_example.py
+```
+- Natural language → RADP parameters
+- Shows query parsing, location resolution, parameter generation
+- Outputs: JSON parameters
+
+### 2. Mobility + Data Simulation
+```bash
+python3 radp/digital_twin/agentic_mobility/examples/end_to_end_example.py
+```
+- Natural language → mobility DataFrame
+- Complete pipeline with data generation
+- Outputs: CSV files with UE tracks
+
+### 3. Mobility + Simulation + Topology + Visualization
+```bash
+python3 radp/digital_twin/agentic_mobility/examples/end_to_end_viz_example.py
+```
+- End-to-end: NL → mobility → topology → visualization
+- Generates cell towers based on UE distribution
+- Outputs: CSV files + PNG visualizations
+
+### 4. Interactive Visualization Demo (Notebook)
+```bash
+jupyter notebook radp/digital_twin/agentic_mobility/examples/interactive_visualization_demo.ipynb
+```
+- Location validation with reverse geocoding
+- World map visualization with spatial bounds
+- Interactive Plotly dashboards (UE-wise & tick-wise views)
+- Exports to standalone HTML
+
+---
+
+## Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Natural Language Parsing** | "Generate 100 UEs in Tokyo" → valid parameters |
+| **Auto-Geocoding** | Location names → lat/lon bounds (cached) |
+| **Context-Aware** | LLM infers distributions from context (e.g., "rush hour" → high car %) |
+| **Distribution Tracking** | Tracks if distribution was "parsed" or "predicted" |
+| **Self-Correction** | Auto-validates + retries with LLM suggestions (max 2 retries) |
+| **Parallel Execution** | Location + parameter generation run simultaneously |
+| **End-to-End** | Complete NL → DataFrame pipeline |
+
+---
+
+## Visualization Suite
+
+### Static Visualizations
 ```python
-query = "Generate 100 UEs in urban Tokyo during morning rush hour"
-result = generate_mobility_params(query)
+from radp.digital_twin.agentic_mobility.visualization import (
+    plot_ue_tracks,
+    plot_ue_tracks_comparison,
+)
 
-# Result includes distribution source tracking:
-result["metadata"]["query_intent"]["ue_distribution"]
-# {
-#   "source": "predicted",  ← LLM generated this
-#   "distribution": {
-#     "stationary": 0.05,
-#     "pedestrian": 0.25,
-#     "cyclist": 0.15,
-#     "car": 0.55  # High car % for rush hour!
-#   }
-# }
+# All UEs without legend
+plot_ue_tracks(df, legend=False)
+
+# Specific UEs with legend
+plot_ue_tracks(df, legend=True, ue_ids=[0, 1, 2, 3, 4])
+
+# Compare two scenarios
+plot_ue_tracks_comparison(df1, df2, legend=False)
 ```
 
-### Explicit Distribution (Parsed)
-
+### Interactive Visualizations
 ```python
-query = "Create 50 UEs in Chicago with 60% pedestrians, 30% cars, 10% cyclists"
-result = generate_mobility_params(query)
+from radp.digital_twin.agentic_mobility.visualization import (
+    plot_ue_wise_interactive,
+    plot_tick_wise_interactive,
+    validate_location_bounds,
+    plot_bounds_on_map,
+)
 
-# Distribution source:
-result["metadata"]["query_intent"]["ue_distribution"]
-# {
-#   "source": "parsed",  ← Extracted from user query
-#   "distribution": {
-#     "pedestrian": 0.6,
-#     "car": 0.3,
-#     "cyclist": 0.1
-#   }
-# }
+# UE-wise: dropdown to select UE, see full track
+fig = plot_ue_wise_interactive(df)
+fig.show()
+
+# Tick-wise: slider to animate through time
+fig = plot_tick_wise_interactive(df)
+fig.show()
+
+# Location validation with world map
+validation = validate_location_bounds(metadata)
+fig = plot_bounds_on_map(validation)
+fig.show()
 ```
 
-### Context-Aware num_ues Guessing
-
-```python
-# No UE count specified - LLM guesses based on context
-query1 = "Generate UEs in downtown Manhattan"
-# → num_ues ≈ 200-300 (dense urban)
-
-query2 = "Generate UEs in rural Kansas"
-# → num_ues ≈ 30-50 (sparse rural)
-```
+See `visualization/README.md` for detailed documentation.
 
 ---
 
@@ -139,23 +133,21 @@ query2 = "Generate UEs in rural Kansas"
 
 ```
 Natural Language Query
-         ↓
-   [1.1] Parser (LLM) → QueryIntent
-         ↓
-   [1.2] Location Resolver (Geocoding) ∥ [1.3] Parameter Agent (LLM)
-         ↓                                      ↓
-         └──────────────┬──────────────────────┘
-                        ↓
-   [1.4] Validator → [1.5] Suggestion (if failed) → Retry
-         ↓
-   [2.1] RADP Formatter → JSON
-         ↓
-   [3] Integration Layer → UETracksGenerator → DataFrame
+    ↓
+Parser (LLM) → QueryIntent
+    ↓
+Location Resolver ∥ Parameter Agent (parallel)
+    ↓
+Validator → Suggestion (if failed) → Retry
+    ↓
+RADP Formatter → JSON
+    ↓
+Integration → UETracksGenerator → DataFrame
+    ↓
+Topology Generator (optional)
+    ↓
+Visualization (optional)
 ```
-
-**Parallel Execution:** Components 1.2 and 1.3 run simultaneously
-**Self-Correction:** Max 2 retries with LLM-generated suggestions
-**Distribution Tracking:** Source field shows "parsed" or "predicted"
 
 ---
 
@@ -164,19 +156,7 @@ Natural Language Query
 ```python
 {
   "status": "success" | "success_with_warnings" | "failed",
-  "radp_params": {
-    "ue_tracks_generation": {
-      "params": {
-        "num_ticks": 50,
-        "num_batches": 1,
-        "simulation_duration": 3600,
-        "simulation_time_interval_seconds": 0.01,
-        "ue_class_distribution": {...},
-        "lat_lon_boundaries": {...},
-        "gauss_markov_params": {...}
-      }
-    }
-  },
+  "radp_params": {/* RADP JSON format */},
   "metadata": {
     "retry_count": 0,
     "query_intent": {
@@ -185,12 +165,15 @@ Natural Language Query
       "num_ues": 100,
       "num_ticks": 50,
       "ue_distribution": {
-        "source": "parsed" | "predicted",  ← NEW: Source tracking
+        "source": "parsed" | "predicted",
         "distribution": {...}
-      },
-      "raw_query": "..."
+      }
     },
-    "validation_warnings": null | [...]
+    "spatial_bounds": {
+      "requested": {...},
+      "actual": {...}
+    },
+    "location_data": {...}
   }
 }
 ```
@@ -199,25 +182,25 @@ Natural Language Query
 
 ## Technology Stack
 
-- **LangGraph**: Workflow orchestration with parallel execution & conditional routing
+- **LangGraph**: Workflow orchestration with parallel execution
 - **LangChain**: LLM chain implementations
 - **Groq API**: LLM provider (llama-3.1-70b-versatile)
 - **Pydantic**: Structured output validation
-- **Geopy/Nominatim**: Free geocoding service (1 req/sec limit, cached)
+- **Geopy/Nominatim**: Free geocoding (1 req/sec, cached)
+- **Plotly**: Interactive visualizations
 
 ---
 
 ## Performance
 
-| Metric                          | Value                    |
-| ------------------------------- | ------------------------ |
-| **Query Parsing**               | ~2-3s                    |
-| **Location Resolution**         | ~0.5-1s (cached: <0.01s) |
-| **Parameter Generation**        | ~2-3s                    |
-| **Validation**                  | <0.1s                    |
-| **Total (no retry)**            | **~5-7s**                |
-| **Total (with retry)**          | ~10-15s                  |
-| **End-to-End (NL → DataFrame)** | ~7-12s                   |
+| Metric | Value |
+|--------|-------|
+| Query Parsing | ~2-3s |
+| Location Resolution | ~0.5-1s (cached: <0.01s) |
+| Parameter Generation | ~2-3s |
+| Validation | <0.1s |
+| **Total (no retry)** | **~5-7s** |
+| End-to-End (NL → DataFrame) | ~7-12s |
 
 ---
 
@@ -227,149 +210,36 @@ Natural Language Query
 radp/digital_twin/agentic_mobility/
 ├── api.py                      # Public API
 ├── integration.py              # End-to-end integration
+├── topology_generator.py       # Cell tower generation
 ├── models/                     # Pydantic models
-│   ├── query_intent.py         # QueryIntent + DistributionSource enum
-│   ├── generation_params.py    # GenParams
-│   └── state.py                # LangGraph state
 ├── chains/                     # LangChain implementations
-│   ├── parser_chain.py         # Component 1.1
-│   ├── parameter_chain.py      # Component 1.3
-│   ├── validation_chain.py     # Component 1.4
-│   └── suggestion_chain.py     # Component 1.5
 ├── nodes/                      # LangGraph nodes
-│   ├── query_parser.py
-│   ├── location_resolver.py
-│   ├── parameter_agent.py
-│   ├── validation.py
-│   └── suggestion.py
-├── graph/                      # LangGraph workflow
-│   └── workflow.py
-├── formatters/
-│   └── radp_formatter.py       # Component 2.1
-├── utils/
-│   ├── llm_client.py           # Groq API wrapper
-│   ├── geocoding.py            # Geopy wrapper
-│   └── validators.py           # Validation functions
+├── graph/                      # Workflow orchestration
+├── formatters/                 # RADP formatter
+├── utils/                      # Utilities (LLM, geocoding, validators)
 ├── prompts/                    # LLM prompts
-├── tests/
-│   └── test_integration.py
-└── examples/
-    ├── basic_usage.py
-    └── end_to_end_example.py
+├── visualization/              # Visualization suite
+│   ├── tracks.py               # Static matplotlib plots
+│   ├── interactive.py          # Interactive Plotly plots
+│   ├── geographic.py           # Location validation & maps
+│   └── README.md               # Visualization docs
+├── examples/
+│   ├── gen_mobility_example.py         # NL → parameters
+│   ├── end_to_end_example.py           # NL → DataFrame
+│   ├── end_to_end_viz_example.py       # NL → mobility + topology + viz
+│   └── interactive_visualization_demo.ipynb  # Interactive demos
+└── tests/
 ```
-
----
-
-## Advanced Usage
-
-### Use with Existing RADP Code
-
-```python
-from radp.digital_twin.agentic_mobility.api import generate_mobility_params
-from radp.digital_twin.mobility.ue_tracks_params import UETracksGenerationParams
-
-# Generate parameters
-result = generate_mobility_params("Generate 100 UEs in Tokyo")
-
-# Use with existing RADP
-params = UETracksGenerationParams(result["radp_params"])
-# Continue with UETracksGenerator...
-```
-
-### Handle Warnings
-
-```python
-result = generate_mobility_params("Generate 1000 UEs on highway with pedestrians")
-
-if result["status"] == "success_with_warnings":
-    print("Warnings:", result["metadata"]["validation_warnings"])
-    # Warnings: ["Highway scenarios typically should not include pedestrians"]
-```
-
----
-
-## Limitations
-
-- **LLM Dependency**: Requires Groq API access
-- **Geocoding Rate Limit**: Nominatim has 1 req/sec (mitigated by caching)
-- **Single Mobility Model**: Only GaussMarkov (Level 2: multi-model support)
-- **POC Behavior**: Accepts params after max retries (even with warnings)
-
----
-
-## Visualization Suite
-
-Comprehensive visualization toolkit for analyzing mobility simulations:
-
-```python
-from radp.digital_twin.agentic_mobility.visualization import (
-    plot_quick,
-    plot_single_ue_track,
-    plot_single_tick,
-    plot_simulation_dashboard,
-    plot_ue_interactive,
-    plot_geographic_context,
-    plot_comparison_dashboard,
-)
-
-# Generate mobility
-df, metadata = AgenticMobilityIntegration.generate_from_natural_language(
-    "Generate 100 UEs in Tokyo"
-)
-
-# Quick plot - all UEs
-plot_quick(df)
-
-# Single UE track
-plot_single_ue_track(df, ue_id=5)
-
-# Single tick snapshot
-plot_single_tick(df, tick=10)
-
-# Full dashboard with metadata
-plot_simulation_dashboard(df, metadata, save_path="dashboard.png")
-
-# Interactive viewer with sliders (opens in browser)
-plot_ue_interactive(df, metadata)
-
-# Geographic context - world map
-plot_geographic_context(metadata, output_html="map.html")
-
-# Compare two simulations
-df2, metadata2 = AgenticMobilityIntegration.generate_from_natural_language(
-    "Generate 100 UEs in NYC"
-)
-plot_comparison_dashboard(df, metadata, df2, metadata2, save_path="comparison.png")
-```
-
-**Available Visualizations:**
-1. **Quick Plot** - Fast standalone view (all UEs)
-2. **Single UE Track** - Focus on one UE's movement
-3. **Single Tick** - Snapshot of all UEs at one tick
-4. **Dashboard** - Complete overview with metadata
-5. **Interactive Viewer** - Plotly with UE ID + Tick sliders
-6. **Geographic Context** - World map with boundaries
-7. **Comparison** - Side-by-side analysis with metrics
-
-See `examples/visualization_demo.py` for complete demo.
-
----
-
-## Documentation
-
-- **IMPLEMENTATION_COMPLETE.md**: Full implementation details + parameter generation deep dive
-- **IMPLEMENTED_ARCHITECTURE.md**: Visual architecture diagram
-- **poc_plan.md**: Original POC plan (Level 1 scope)
 
 ---
 
 ## Support
 
-**Examples**: `radp/digital_twin/agentic_mobility/examples/`
-**Tests**: `radp/digital_twin/agentic_mobility/tests/`
-**Configuration**: `.env.example` for required environment variables
+- **Examples**: See `examples/` directory
+- **Visualization**: See `visualization/README.md`
+- **Tests**: Run `pytest radp/digital_twin/agentic_mobility/tests/`
 
 ---
 
-**Status**: ✅ Production-Ready (with Visualization Suite)
-**Last Updated**: 2025-10-28
+**Status**: Production-Ready
+**Last Updated**: 2025-10-30
