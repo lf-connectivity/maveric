@@ -1,16 +1,12 @@
 # Core Dependencies
-# pandas>=2.0.0 # Uncomment if facing any pandas error
-# numpy>=1.24.0 # Uncomment if facing any numpy error
-pyyaml>=6.0
+# pandas # Uncomment if facing any pandas error
+# numpy # Uncomment if facing any numpy error
 
 # LangGraph Framework
-langgraph>=1.0.0
-langgraph-checkpoint>=3.0.0
+langgraph
+langgraph-checkpoint
 
 # LLM Provider SDKs
-groq>=0.30.0
-# boto3>=1.28.0  # Uncomment if using AWS Bedrock
-# openai>=1.0.0  # Uncomment if using OpenAI
-
-# Utilities
-python-dotenv>=1.0.0
+groq
+# boto3 # Uncomment if using AWS Bedrock
+# openai # Uncomment if using OpenAI
