@@ -29,55 +29,80 @@ class CellTowerChromosome:
         self.num_sites = num_sites
         self.bounds = (min_lat, max_lat, min_lon, max_lon)
 
-        # Each gene is a (lat, lon) tuple representing a cell site location
-        self.genes: List[Tuple[float, float]] = [
+        # Each gene is a (lat, lon, azimuth) tuple representing a cell site
+        # azimuth is the antenna direction in degrees (0-360)
+        self.genes: List[Tuple[float, float, int]] = [
             (
                 random.uniform(min_lat, max_lat),
                 random.uniform(min_lon, max_lon),
+                random.randint(0, 360),  # Random azimuth
             )
             for _ in range(num_sites)
         ]
 
         self.fitness: float = 0.0
 
-    def calculate_fitness(self, ue_locations: np.ndarray = None, weights: dict = None) -> float:
+    def calculate_fitness(
+        self,
+        ue_locations: np.ndarray = None,
+        weights: dict = None,
+        frequency_mhz: int = 2100
+    ) -> float:
         """Calculate fitness score for this chromosome.
 
         Multi-objective fitness function:
-        1. Coverage: Maximize area covered
-        2. Capacity: Minimize overcrowding (balance load)
-        3. Cost: Minimize inter-site distance variance (uniform distribution)
+        1. SINR: Maximize average SINR across UE locations (if ue_locations provided)
+        2. Coverage: Maximize area covered
+        3. Capacity: Minimize overcrowding (balance load)
+        4. Cost: Minimize inter-site distance variance (uniform distribution)
 
         Args:
-            ue_locations: Array of UE positions [(lat, lon), ...] for coverage calculation
-            weights: Dictionary with keys 'coverage', 'capacity', 'cost'
+            ue_locations: Array of UE positions [(lat, lon), ...] for SINR/coverage calculation
+            weights: Dictionary with keys 'sinr', 'coverage', 'capacity', 'cost'
+            frequency_mhz: Carrier frequency in MHz for path loss calculation
 
         Returns:
             Fitness score (higher is better)
         """
         if weights is None:
+            # Default weights when SINR is not used
             weights = {'coverage': 0.5, 'capacity': 0.3, 'cost': 0.2}
 
         min_lat, max_lat, min_lon, max_lon = self.bounds
 
-        # Objective 1: Coverage uniformity (minimize maximum distance to nearest site)
-        # Sample points across the area
-        grid_points = self._sample_area_points(num_samples=100)
-        max_distance_to_site = 0.0
+        # Objective 1: SINR optimization (if UE locations provided)
+        sinr_score = 0.0
+        if ue_locations is not None and len(ue_locations) > 0 and 'sinr' in weights:
+            sinr_score = self._calculate_sinr_score(ue_locations, frequency_mhz)
 
-        for point in grid_points:
-            min_dist = min(self._haversine_distance(point, site) for site in self.genes)
+        # Objective 2: Coverage uniformity (minimize maximum distance to nearest site)
+        # Use UE locations if provided, otherwise sample grid points
+        if ue_locations is not None and len(ue_locations) > 0:
+            coverage_points = ue_locations
+        else:
+            coverage_points = self._sample_area_points(num_samples=100)
+
+        max_distance_to_site = 0.0
+        for point in coverage_points:
+            # Extract only lat/lon from genes (ignoring azimuth)
+            min_dist = min(
+                self._haversine_distance(point, (site[0], site[1]))
+                for site in self.genes
+            )
             max_distance_to_site = max(max_distance_to_site, min_dist)
 
         # Coverage score: inverse of max distance (lower max distance = better coverage)
         coverage_score = 1.0 / (1.0 + max_distance_to_site)
 
-        # Objective 2: Load balancing (standard deviation of distances between sites)
+        # Objective 3: Load balancing (standard deviation of distances between sites)
         # Uniform distribution minimizes congestion
         site_distances = []
         for i, site1 in enumerate(self.genes):
             for site2 in self.genes[i + 1:]:
-                site_distances.append(self._haversine_distance(site1, site2))
+                # Compare only lat/lon, ignore azimuth
+                site_distances.append(
+                    self._haversine_distance((site1[0], site1[1]), (site2[0], site2[1]))
+                )
 
         if site_distances:
             dist_std = np.std(site_distances)
@@ -87,13 +112,13 @@ class CellTowerChromosome:
         else:
             capacity_score = 1.0
 
-        # Objective 3: Cost minimization (avoid boundary clustering)
+        # Objective 4: Cost minimization (avoid boundary clustering)
         # Penalize sites too close to boundaries or clustered together
         boundary_penalty = 0.0
         lat_range = max_lat - min_lat
         lon_range = max_lon - min_lon
 
-        for lat, lon in self.genes:
+        for lat, lon, azimuth in self.genes:
             # Penalize if within 10% of boundary
             if (lat - min_lat) / lat_range < 0.1 or (max_lat - lat) / lat_range < 0.1:
                 boundary_penalty += 0.1
@@ -104,9 +129,10 @@ class CellTowerChromosome:
 
         # Combine objectives with weights
         self.fitness = (
-            weights['coverage'] * coverage_score +
-            weights['capacity'] * capacity_score +
-            weights['cost'] * cost_score
+            weights.get('sinr', 0.0) * sinr_score +
+            weights.get('coverage', 0.0) * coverage_score +
+            weights.get('capacity', 0.0) * capacity_score +
+            weights.get('cost', 0.0) * cost_score
         )
 
         return self.fitness
@@ -137,6 +163,158 @@ class CellTowerChromosome:
         r = 6371.0
 
         return r * c
+
+    def _calculate_sinr_score(
+        self,
+        ue_locations: np.ndarray,
+        frequency_mhz: int
+    ) -> float:
+        """
+        Calculate average SINR across all UE locations using path loss model.
+        Optimized with vectorized operations for better performance.
+
+        Uses Log-Distance Path Loss model:
+        - Rx_power (dBm) = Tx_power - Path_Loss + Antenna_Gain
+        - Path_Loss (dB) = PL₀ + 10·n·log₁₀(d/d₀)
+        - SINR (dB) = Signal / (Interference + Noise)
+
+        Args:
+            ue_locations: Array of UE positions [(lat, lon), ...]
+            frequency_mhz: Carrier frequency in MHz
+
+        Returns:
+            Normalized SINR score in [0, 1] where higher is better
+        """
+        # Constants for path loss model
+        TX_POWER_DBM = 46.0        # Typical macro cell Tx power (40W)
+        NOISE_DBM = -104.0         # Thermal noise for 10 MHz bandwidth
+        PATH_LOSS_EXPONENT = 3.5   # Urban/suburban propagation
+        REFERENCE_DISTANCE_M = 1.0
+        REFERENCE_PATH_LOSS_DB = 40.0
+
+        num_ues = len(ue_locations)
+        num_cells = len(self.genes)
+
+        # Pre-allocate matrix for Rx powers [num_ues x num_cells]
+        rx_powers_matrix = np.zeros((num_ues, num_cells))
+
+        # Vectorized calculation for all UE-cell pairs
+        for cell_idx, (cell_lat, cell_lon, azimuth) in enumerate(self.genes):
+            for ue_idx, (ue_lat, ue_lon) in enumerate(ue_locations):
+                # 1. Calculate distance (Haversine)
+                distance_km = self._haversine_distance(
+                    (ue_lat, ue_lon), (cell_lat, cell_lon)
+                )
+                distance_m = max(distance_km * 1000, 1.0)  # Prevent log(0)
+
+                # 2. Calculate path loss
+                path_loss_db = REFERENCE_PATH_LOSS_DB + \
+                    10 * PATH_LOSS_EXPONENT * np.log10(
+                        distance_m / REFERENCE_DISTANCE_M
+                    )
+
+                # 3. Calculate antenna gain based on azimuth
+                antenna_gain_db = self._calculate_antenna_gain(
+                    cell_lat, cell_lon, azimuth, ue_lat, ue_lon
+                )
+
+                # 4. Calculate Rx power
+                rx_powers_matrix[ue_idx, cell_idx] = TX_POWER_DBM - path_loss_db + antenna_gain_db
+
+        # Vectorized SINR calculation
+        # Convert to linear scale
+        rx_powers_linear = 10 ** (rx_powers_matrix / 10)
+
+        # Find serving cell (max power) for each UE
+        max_power_linear = np.max(rx_powers_linear, axis=1)
+
+        # Calculate interference (sum of all powers minus serving)
+        total_power_linear = np.sum(rx_powers_linear, axis=1)
+        interference_linear = total_power_linear - max_power_linear
+
+        # Add noise
+        noise_linear = 10 ** (NOISE_DBM / 10)
+
+        # Calculate SINR for all UEs
+        sinr_linear = max_power_linear / (interference_linear + noise_linear + 1e-12)
+        sinr_db = 10 * np.log10(sinr_linear)
+
+        # Normalize SINR: typical range [-5, 25] dB
+        # Good SINR > 10 dB, Excellent > 20 dB
+        avg_sinr_db = np.mean(sinr_db)
+        normalized_sinr = np.clip((avg_sinr_db + 5) / 30, 0, 1)
+
+        return normalized_sinr
+
+    def _calculate_antenna_gain(
+        self,
+        cell_lat: float,
+        cell_lon: float,
+        azimuth: int,
+        ue_lat: float,
+        ue_lon: float
+    ) -> float:
+        """
+        Calculate antenna gain based on azimuth pattern.
+
+        Uses 3-sector antenna pattern:
+        - Max gain: 15 dBi (front)
+        - 3dB beamwidth: 65°
+        - Front-to-back ratio: 20 dB
+
+        Args:
+            cell_lat: Cell latitude
+            cell_lon: Cell longitude
+            azimuth: Antenna azimuth in degrees (0-360)
+            ue_lat: UE latitude
+            ue_lon: UE longitude
+
+        Returns:
+            Antenna gain in dB
+        """
+        # Calculate bearing from cell to UE
+        bearing = self._calculate_bearing(
+            cell_lat, cell_lon, ue_lat, ue_lon
+        )
+
+        # Angle difference from main beam
+        angle_diff = abs(((bearing - azimuth + 180) % 360) - 180)
+
+        # Antenna pattern
+        if angle_diff <= 32.5:  # Main lobe (±32.5° = 65° beamwidth)
+            antenna_gain_db = 15.0  # Max gain
+        elif angle_diff <= 90:  # Side lobe
+            # Linear attenuation in side lobe
+            antenna_gain_db = 15.0 - (angle_diff - 32.5) * 0.35
+        else:  # Back lobe
+            antenna_gain_db = -5.0  # 20 dB front-to-back ratio
+
+        return antenna_gain_db
+
+    def _calculate_bearing(
+        self, lat1: float, lon1: float, lat2: float, lon2: float
+    ) -> float:
+        """
+        Calculate bearing from point 1 to point 2 in degrees (0-360).
+
+        Args:
+            lat1: Starting latitude
+            lon1: Starting longitude
+            lat2: Ending latitude
+            lon2: Ending longitude
+
+        Returns:
+            Bearing in degrees (0-360), where 0° is North
+        """
+        lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
+
+        dlon = lon2 - lon1
+        x = np.sin(dlon) * np.cos(lat2)
+        y = (np.cos(lat1) * np.sin(lat2) -
+             np.sin(lat1) * np.cos(lat2) * np.cos(dlon))
+
+        bearing = np.degrees(np.arctan2(x, y))
+        return (bearing + 360) % 360
 
 
 class GeneticAlgorithmOptimizer:
@@ -172,9 +350,11 @@ class GeneticAlgorithmOptimizer:
         max_lat: float,
         min_lon: float,
         max_lon: float,
+        ue_locations: np.ndarray = None,
+        frequency_mhz: int = 2100,
         fitness_weights: dict = None,
         verbose: bool = True,
-    ) -> List[Tuple[float, float]]:
+    ) -> List[Tuple[float, float, int]]:
         """Run genetic algorithm to find optimal cell tower locations.
 
         Args:
@@ -183,17 +363,22 @@ class GeneticAlgorithmOptimizer:
             max_lat: Maximum latitude boundary
             min_lon: Minimum longitude boundary
             max_lon: Maximum longitude boundary
+            ue_locations: Array of UE positions [(lat, lon), ...] for SINR optimization
+            frequency_mhz: Carrier frequency in MHz for path loss calculation
             fitness_weights: Weights for multi-objective fitness
             verbose: Print progress
 
         Returns:
-            List of optimal (lat, lon) positions
+            List of optimal (lat, lon, azimuth) tuples
         """
         if verbose:
             print(f"\n[Genetic Algorithm Optimization]")
             print(f"  Population: {self.population_size}")
             print(f"  Generations: {self.generations}")
             print(f"  Sites to optimize: {num_sites}")
+            if ue_locations is not None:
+                print(f"  UE locations for SINR: {len(ue_locations)}")
+                print(f"  Frequency: {frequency_mhz} MHz")
 
         # Initialize population
         population = [
@@ -203,7 +388,11 @@ class GeneticAlgorithmOptimizer:
 
         # Evaluate initial population
         for chromosome in population:
-            chromosome.calculate_fitness(weights=fitness_weights)
+            chromosome.calculate_fitness(
+                ue_locations=ue_locations,
+                weights=fitness_weights,
+                frequency_mhz=frequency_mhz
+            )
 
         best_fitness_history = []
 
@@ -215,7 +404,7 @@ class GeneticAlgorithmOptimizer:
             best_fitness = population[0].fitness
             best_fitness_history.append(best_fitness)
 
-            if verbose and gen % 20 == 0:
+            if verbose and gen % 10 == 0:
                 print(f"  Generation {gen}/{self.generations}: Best fitness = {best_fitness:.4f}")
 
             # Elitism: preserve best individuals
@@ -240,8 +429,16 @@ class GeneticAlgorithmOptimizer:
                     self._mutate(child2)
 
                 # Evaluate fitness
-                child1.calculate_fitness(weights=fitness_weights)
-                child2.calculate_fitness(weights=fitness_weights)
+                child1.calculate_fitness(
+                    ue_locations=ue_locations,
+                    weights=fitness_weights,
+                    frequency_mhz=frequency_mhz
+                )
+                child2.calculate_fitness(
+                    ue_locations=ue_locations,
+                    weights=fitness_weights,
+                    frequency_mhz=frequency_mhz
+                )
 
                 new_population.extend([child1, child2])
 
@@ -282,7 +479,7 @@ class GeneticAlgorithmOptimizer:
         return child1, child2
 
     def _mutate(self, chromosome: CellTowerChromosome):
-        """Mutate chromosome by randomly adjusting site locations."""
+        """Mutate chromosome by randomly adjusting site locations and azimuths."""
         min_lat, max_lat, min_lon, max_lon = chromosome.bounds
 
         # Random mutation: adjust one or more sites
@@ -292,11 +489,15 @@ class GeneticAlgorithmOptimizer:
             site_idx = random.randint(0, chromosome.num_sites - 1)
 
             # Small perturbation (Gaussian mutation)
-            lat, lon = chromosome.genes[site_idx]
+            lat, lon, azimuth = chromosome.genes[site_idx]
             lat_range = max_lat - min_lat
             lon_range = max_lon - min_lon
 
             new_lat = np.clip(lat + random.gauss(0, lat_range * 0.05), min_lat, max_lat)
             new_lon = np.clip(lon + random.gauss(0, lon_range * 0.05), min_lon, max_lon)
 
-            chromosome.genes[site_idx] = (new_lat, new_lon)
+            # Mutate azimuth with Gaussian noise (±30° std dev)
+            azimuth_change = random.gauss(0, 30)
+            new_azimuth = int((azimuth + azimuth_change) % 360)
+
+            chromosome.genes[site_idx] = (new_lat, new_lon, new_azimuth)

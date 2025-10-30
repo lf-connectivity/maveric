@@ -1,15 +1,21 @@
 """End-to-end example: Natural language → Mobility simulation + Visualization + Topology."""
 import json
+import os
 
 import matplotlib
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from radp.digital_twin.agentic_mobility.integration import AgenticMobilityIntegration
 from radp.digital_twin.agentic_mobility.topology_generator import TopologyGenerator
+from radp.digital_twin.mobility.param_regression import get_predicted_alpha, preprocess_ue_data
 
 matplotlib.use("Agg")
+
+# Output directory for generated artifacts (relative to this file)
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "generated_ues")
 
 
 # ----------------------------------------------------------------------
@@ -81,8 +87,11 @@ def plot_ue_tracks_with_topology(df: pd.DataFrame, topology_df: pd.DataFrame) ->
         plt.grid(True, alpha=0.3)
         plt.legend(loc="upper right")
         plt.tight_layout()
-        plt.savefig("ue_tracks_with_topology.png", dpi=150)
-        print("Saved visualization to: ue_tracks_with_topology.png")
+
+        # Save to output directory
+        viz_path = os.path.join(OUTPUT_DIR, "ue_tracks_with_topology.png")
+        plt.savefig(viz_path, dpi=150)
+        print(f"Saved visualization to: {viz_path}")
         start_idx = end_idx
 
 
@@ -131,7 +140,10 @@ def plot_ue_tracks(df: pd.DataFrame) -> None:
         plt.xlabel("Longitude")
         plt.ylabel("Latitude")
         plt.legend(loc="upper right", bbox_to_anchor=(1.2, 1))
-        plt.savefig("ue_tracks.png")
+
+        # Save to output directory
+        tracks_path = os.path.join(OUTPUT_DIR, "ue_tracks.png")
+        plt.savefig(tracks_path)
         start_idx = end_idx
 
 
@@ -139,6 +151,10 @@ def plot_ue_tracks(df: pd.DataFrame) -> None:
 # Main pipeline
 # ----------------------------------------------------------------------
 def main():
+    # Create output directory if it doesn't exist
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    print(f"📁 Output directory: {OUTPUT_DIR}\n")
+
     print("=" * 80)
     print("Agentic Mobility Generation - End-to-End Example with Visualization & Topology")
     print("Natural Language → Parameters → Simulation → DataFrame → Topology → Plot")
@@ -155,7 +171,7 @@ def main():
         "Give me for Tokyo. consider it as a suburban area with lots of pedestrians and cars. "
         "There are so many motorbikes, consider them as cyclists. Have two hundreds total devices."
         # Add tower count here if desired, e.g.:
-        " Deploy 2 cell towers."
+        " Deploy 5 cell towers."
     )
 
     print(f"Query: '{query1}'\nProcessing...")
@@ -168,8 +184,8 @@ def main():
     # alpha_val = get_predicted_alpha(ue_data)
     # print(f"Predicted alpha: {alpha_val:.3f}")
 
-    # Generate topology using LLM-based parameter generation
-    print("\n📡 Generating cell topology using LLM...")
+    # Generate topology using LLM-based parameter generation with GA optimization
+    print("\n📡 Generating cell topology using LLM with GA optimization...")
     location_data = metadata1.get("location_data", {})
     query_intent = metadata1.get("query_intent", {})
 
@@ -184,9 +200,10 @@ def main():
         },
     }
 
-    with open("generation_params.json", "w") as f:
+    params_json_path = os.path.join(OUTPUT_DIR, "generation_params.json")
+    with open(params_json_path, "w") as f:
         json.dump(params_info, f, indent=2)
-    print("💾 Saved generation parameters to: generation_params.json")
+    print(f"💾 Saved generation parameters to: {params_json_path}")
 
     topology_df = TopologyGenerator.generate_from_llm(
         area_type=location_data.get("area_type", "suburban"),
@@ -196,18 +213,20 @@ def main():
         min_lon=location_data.get("min_lon", df1["lon"].min()),
         max_lon=location_data.get("max_lon", df1["lon"].max()),
         raw_query=query1,
+        mobility_df=df1,                # NEW: Pass mobility data for SINR calculation
+        use_genetic_algorithm=True,     # NEW: Enable GA optimization
     )
 
-    print(f"✓ Generated {len(topology_df)} cell sectors")
+    print(f"✓ Generated {len(topology_df)} cells with optimized locations and azimuths")
 
-    # Count unique locations
-    unique_locations = topology_df.groupby(["cell_lat", "cell_lon"]).size()
-    print(f"✓ Generated {len(unique_locations)} unique cell sites")
+    # Show azimuth optimization results
+    print(f"  Azimuth range: {topology_df['cell_az_deg'].min()}° to {topology_df['cell_az_deg'].max()}°")
+    print(f"  All {len(topology_df)} cells have unique locations")
     print("\nTopology preview:")
     print(topology_df.to_string())
 
     # Save topology to CSV
-    topology_csv_path = "cell_topology.csv"
+    topology_csv_path = os.path.join(OUTPUT_DIR, "cell_topology.csv")
     topology_df.to_csv(topology_csv_path, index=False)
     print(f"\n💾 Saved topology to: {topology_csv_path}")
 

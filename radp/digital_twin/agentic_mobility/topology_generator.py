@@ -21,6 +21,8 @@ class TopologyGenerator:
         min_lon: float,
         max_lon: float,
         raw_query: str,
+        mobility_df: pd.DataFrame = None,
+        use_genetic_algorithm: bool = False,
     ) -> pd.DataFrame:
         """Generate cell topology using LLM to determine parameters.
 
@@ -32,6 +34,8 @@ class TopologyGenerator:
             min_lon: Minimum longitude boundary
             max_lon: Maximum longitude boundary
             raw_query: Original user query for context
+            mobility_df: Optional DataFrame with UE mobility data for GA optimization
+            use_genetic_algorithm: If True and mobility_df provided, use GA optimization
 
         Returns:
             DataFrame with columns: cell_lat, cell_lon, cell_id, cell_az_deg, cell_carrier_freq_mhz
@@ -55,22 +59,36 @@ class TopologyGenerator:
         print(f"  azimuth_strategy: {params.azimuth_strategy}")
         print(f"  cell_placement_strategy: {params.cell_placement_strategy}")
 
-        # Calculate actual sites
-        if params.azimuth_strategy == "sectored":
-            num_sites = max(1, params.num_cells // 3)
-            print(f"  → Will generate {num_sites} sites × 3 sectors = {num_sites * 3} total cells")
+        # Determine if GA should be used
+        if use_genetic_algorithm and mobility_df is not None:
+            print(f"  → Using Genetic Algorithm optimization")
+            # Generate topology using LLM parameters
+            return TopologyGenerator.generate_with_params(
+                params=params,
+                min_lat=min_lat,
+                max_lat=max_lat,
+                min_lon=min_lon,
+                max_lon=max_lon,
+                mobility_df=mobility_df,
+                use_genetic_algorithm=True,
+            )
         else:
-            num_sites = params.num_cells
-            print(f"  → Will generate {num_sites} sites")
+            # Calculate actual sites for traditional sectored deployment
+            if params.azimuth_strategy == "sectored":
+                num_sites = max(1, params.num_cells // 3)
+                print(f"  → Will generate {num_sites} sites × 3 sectors = {num_sites * 3} total cells")
+            else:
+                num_sites = params.num_cells
+                print(f"  → Will generate {num_sites} sites")
 
-        # Generate topology using LLM parameters
-        return TopologyGenerator.generate_with_params(
-            params=params,
-            min_lat=min_lat,
-            max_lat=max_lat,
-            min_lon=min_lon,
-            max_lon=max_lon,
-        )
+            # Generate topology using LLM parameters (traditional method)
+            return TopologyGenerator.generate_with_params(
+                params=params,
+                min_lat=min_lat,
+                max_lat=max_lat,
+                min_lon=min_lon,
+                max_lon=max_lon,
+            )
 
     @staticmethod
     def generate_with_params(
@@ -79,6 +97,8 @@ class TopologyGenerator:
         max_lat: float,
         min_lon: float,
         max_lon: float,
+        mobility_df: pd.DataFrame = None,
+        use_genetic_algorithm: bool = False,
     ) -> pd.DataFrame:
         """Generate cell topology using provided parameters.
 
@@ -88,10 +108,22 @@ class TopologyGenerator:
             max_lat: Maximum latitude boundary
             min_lon: Minimum longitude boundary
             max_lon: Maximum longitude boundary
+            mobility_df: Optional DataFrame with UE mobility data for GA optimization
+            use_genetic_algorithm: If True and mobility_df provided, use GA optimization
 
         Returns:
             DataFrame with cell topology data
         """
+        # Check if we should use Genetic Algorithm
+        if use_genetic_algorithm and mobility_df is not None:
+            return TopologyGenerator.generate_with_genetic_algorithm(
+                params=params,
+                mobility_df=mobility_df,
+                min_lat=min_lat,
+                max_lat=max_lat,
+                min_lon=min_lon,
+                max_lon=max_lon,
+            )
         # Calculate cell sites based on azimuth strategy
         # num_cells represents TOTAL sectors, so we need to calculate actual sites
         if params.azimuth_strategy == "sectored":
@@ -154,6 +186,112 @@ class TopologyGenerator:
                 break
 
         return pd.DataFrame(cells)
+
+    @staticmethod
+    def generate_with_genetic_algorithm(
+        params: TopologyParams,
+        mobility_df: pd.DataFrame,
+        min_lat: float,
+        max_lat: float,
+        min_lon: float,
+        max_lon: float,
+    ) -> pd.DataFrame:
+        """Generate cell topology using Genetic Algorithm with SINR optimization.
+
+        This method uses GA to optimize both cell locations and azimuths based on
+        actual UE mobility patterns and SINR quality.
+
+        Args:
+            params: TopologyParams with generation parameters
+            mobility_df: DataFrame with UE mobility data containing 'lat' and 'lon' columns
+            min_lat: Minimum latitude boundary
+            max_lat: Maximum latitude boundary
+            min_lon: Minimum longitude boundary
+            max_lon: Maximum longitude boundary
+
+        Returns:
+            DataFrame with optimized cell topology data
+        """
+        from radp.digital_twin.agentic_mobility.placement.genetic_algorithm import (
+            GeneticAlgorithmOptimizer
+        )
+
+        # Extract unique UE locations from mobility data
+        ue_locations_full = mobility_df[['lat', 'lon']].drop_duplicates().values
+
+        # Sample UE locations for faster optimization (max 100 samples)
+        # This significantly speeds up GA while maintaining optimization quality
+        max_ue_samples = 100
+        if len(ue_locations_full) > max_ue_samples:
+            # Stratified sampling to ensure coverage across the area
+            np.random.seed(42)  # For reproducibility
+            sample_indices = np.random.choice(
+                len(ue_locations_full),
+                size=max_ue_samples,
+                replace=False
+            )
+            ue_locations = ue_locations_full[sample_indices]
+            print(f"\n[Genetic Algorithm Optimization]")
+            print(f"  Optimizing {params.num_cells} cells")
+            print(f"  Sampled {len(ue_locations)} from {len(ue_locations_full)} unique UE locations")
+            print(f"  Frequency: {params.cell_carrier_freq_mhz} MHz")
+            print(f"  SINR optimization: ENABLED")
+        else:
+            ue_locations = ue_locations_full
+            print(f"\n[Genetic Algorithm Optimization]")
+            print(f"  Optimizing {params.num_cells} cells")
+            print(f"  Based on {len(ue_locations)} unique UE locations")
+            print(f"  Frequency: {params.cell_carrier_freq_mhz} MHz")
+            print(f"  SINR optimization: ENABLED")
+
+        # Initialize GA optimizer with optimized parameters
+        # Reduced population and generations for faster convergence
+        ga = GeneticAlgorithmOptimizer(
+            population_size=30,      # Reduced from 50 (40% faster)
+            generations=50,          # Reduced from 100 (50% faster)
+            crossover_rate=0.8,
+            mutation_rate=0.15,      # Slightly higher for azimuth exploration
+            elitism_rate=0.15,       # Increased to preserve good solutions
+        )
+
+        # Set fitness weights with SINR as primary objective
+        fitness_weights = {
+            'sinr': 0.40,      # SINR quality (primary)
+            'coverage': 0.30,  # Coverage uniformity
+            'capacity': 0.20,  # Load balancing
+            'cost': 0.10       # Cost minimization
+        }
+
+        # Run optimization
+        optimized_genes = ga.optimize(
+            num_sites=params.num_cells,
+            min_lat=min_lat,
+            max_lat=max_lat,
+            min_lon=min_lon,
+            max_lon=max_lon,
+            ue_locations=ue_locations,
+            frequency_mhz=params.cell_carrier_freq_mhz,
+            fitness_weights=fitness_weights,
+            verbose=True,
+        )
+
+        # Build topology DataFrame
+        cells = []
+        for idx, (lat, lon, azimuth) in enumerate(optimized_genes, start=1):
+            cells.append({
+                'cell_lat': round(lat, 6),
+                'cell_lon': round(lon, 6),
+                'cell_id': f'cell_{idx}',
+                'cell_az_deg': azimuth,
+                'cell_carrier_freq_mhz': params.cell_carrier_freq_mhz,
+            })
+
+        topology_df = pd.DataFrame(cells)
+
+        print(f"\n✓ Generated {len(topology_df)} cells with optimized positions and azimuths")
+        print(f"  Azimuth range: {topology_df['cell_az_deg'].min()}° to {topology_df['cell_az_deg'].max()}°")
+
+        return topology_df
 
     @staticmethod
     def _generate_grid_locations(

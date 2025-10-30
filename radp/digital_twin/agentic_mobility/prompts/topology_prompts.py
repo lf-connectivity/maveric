@@ -6,15 +6,15 @@ Your task is to generate optimal cell tower deployment parameters based on area 
 
 Parameters to generate:
 
-1. num_cells: Total number of cell sectors to deploy
-   - This is the TOTAL number of sectors, not sites
-   - If using sectored (3-sector sites), the actual number of sites will be num_cells / 3
-   - If using omnidirectional, num_cells = number of sites
+1. num_cells: Total number of cell sites to deploy
+   - This is the TOTAL number of SITES (not sectors)
+   - Each cell will have ONE optimized azimuth (0-360°) determined by genetic algorithm
+   - No longer using 3-sector (0°/120°/240°) configuration
    - Depends on area size, area type, UE density, and coverage requirements
-   - Urban dense: 1 site per 0.5-1 km² → for 10km² = 10-20 sites = 30-60 sectors
-   - Urban: 1 site per 1-2 km² → for 10km² = 5-10 sites = 15-30 sectors
-   - Suburban: 1 site per 2-5 km² → for 10km² = 2-5 sites = 6-15 sectors
-   - Rural: 1 site per 5-15 km² → for 10km² = 1-2 sites = 3-6 sectors
+   - Urban dense: 1 site per 0.5-1 km² → for 10km² = 10-20 cells
+   - Urban: 1 site per 1-2 km² → for 10km² = 5-10 cells
+   - Suburban: 1 site per 2-5 km² → for 10km² = 2-5 cells
+   - Rural: 1 site per 5-15 km² → for 10km² = 1-2 cells
    - Highway: Linear deployment along route
 
 2. cell_carrier_freq_mhz: Carrier frequency in MHz
@@ -30,14 +30,12 @@ Parameters to generate:
    - 3500 MHz: 5G, dense urban
 
 3. azimuth_strategy: How to orient cell antennas
-   - 'sectored': 3-sector sites (0°, 120°, 240°) - MOST COMMON for urban/suburban
-     * Provides 360° coverage with directional gain
-     * Higher capacity, better interference management
-   - 'omnidirectional': Single antenna (0°) - for rural/low density
-     * Simpler deployment
-     * Lower capacity but adequate for low UE count
-   - 'random': Random orientations - for irregular terrain or custom scenarios
-     * Use sparingly, mainly for research/testing
+   - NOTE: When using Genetic Algorithm (GA) optimization, azimuth is automatically optimized (0-360°)
+   - This parameter is mainly for backwards compatibility with non-GA methods
+   - 'sectored': Indicates directional antennas (GA will optimize exact angles)
+   - 'omnidirectional': Indicates omnidirectional pattern
+   - 'random': For research/testing purposes
+   - RECOMMENDED: Use 'sectored' for GA mode - the algorithm will find optimal azimuths
 
 4. cell_placement_strategy: How to position cells geographically
    - 'grid': Uniform hexagonal/square grid - DEFAULT for most scenarios
@@ -110,19 +108,19 @@ Query context clues:
 TOPOLOGY_GENERATION_EXAMPLES = """
 Example 1: Urban Tokyo, 200 UEs, suburban area, ~10 km²
 Query: "Give me for Tokyo. consider it as a suburban area with lots of pedestrians and cars."
-→ num_cells: 15 (5 sites × 3 sectors, suburban density ~2 km² per site)
+→ num_cells: 5 (5 cell sites with GA-optimized azimuths)
 → frequency: 2100 MHz (universal, good urban/suburban balance)
-→ azimuth: 'sectored' (standard for suburban, good capacity)
-→ placement: 'grid' (uniform distribution)
-→ reasoning: "Suburban area ~10km² needs 5 sites at 2km²/site density. With 200 UEs and sectored deployment, 15 total sectors (5 sites × 3 sectors) provide good coverage and capacity. 2100 MHz is optimal for urban/suburban mixed use."
+→ azimuth: 'sectored' (GA will optimize exact angles based on UE distribution)
+→ placement: 'grid' (GA will refine placement based on SINR optimization)
+→ reasoning: "Suburban area ~10km² needs 5 cells at ~2km²/site density. With 200 UEs, 5 cells with optimized azimuths provide excellent coverage and capacity. 2100 MHz is optimal for urban/suburban mixed use. GA will optimize both positions and azimuths for maximum SINR."
 
 Example 2: Rural area, 30 UEs, ~50 km²
 Query: "Generate 30 UEs in rural countryside"
-→ num_cells: 9 (3 sites × 3 sectors, low density ~15-17 km² per site)
+→ num_cells: 3 (3 cell sites with GA-optimized azimuths)
 → frequency: 1800 MHz (good rural coverage)
-→ azimuth: 'sectored' (standard configuration)
-→ placement: 'grid' (uniform coverage)
-→ reasoning: "Rural area 50km² with low UE density needs 3 sites (~17km²/site). Sectored deployment gives 9 total sectors for adequate coverage. 1800 MHz provides good propagation for wide areas."
+→ azimuth: 'sectored' (GA will optimize directions)
+→ placement: 'grid' (GA will refine based on UE locations)
+→ reasoning: "Rural area 50km² with low UE density needs 3 cells (~17km²/site). GA will optimize azimuth angles to point toward UE concentrations. 1800 MHz provides good propagation for wide areas."
 
 Example 3: Dense urban, 500 UEs, small area ~5 km²
 Query: "Generate 500 UEs in downtown Manhattan during rush hour"
@@ -150,19 +148,19 @@ Query: "Generate 10 UEs in small village"
 
 Example 6: User explicitly requests tower count
 Query: "Give me 5 cell towers for Tokyo suburban area with 200 UEs"
-→ num_cells: 15 (USER REQUESTED 5 towers, sectored = 5 sites × 3 sectors = 15 cells)
+→ num_cells: 5 (USER REQUESTED 5 towers = 5 cells with optimized azimuths)
 → frequency: 2100 MHz
-→ azimuth: 'sectored' (standard)
+→ azimuth: 'sectored' (GA will optimize angles)
 → placement: 'grid'
-→ reasoning: "User explicitly requested 5 towers. Using sectored deployment (industry standard), this becomes 15 total cells (5 sites × 3 sectors each). 2100 MHz appropriate for suburban."
+→ reasoning: "User explicitly requested 5 towers. With GA optimization, each cell will have a unique location and optimized azimuth (0-360°) based on UE distribution. 2100 MHz appropriate for suburban."
 
 Example 7: User requests specific cell count
 Query: "Deploy 20 cells in downtown area with 300 UEs"
-→ num_cells: 20 (USER REQUESTED 20 cells, use exactly this number)
+→ num_cells: 20 (USER REQUESTED 20 cells = 20 unique cell sites)
 → frequency: 2600 MHz (dense urban)
-→ azimuth: 'sectored' (will create ~7 sites if sectored)
+→ azimuth: 'sectored' (GA will optimize angles)
 → placement: 'cluster'
-→ reasoning: "User explicitly requested 20 cells. This will create approximately 7 sites with 3 sectors each (21 cells), adjusted to 20. High frequency for dense urban capacity."
+→ reasoning: "User explicitly requested 20 cells. GA will create 20 cells with unique locations and optimized azimuths for maximum SINR. High frequency for dense urban capacity."
 """
 
 
