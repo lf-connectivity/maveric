@@ -196,15 +196,22 @@ class BedrockProvider(BaseLLMProvider):
     def __init__(self, config: Dict[str, Any]):
         """
         Initialize Bedrock provider.
-        
+
         Required config:
             - model: Model ID (e.g., "anthropic.claude-3-5-sonnet-20241022-v2:0")
             - region: AWS region (e.g., "us-east-1")
-            - aws_access_key_id: Optional, uses default AWS credentials if not provided
-            - aws_secret_access_key: Optional
+
+        Optional config (will use environment variables or AWS default credentials if not provided):
+            - aws_access_key_id: AWS Access Key ID (falls back to AWS_ACCESS_KEY_ID env var)
+            - aws_secret_access_key: AWS Secret Access Key (falls back to AWS_SECRET_ACCESS_KEY env var)
+
+        Credential Priority:
+            1. Credentials from config dict
+            2. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+            3. AWS default credentials (~/.aws/credentials or IAM role)
         """
         super().__init__(config)
-        
+
         # Import boto3
         try:
             import boto3
@@ -212,22 +219,28 @@ class BedrockProvider(BaseLLMProvider):
             raise ImportError(
                 "boto3 not installed. Install with: pip install boto3"
             )
-        
-        # Get region
-        self.region = config.get("region", "us-east-1")
-        
+
+        # Get region (from config or env var)
+        self.region = config.get("region") or os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+
         # Initialize Bedrock client
+        # Priority order: 1. Config dict, 2. Environment variables, 3. AWS default credentials
         session_kwargs = {}
-        if config.get("aws_access_key_id"):
-            session_kwargs["aws_access_key_id"] = config["aws_access_key_id"]
-            session_kwargs["aws_secret_access_key"] = config["aws_secret_access_key"]
-        
+
+        # Check config first, then fall back to environment variables
+        aws_access_key = config.get("aws_access_key_id") or os.getenv("AWS_ACCESS_KEY_ID")
+        aws_secret_key = config.get("aws_secret_access_key") or os.getenv("AWS_SECRET_ACCESS_KEY")
+
+        if aws_access_key and aws_secret_key:
+            session_kwargs["aws_access_key_id"] = aws_access_key
+            session_kwargs["aws_secret_access_key"] = aws_secret_key
+
         self.client = boto3.client(
             "bedrock-runtime",
             region_name=self.region,
             **session_kwargs
         )
-        
+
         # Default model if not specified
         if not self.model:
             self.model = "anthropic.claude-3-5-sonnet-20241022-v2:0"

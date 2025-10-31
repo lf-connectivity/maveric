@@ -8,5 +8,4 @@ langgraph-checkpoint
 
 # LLM Provider SDKs
 groq
-# boto3 # Uncomment if using AWS Bedrock
-# openai # Uncomment if using OpenAI
+boto3 

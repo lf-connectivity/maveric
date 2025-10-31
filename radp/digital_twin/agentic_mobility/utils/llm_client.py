@@ -1,8 +1,9 @@
-"""Groq API client wrapper."""
+"""LLM API client wrapper with multi-provider support."""
 from typing import Optional, Type, TypeVar
 
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_groq import ChatGroq
+from langchain_aws import ChatBedrockConverse
 from pydantic import BaseModel
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -15,13 +16,34 @@ class LLMClient:
     """Wrapper for LLM API calls with structured output support."""
 
     def __init__(self):
-        """Initialize LLM client with Groq configuration."""
+        """Initialize LLM client with configured provider."""
         Config.validate()
-        self.llm = ChatGroq(
-            api_key=Config.GROQ_API_KEY,
-            model=Config.GROQ_MODEL,
-            temperature=0.0,  # Deterministic outputs for structured generation
-        )
+
+        # Select provider based on configuration
+        if Config.LLM_PROVIDER == "groq":
+            self.llm = ChatGroq(
+                api_key=Config.GROQ_API_KEY,
+                model=Config.GROQ_MODEL,
+                temperature=0.0,  # Deterministic outputs for structured generation
+            )
+        elif Config.LLM_PROVIDER == "bedrock":
+            # Build credentials dict if provided
+            credentials = {}
+            if Config.AWS_ACCESS_KEY_ID:
+                credentials = {
+                    "aws_access_key_id": Config.AWS_ACCESS_KEY_ID,
+                    "aws_secret_access_key": Config.AWS_SECRET_ACCESS_KEY,
+                }
+
+            self.llm = ChatBedrockConverse(
+                model=Config.BEDROCK_MODEL,
+                region_name=Config.BEDROCK_REGION,
+                temperature=0.0,
+                credentials_profile_name=None,  # Use default credentials if not explicitly provided
+                **credentials
+            )
+        else:
+            raise ValueError(f"Unsupported LLM provider: {Config.LLM_PROVIDER}")
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def generate_structured(self, prompt: str, output_model: Type[T], system_message: Optional[str] = None) -> T:
