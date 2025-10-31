@@ -1,6 +1,6 @@
 gpytorch==1.9.1
-numpy==1.24.2
-pandas==1.5.3
+numpy==1.24.3
+pandas==2.0.3
 pyarrow==13.0.0
 scikit-learn==1.2.1
 torch==2.0.0
