@@ -534,6 +534,11 @@ class BayesianDigitalTwin:
         # Create Training Tensors
         train_X, train_Y = self._create_training_tensors(data_in)
 
+        # Move tensors to the same device as the model
+        if next(self.model.parameters()).is_cuda:
+            train_X = train_X.cuda()
+            train_Y = train_Y.cuda()
+
         self.model = self.model.get_fantasy_model(inputs=train_X, targets=train_Y)
 
     def predict_distributed_gpmodel(

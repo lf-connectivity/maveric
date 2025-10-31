@@ -109,9 +109,9 @@ def main():
     # LLM arguments
     parser.add_argument(
         "--provider",
-        default="groq",
+        default=os.getenv("LLM_PROVIDER", "groq"),
         choices=["groq", "bedrock", "openai"],
-        help="LLM provider to use (default: groq)"
+        help="LLM provider to use (default: from LLM_PROVIDER env var or 'groq')"
     )
     parser.add_argument(
         "--model",

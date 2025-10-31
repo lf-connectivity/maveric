@@ -39,7 +39,8 @@ def main():
     config = load_config(config_path)
 
     # Get default provider settings
-    default_provider = config.get("default_provider", "groq")
+    # Priority: 1. LLM_PROVIDER env var, 2. config.yaml default_provider
+    default_provider = os.getenv("LLM_PROVIDER") or config.get("default_provider", "groq")
     provider_config = config["providers"][default_provider]
 
     # Get optimization settings

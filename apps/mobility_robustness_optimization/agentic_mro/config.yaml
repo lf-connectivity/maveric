@@ -3,8 +3,11 @@
 # ==============================================================================
 # LLM Provider Configurations
 # ==============================================================================
+# Provider selection priority:
+#   1. LLM_PROVIDER environment variable (shared with Agentic Mobility)
+#   2. default_provider below (fallback)
 
-default_provider: "groq"
+default_provider: "bedrock"
 
 providers:
   groq:
@@ -12,7 +15,7 @@ providers:
     model: "openai/gpt-oss-120b"
     temperature: 0.2
     max_tokens: 2000
-    api_key: "PUT_YOUR_GROQ_API_KEY_HERE"  # Replace with your actual key
+    api_key: "PUT_YOUR_GROQ_API_KEY_HERE"  # Or set GROQ_API_KEY env var
 
   bedrock:
     provider: "bedrock"
@@ -20,14 +23,17 @@ providers:
     region: "us-east-1"
     temperature: 0.2
     max_tokens: 2000
-    # Uses AWS default credentials (AWS CLI configured)
+    # AWS credentials priority:
+    #   1. aws_access_key_id/aws_secret_access_key in this config
+    #   2. AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY env vars
+    #   3. AWS default credentials (~/.aws/credentials or IAM role)
 
   openai:
     provider: "openai"
     model: "gpt-4"
     temperature: 0.2
     max_tokens: 2000
-    # Set OPENAI_API_KEY environment variable or pass api_key explicitly
+    # Set OPENAI_API_KEY env var or add api_key: "your_key" here
 
 # ==============================================================================
 # MRO Optimization Parameters
