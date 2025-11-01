@@ -19,7 +19,7 @@ providers:
 
   bedrock:
     provider: "bedrock"
-    model: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    model: "global.anthropic.claude-sonnet-4-20250514-v1:0"
     region: "us-east-1"
     temperature: 0.2
     max_tokens: 2000
