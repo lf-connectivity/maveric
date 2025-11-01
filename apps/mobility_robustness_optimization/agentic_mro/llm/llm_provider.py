@@ -235,9 +235,19 @@ class BedrockProvider(BaseLLMProvider):
             session_kwargs["aws_access_key_id"] = aws_access_key
             session_kwargs["aws_secret_access_key"] = aws_secret_key
 
+        # Configure retry strategy for throttling
+        from botocore.config import Config as BotocoreConfig
+        retry_config = BotocoreConfig(
+            retries={
+                'max_attempts': 10,  # Increase from default 4 to 10
+                'mode': 'adaptive'   # Use adaptive retry mode for better throttling handling
+            }
+        )
+
         self.client = boto3.client(
             "bedrock-runtime",
             region_name=self.region,
+            config=retry_config,
             **session_kwargs
         )
 

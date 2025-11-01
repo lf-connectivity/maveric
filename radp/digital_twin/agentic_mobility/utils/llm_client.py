@@ -35,17 +35,27 @@ class LLMClient:
                     "aws_secret_access_key": Config.AWS_SECRET_ACCESS_KEY,
                 }
 
+            # Configure retry strategy for throttling
+            from botocore.config import Config as BotocoreConfig
+            retry_config = BotocoreConfig(
+                retries={
+                    'max_attempts': 10,  # Increase from default 4 to 10
+                    'mode': 'adaptive'   # Use adaptive retry mode for better throttling handling
+                }
+            )
+
             self.llm = ChatBedrockConverse(
                 model=Config.BEDROCK_MODEL,
                 region_name=Config.BEDROCK_REGION,
                 temperature=0.0,
                 credentials_profile_name=None,  # Use default credentials if not explicitly provided
+                config=retry_config,
                 **credentials
             )
         else:
             raise ValueError(f"Unsupported LLM provider: {Config.LLM_PROVIDER}")
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=2, max=30))
     def generate_structured(self, prompt: str, output_model: Type[T], system_message: Optional[str] = None) -> T:
         """Generate structured output using Pydantic model.
 
@@ -74,7 +84,7 @@ class LLMClient:
         response = self.llm.invoke(messages)
         return parser.parse(response.content)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=2, max=30))
     def generate_text(self, prompt: str, system_message: Optional[str] = None) -> str:
         """Generate text output.
 
