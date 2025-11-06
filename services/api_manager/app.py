@@ -10,7 +10,6 @@ from flask import Flask, jsonify, request, send_file
 
 from api_manager.exceptions.base_api_exception import APIException
 from api_manager.exceptions.invalid_parameter_exception import InvalidParameterException
-from api_manager.exceptions.validation_exception import ValidationException, FileValidationException
 from api_manager.handlers.consume_simulation_output_handler import (
     ConsumeSimulationOutputHandler,
 )
@@ -19,7 +18,6 @@ from api_manager.handlers.describe_simulation_handler import DescribeSimulationH
 from api_manager.handlers.simulation_handler import SimulationHandler
 from api_manager.handlers.train_handler import TrainHandler
 from api_manager.utils.file_io import bootstrap_radp_filesystem, save_input_file
-from api_manager.validators.file_validator import UploadedFileValidator
 
 from radp.common import constants
 from radp.common.enums import InputFileType
@@ -39,19 +37,6 @@ def handle_exception(e):
     """Return custom JSON when an APIException (sub)class"""
     response = {"status_code": e.code, "error": e.message}
     return jsonify(response), e.code
-
-
-# add validation exception handler for detailed validation errors
-@app.errorhandler(ValidationException)
-def handle_validation_exception(e):
-    """Return detailed JSON for validation errors"""
-    return jsonify(e.to_dict()), e.code
-
-
-@app.errorhandler(FileValidationException)
-def handle_file_validation_exception(e):
-    """Return detailed JSON for file validation errors"""
-    return jsonify(e.to_dict()), e.code
 
 
 # add 500 exception handler to return formatted json to client
@@ -87,27 +72,6 @@ def train():
             f"Invalid request, missing file input '{constants.REQUEST_TOPOLOGY_FILE_KEY}'"
         )
 
-    # Validate uploaded files
-    UploadedFileValidator.validate_uploaded_file(
-        request.files[constants.REQUEST_PAYLOAD_FILE_KEY], ".json"
-    )
-    UploadedFileValidator.validate_uploaded_file(
-        request.files[constants.REQUEST_UE_TRAINING_DATA_FILE_KEY], ".csv"
-    )
-    UploadedFileValidator.validate_uploaded_file(
-        request.files[constants.REQUEST_TOPOLOGY_FILE_KEY], ".csv"
-    )
-
-    # Validate CSV structure before processing
-    UploadedFileValidator.validate_csv_structure(
-        request.files[constants.REQUEST_UE_TRAINING_DATA_FILE_KEY],
-        ["cell_id", "avg_rsrp", "lon", "lat", "cell_el_deg"]
-    )
-    UploadedFileValidator.validate_csv_structure(
-        request.files[constants.REQUEST_TOPOLOGY_FILE_KEY],
-        ["cell_lat", "cell_lon", "cell_id", "cell_az_deg", "cell_carrier_freq_mhz"]
-    )
-
     payload = json.load(request.files[constants.REQUEST_PAYLOAD_FILE_KEY])
 
     # save training files to filesystem
@@ -140,38 +104,18 @@ def simulation():
         raise InvalidParameterException(
             f"Invalid request, missing file input '{constants.REQUEST_PAYLOAD_FILE_KEY}'"
         )
-    
-    # Validate payload file
-    UploadedFileValidator.validate_uploaded_file(
-        request.files[constants.REQUEST_PAYLOAD_FILE_KEY], ".json"
-    )
-    
     payload = json.load(request.files[constants.REQUEST_PAYLOAD_FILE_KEY])
 
     # store and pass whatever files are provided
     files = {}
 
-    # check if UE data or config files provided and validate them
+    # check if UE data or config files provided
     if constants.REQUEST_UE_DATA_FILE_KEY in request.files:
-        UploadedFileValidator.validate_uploaded_file(
-            request.files[constants.REQUEST_UE_DATA_FILE_KEY], ".csv"
-        )
-        UploadedFileValidator.validate_csv_structure(
-            request.files[constants.REQUEST_UE_DATA_FILE_KEY],
-            ["mock_ue_id", "lon", "lat", "tick"]
-        )
         files[constants.UE_DATA_FILE_PATH_KEY] = save_input_file(
             input_file_type=InputFileType.UE_DATA,
             file_storage=request.files[constants.REQUEST_UE_DATA_FILE_KEY],
         )
     if constants.REQUEST_CONFIG_FILE_KEY in request.files:
-        UploadedFileValidator.validate_uploaded_file(
-            request.files[constants.REQUEST_CONFIG_FILE_KEY], ".csv"
-        )
-        UploadedFileValidator.validate_csv_structure(
-            request.files[constants.REQUEST_CONFIG_FILE_KEY],
-            ["cell_id", "cell_el_deg"]
-        )
         files[constants.CONFIG_FILE_PATH_KEY] = save_input_file(
             input_file_type=InputFileType.CONFIG,
             file_storage=request.files[constants.REQUEST_CONFIG_FILE_KEY],

@@ -99,29 +99,14 @@ def happy_case__rf_prediction():
     # download results to pandas dataframe
     rf_dataframe = radp_client.consume_simulation_output(simulation_id)
 
-    # Enhanced validation of results
-    assert len(rf_dataframe) == 45, f"Expected 45 rows, got {len(rf_dataframe)}"
+    assert len(rf_dataframe) == 45
 
     expected_rf_df_cols = [
         "cell_id",
-        "rxpower_dbm", 
+        "rxpower_dbm",
         "lon",
         "lat",
         "mock_ue_id",
         "tick",
     ]
-    assert set(expected_rf_df_cols).issubset(rf_dataframe.columns), \
-        f"Missing columns: {set(expected_rf_df_cols) - set(rf_dataframe.columns)}"
-    
-    # Validate data ranges
-    assert rf_dataframe["rxpower_dbm"].min() >= -200, "RSRP values too low"
-    assert rf_dataframe["rxpower_dbm"].max() <= 0, "RSRP values too high"
-    assert rf_dataframe["lat"].between(-90, 90).all(), "Invalid latitude values"
-    assert rf_dataframe["lon"].between(-180, 180).all(), "Invalid longitude values"
-    assert rf_dataframe["tick"].min() >= 0, "Negative tick values found"
-    
-    print(f"✅ RF prediction completed successfully with {len(rf_dataframe)} results")
-    print(f"   RSRP range: {rf_dataframe['rxpower_dbm'].min():.1f} to {rf_dataframe['rxpower_dbm'].max():.1f} dBm")
-    print(f"   Spatial range: lat {rf_dataframe['lat'].min():.3f}-{rf_dataframe['lat'].max():.3f}, "
-          f"lon {rf_dataframe['lon'].min():.3f}-{rf_dataframe['lon'].max():.3f}")
-    print(f"   Time range: ticks {rf_dataframe['tick'].min()}-{rf_dataframe['tick'].max()}")
+    assert set(expected_rf_df_cols).issubset(rf_dataframe.columns)

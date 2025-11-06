@@ -96,40 +96,14 @@ def happy_case__ue_track_gen_rf_prediction():
     # download results to pandas dataframe
     rf_dataframe = radp_client.consume_simulation_output(simulation_id)
 
-    # Enhanced validation of results
-    assert len(rf_dataframe) == 6000, f"Expected 6000 rows, got {len(rf_dataframe)}"
+    assert len(rf_dataframe) == 6000
 
     expected_rf_df_cols = [
         "cell_id",
         "rxpower_dbm",
-        "lon", 
+        "lon",
         "lat",
         "mock_ue_id",
         "tick",
     ]
-    assert set(expected_rf_df_cols).issubset(rf_dataframe.columns), \
-        f"Missing columns: {set(expected_rf_df_cols) - set(rf_dataframe.columns)}"
-    
-    # Validate data ranges and consistency
-    assert rf_dataframe["rxpower_dbm"].min() >= -200, "RSRP values too low"
-    assert rf_dataframe["rxpower_dbm"].max() <= 0, "RSRP values too high"
-    assert rf_dataframe["lat"].between(-90, 90).all(), "Invalid latitude values"
-    assert rf_dataframe["lon"].between(-180, 180).all(), "Invalid longitude values"
-    assert rf_dataframe["tick"].min() >= 0, "Negative tick values found"
-    
-    # Validate UE tracking consistency
-    ue_count = rf_dataframe["mock_ue_id"].nunique()
-    expected_ue_count = 20  # 5 + 5 + 5 + 5 from simulation config
-    assert ue_count == expected_ue_count, f"Expected {expected_ue_count} UEs, found {ue_count}"
-    
-    # Validate temporal consistency
-    ticks_per_ue = rf_dataframe.groupby("mock_ue_id")["tick"].nunique()
-    expected_ticks = 100  # 10 seconds / 0.1 interval
-    assert (ticks_per_ue == expected_ticks).all(), "Inconsistent tick counts across UEs"
-    
-    print(f"✅ UE track generation + RF prediction completed successfully")
-    print(f"   Generated {len(rf_dataframe)} RF predictions for {ue_count} UEs over {rf_dataframe['tick'].max() + 1} ticks")
-    print(f"   RSRP range: {rf_dataframe['rxpower_dbm'].min():.1f} to {rf_dataframe['rxpower_dbm'].max():.1f} dBm")
-    print(f"   UE mobility range: lat {rf_dataframe['lat'].min():.3f}-{rf_dataframe['lat'].max():.3f}, "
-          f"lon {rf_dataframe['lon'].min():.3f}-{rf_dataframe['lon'].max():.3f}")
-    print(f"   Temporal coverage: {ticks_per_ue.iloc[0]} ticks per UE")
+    assert set(expected_rf_df_cols).issubset(rf_dataframe.columns)

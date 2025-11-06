@@ -6,8 +6,5 @@
 
 class APIException(Exception):
     """All custom API Exceptions"""
-    
-    def __init__(self, message: str = ""):
-        super().__init__(message)
-        self.message = message
-        self.code = 500  # Default error code
+
+    pass

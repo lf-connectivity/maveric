@@ -18,7 +18,6 @@ from api_manager.dtos.responses.simulation_response import SimulationResponse
 from api_manager.preprocessors.simulation_request_preprocessor import (
     RICSimulationRequestPreprocessor,
 )
-from api_manager.validators.simulation_validator import SimulationRequestValidator
 from confluent_kafka import Producer
 
 from radp.common import constants
@@ -32,17 +31,29 @@ class SimulationHandler:
     """The API handler for starting a new RIC Simulation"""
 
     def __init__(self):
-        """Initialize kafka producer and validator"""
+        """Initialize kafka producer"""
         self.producer = Producer(kafka_producer_config)
-        self.validator = SimulationRequestValidator()
 
     def handle_simulation_request(self, request: Dict, files: Dict) -> Dict:
         """Handle simulation request"""
 
-        # VALIDATION - Comprehensive validation using new validation system
-        self.validator.validate(request)
-        if files:
-            self.validator.validate_simulation_files(files)
+        # VALIDATION
+        # TODO: implement simulation request format validation!
+        # This should just make sure that correct syntax of request is passed in
+
+        # TODO: implement deep validation of simulation event!
+        # This validation will involve logical validation of simulation stages requested
+        # and ensure that the request is serviceable within the simulation pipeline.
+        # For example, check that the RF Digital Twin model referenced actually exists.
+
+        # If the user has inputted their own data, check that the required columns are
+        # present given their specified starting stage
+
+        # If the user has inputted their own data, ensure they have supplied both a
+        # ue data file and a config file
+
+        # Set and check limit on the total tick count of simulation. Make sure
+        # a user is not making too large of a simlulation request
 
         # PREPROCESSING
 

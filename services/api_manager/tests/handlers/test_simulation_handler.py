@@ -26,10 +26,8 @@ class TestDescribeSimulationHandler(TestCase):
     @patch("api_manager.handlers.simulation_handler.RADPFileSystemHelper")
     @patch("api_manager.handlers.simulation_handler.os")
     @patch("api_manager.handlers.simulation_handler.produce_object_to_kafka_topic")
-    @patch("api_manager.handlers.simulation_handler.SimulationRequestValidator")
     def test_handle_simulation_request(
         self,
-        mock_validator_class,
         mock_produce,
         mock_os,
         mock_file_system_helper,
@@ -38,10 +36,6 @@ class TestDescribeSimulationHandler(TestCase):
     ):
         mock_producer_instance = MagicMock
         mock_producer.return_value = mock_producer_instance
-        
-        # Mock validator
-        mock_validator_instance = MagicMock()
-        mock_validator_class.return_value = mock_validator_instance
 
         mock_produce.return_value = "dummy_job_id"
         mock_preprocessor.preprocess.return_value = {

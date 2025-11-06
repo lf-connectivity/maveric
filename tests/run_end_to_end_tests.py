@@ -12,7 +12,6 @@ from happy_case_tests.happy_rf_prediction import happy_case__rf_prediction
 from happy_case_tests.happy_ue_track_gen_rf_prediction import (
     happy_case__ue_track_gen_rf_prediction,
 )
-from unhappy_case_tests.unhappy_invalid_requests import unhappy_case__invalid_requests
 
 # Create the Logger
 logger = logging.getLogger(__name__)
@@ -28,11 +27,7 @@ logger.propagate = False
 
 
 # add new integration tests to this list
-tests = [
-    happy_case__rf_prediction, 
-    happy_case__ue_track_gen_rf_prediction,
-    unhappy_case__invalid_requests
-]
+tests = [happy_case__rf_prediction, happy_case__ue_track_gen_rf_prediction]
 
 delay_for_service_startup = "--delayed-start" in sys.argv
 
