@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import rasterio.features
 from dotenv import load_dotenv
 from rasterio.transform import Affine
@@ -25,7 +26,7 @@ from radp.digital_twin.mobility.mobility import gauss_markov
 from radp.digital_twin.mobility.ue_tracks import UETracksGenerator
 from radp.digital_twin.mobility.ue_tracks_params import UETracksGenerationParams
 from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin, NormMethod
-from radp.digital_twin.utils.constants import RLF_THRESHOLD, TXPWR_DBM
+from radp.digital_twin.utils.constants import BOUNDS_PADDING, RLF_THRESHOLD, TXPWR_DBM
 from radp.digital_twin.utils.gis_tools import GISTools
 
 Boundary = Union[geometry.Polygon, geometry.MultiPolygon]
@@ -39,11 +40,14 @@ FFMPEG_PATH = os.environ.get("FFMPEG_PATH", None)
 
 
 def _kml_obj_to_string(kml_obj: fastkml.KML) -> bytes:
+    """
+    Convert a FastKML object to its string representation.
+    Args:
+        kml_obj: A FastKML object to convert.
+    Returns:
+        Byte-encoded string representation of the KML object in UTF-8 format.
+    """
     kml_str = kml_obj.to_string(prettyprint=False).replace("kml:", "")
-    """
-    Converts a FastKML object to its string representation.
-    @return str: string representation of the KML object
-    """
     # Encode to 'utf-8' to eliminate unicode code points
     return kml_str.encode()
 
@@ -235,8 +239,7 @@ def get_percell_data(
     """
     Prediction dataframe cleanup
     Dataframe should contain ['cell_id', 'log_distance', 'relative_bearing', 'cell_rxpwr_dbm'] cloumns.
-    
-    
+
     +---------+--------------+------------------+----------------+
     | cell_id | log_distance | relative_bearing | cell_rxpwr_dbm |
     +=========+==============+==================+================+
@@ -247,7 +250,7 @@ def get_percell_data(
     |   2     | 102.36       | 33.91            | -72.0          |
     |   3     | 102.08       | 33.83            | -78.7          |
     +---------+--------------+------------------+----------------+
-    
+
     """
     data_out = []
     data_stats = []
@@ -440,7 +443,7 @@ def find_closest(data_df: pd.DataFrame, lat: float, lon: float) -> Optional[int]
     @param lat: Latitude of the target point.
     @param lon: Longitude of the target point.
     @returns: The index of the closest point if the minimum distance is less than 100, otherwise None.
-   
+
     +------------+------------+
     |  loc_x     |  loc_y     |
     +============+============+
@@ -450,7 +453,7 @@ def find_closest(data_df: pd.DataFrame, lat: float, lon: float) -> Optional[int]
     |  90.420000 | 23.820000  |
     |  90.405000 | 23.800000  |
     +------------+------------+
-    
+
     """
     dist = data_df.apply(lambda row: GISTools.dist((row.loc_y, row.loc_x), (lat, lon)), axis=1)
     if dist.min() < 100:
@@ -472,7 +475,7 @@ def get_track_samples(
     @param num_UEs: Number of user equipment (UE) tracks to simulate.
     @param ticks: Number of time steps to simulate for the mobility model.
     @returns: A DataFrame containing the sampled track points mapped to the closest points in the input dataset.
-    
+
     +------------+------------+
     |  loc_x     |  loc_y     |
     +============+============+
@@ -543,8 +546,47 @@ def bdt(
     num_UEs=10,
     ticks=100,
 ):
-    """
-    Train and test Bayesian Digital Twins (BDT) for cellular network data.
+    """Train and test Bayesian Digital Twins (BDT) for cellular network data.
+
+    This function trains Bayesian Digital Twin models for each cell in a cellular network
+    using simulation data, then evaluates the models on test data. It supports various
+    training configurations including sample selection strategies, filtering thresholds,
+    and optional track-based sampling.
+
+    Args:
+        sim_idx_folders: List of folder paths containing simulation data for different scenarios.
+        bucket_path: Base path to the data bucket.
+        sim_data_path: Path to simulation data within the bucket.
+        test_idx: Index of the simulation folder to use as test data (zero-indexed).
+        p_train: Percentage of samples to use for training per cell. Defaults to 20.
+        p_test: Percentage of samples to use for testing per cell. Defaults to 100.
+        maxiter: Maximum number of training iterations for the BDT models. Defaults to 20.
+        plot_loss_vs_iter: If True, plots the loss versus iterations during training.
+            Defaults to False.
+        cmap: Colormap name for visualizations. Defaults to 'PuBuGn'.
+        choose_strongest_samples_percell: If True, selects samples with strongest signal
+            per cell instead of random sampling. Defaults to False.
+        include_test_in_training: If True, includes test data in the training set.
+            Defaults to False.
+        filter_out_samples_dbm_threshold: Minimum signal strength threshold in dBm.
+            Samples below this threshold are filtered out. Defaults to -inf (no filtering).
+        filter_out_samples_kms_threshold: Maximum distance threshold in kilometers.
+            Samples beyond this distance are filtered out. Defaults to inf (no filtering).
+        track_sampling: If True, uses track-based sampling instead of random sampling.
+            Defaults to False.
+        num_UEs: Number of user equipment tracks to generate when track_sampling is True.
+            Defaults to 10.
+        ticks: Number of time ticks for track generation when track_sampling is True.
+            Defaults to 100.
+
+    Returns:
+        tuple: A tuple containing:
+            - lats (np.ndarray): Latitude coordinates of test samples
+            - lons (np.ndarray): Longitude coordinates of test samples
+            - true_rsrp (np.ndarray): True RSRP values from test data
+            - pred_rsrp (np.ndarray): Predicted RSRP values from BDT models
+            - MAE (float): Mean Absolute Error of predictions
+            - Percentile85Error (float): 85th percentile of absolute errors
     """
     site_config_path = sim_idx_folders[0] + "/site_config.csv"
     site_config_df = pd.read_csv(f"/{bucket_path}/{sim_data_path}/{site_config_path}")
@@ -893,8 +935,30 @@ def animate_predictions(
     filename,
     cmap="PuBuGn",
 ):
-    """ "
-    Create an animation visualizing true and predicted RSRP values over geographical coordinates.
+    """Create an animation visualizing true and predicted RSRP values over geographical coordinates.
+
+    This function generates a side-by-side animated comparison of true RSRP values and
+    predicted RSRP values from Bayesian Digital Twin models. The animation shows how
+    predictions evolve across different training iterations and training percentages.
+
+    Args:
+        lats: Array of latitude coordinates for sample points.
+        lons: Array of longitude coordinates for sample points.
+        true_rsrp: Array of true RSRP (Reference Signal Received Power) values.
+        pred_rsrp_list: List of predicted RSRP arrays, one for each animation frame.
+        MAE_list: List of Mean Absolute Error values for each frame.
+        Percentile85Error_list: List of 85th percentile error values for each frame.
+        maxiter_list: List of maximum iteration values used for each frame.
+        p_train_list: List of training percentage values used for each frame.
+        filename: Output filename for the animation video.
+        cmap: Matplotlib colormap name for visualization. Defaults to 'PuBuGn'.
+
+    Returns:
+        None. Saves animation to the specified filename if FFMPEG_PATH is configured.
+
+    Note:
+        Requires FFMPEG to be installed and FFMPEG_PATH environment variable to be set.
+        If FFMPEG_PATH is not configured, the function returns without creating animation.
     """
     if not FFMPEG_PATH:
         print("Please provide ffmpeg path to create animation")
@@ -910,6 +974,14 @@ def animate_predictions(
     plt.show()
 
     def _init_plt(axs):
+        """Initialize the plot axes with titles and formatting.
+
+        Args:
+            axs: Array of matplotlib axes objects to configure.
+
+        Returns:
+            Tuple of scatter plot artists for true and predicted RSRP.
+        """
         axs[0].set_title(
             r"Actual RSRP",
             fontsize=12,
@@ -980,12 +1052,25 @@ def rfco_to_best_server_shapes(
     min_lon: float,
     step: float,
 ) -> List[Tuple[Dict[str, Any], float]]:
-    """
-    Vectorize the RFCoverageObject coverage areas, based on signal power source raster.
+    """Vectorize RF coverage areas based on signal power source raster.
 
-    For each site (int in spwr_src_raster), create a geojson-like dict of geometries and
-    the value associated with them in spwr_src_raster. Return a list with one dict+value
-    per site.
+    Converts a raster representation of RF coverage into vector geometries. For each
+    cell site (represented as an integer value in the raster), this creates a GeoJSON-like
+    dictionary of geometries with their associated signal power values.
+
+    Args:
+        spwr_src_raster: 2D numpy array where each integer value represents a different
+            cell site's coverage area.
+        min_lat: Minimum latitude coordinate of the raster's bounding box.
+        min_lon: Minimum longitude coordinate of the raster's bounding box.
+        step: Spatial resolution step size in degrees for the raster grid.
+
+    Returns:
+        List of tuples, where each tuple contains:
+            - Dict[str, Any]: GeoJSON-like geometry dictionary describing coverage area
+            - float: Cell site identifier value from the raster
+
+        The list is sorted by site identifier values.
     """
     # transform like GDAL GeoTransform
     tf = Affine.from_gdal(min_lon, 0, step, min_lat, step, 0)
@@ -1051,8 +1136,24 @@ def get_ue_data(params: dict) -> pd.DataFrame:
 
 
 def calculate_received_power(distance_km: float, frequency_mhz: int) -> float:
-    """
-    Calculate received power using the Free-Space Path Loss (FSPL) model.
+    """Calculate received power using the Free-Space Path Loss (FSPL) model.
+
+    Computes the received signal power at a given distance from the transmitter
+    using the Free-Space Path Loss propagation model. The FSPL formula accounts
+    for signal attenuation due to distance and frequency.
+
+    The FSPL formula used is:
+        FSPL(dB) = 20*log10(distance_m) + 20*log10(frequency_mhz) - 27.55
+
+    Args:
+        distance_km: Distance from transmitter to receiver in kilometers.
+        frequency_mhz: Carrier frequency in megahertz.
+
+    Returns:
+        Received power in dBm, calculated as:
+            received_power_dbm = TXPWR_DBM - FSPL(dB)
+
+        where TXPWR_DBM is the transmit power constant.
     """
     # Convert distance from kilometers to meters
     distance_m = distance_km * 1000
@@ -1068,7 +1169,7 @@ def calculate_received_power(distance_km: float, frequency_mhz: int) -> float:
 def plot_ue_tracks(df: pd.DataFrame) -> None:
     """
     Plots the movement tracks of unique UE IDs on a grid of subplots.
-    
+
     +-------------+------+-----------+------------+
     | mock_ue_id  | tick |   lat     |    lon     |
     +=============+======+===========+============+
@@ -1159,7 +1260,7 @@ def plot_ue_tracks(df: pd.DataFrame) -> None:
 def plot_ue_tracks_side_by_side(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
     """
     Plots the movement tracks of unique UE IDs from two DataFrames side by side.
-    
+
     df1:
     +-------------+-----------+------------+
     | mock_ue_id  |   lat     |    lon     |
@@ -1169,8 +1270,9 @@ def plot_ue_tracks_side_by_side(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
     |     3       | 23.8110   | 90.4120    |
     |     4       | 23.8115   | 90.4130    |
     +-------------+-----------+------------+
-    
-    df2: 
+
+    df2:
+
     +-------------+-----------+------------+
     | mock_ue_id  |   lat     |    lon     |
     +=============+===========+============+
@@ -1198,7 +1300,7 @@ def plot_ue_tracks_side_by_side(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
 def plot_ue_tracks_on_axis(df: pd.DataFrame, ax, title: str) -> None:
     """
     Helper function to plot UE tracks on a given axis.
-    
+
     +-------------+-----------+------------+
     | mock_ue_id  |   lat     |    lon     |
     +=============+===========+============+
@@ -1210,7 +1312,6 @@ def plot_ue_tracks_on_axis(df: pd.DataFrame, ax, title: str) -> None:
     |     2       | 23.8130   | 90.4150    |
     +-------------+-----------+------------+
 
-    
     """
     data = df
     unique_ids = data["mock_ue_id"].unique()
@@ -1251,13 +1352,14 @@ def plot_ue_tracks_on_axis(df: pd.DataFrame, ax, title: str) -> None:
 # Scatter plot of the Cell towers and UE Locations
 
 
-def mro_plot_scatter(df: pd.DataFrame, topology: pd.DataFrame) -> None:
+def mro_plot_scatter(df: pd.DataFrame, topology: pd.DataFrame, save_path: str) -> None:
     """
-    Plot a scatter plot of cell towers and UE (User Equipment) locations.
+    Plot a scatter plot of cell towers and UE (User Equipment) locations and saves to file.
     @param df: DataFrame containing UE data with columns 'loc_x', 'loc_y', 'cell_id', and 'sinr_db'.
     @param topology: DataFrame containing cell tower data with columns 'cell_lon', 'cell_lat', and 'cell_id'.
-    @returns: None. Displays a scatter plot with cell towers and UE locations.
-    
+    @param save_path: File path where the plot will be saved (e.g., '/path/to/plot.png').
+    @returns: None. Saves a scatter plot with cell towers and UE locations.
+
     df:
     +---------+--------+--------+----------+
     | cell_id | loc_x  | loc_y  | sinr_db  |
@@ -1283,28 +1385,48 @@ def mro_plot_scatter(df: pd.DataFrame, topology: pd.DataFrame) -> None:
 
     plt.scatter([], [], color="grey", label="RLF")
 
-    # Define color mapping based on cell_id for both cells and UEs
-    color_map = {1: "red", 2: "green", 3: "blue"}
+    # Define color mapping based on cell_id for both cells and UEs (dynamic)
+    # Get all unique cell_ids from both dataframes
+    all_cell_ids = pd.concat([topology["cell_id"], df["cell_id"]]).unique()
 
-    # Plot cell towers from the topology dataframe with 'X' markers and corresponding colors
-    for _, row in topology.iterrows():
-        color = color_map.get(row["cell_id"], "black")  # Default to black if unknown cell_id
-        plt.scatter(
-            row["cell_lon"],
-            row["cell_lat"],
-            marker="x",
-            color=color,
-            s=200,
-            label=f"Cell {row['cell_id']}",
-        )
+    # Create base colors mapping - handle both int and string cell_ids
+    base_colors = {}
+    color_list = ["red", "green", "blue"]
+    for i, color in enumerate(color_list, start=1):
+        # Add both integer and string versions to handle different formats
+        base_colors[i] = color
+        base_colors[f"cell_{i}"] = color
+
+    # Find cell_ids that don't have colors yet
+    missing_ids = [cid for cid in all_cell_ids if cid not in base_colors]
+    extra_colors = cm.get_cmap("tab10", len(missing_ids))
+    dynamic_colors = {cid: extra_colors(i) for i, cid in enumerate(missing_ids)}
+    color_map = {**base_colors, **dynamic_colors}
 
     # Plot UEs from df without labels but with the same color coding
+    # Plot UEs first with lower zorder so they appear underneath cell towers
     for _, row in df.iterrows():
         color = color_map.get(row["cell_id"], "black")  # Default to black if unknown cell_id
         if row["sinr_db"] < RLF_THRESHOLD:  # REMOVE COMMENT WHEN sinr_db IS FIXED
             color = "grey"  # Change to grey if sinr_db < 2
 
-        plt.scatter(row["loc_x"], row["loc_y"], color=color)
+        plt.scatter(row["loc_x"], row["loc_y"], color=color, zorder=1)
+
+    # Plot cell towers from the topology dataframe with triangle markers and corresponding colors
+    # Plot cell towers with higher zorder so they appear on top
+    for _, row in topology.iterrows():
+        color = color_map.get(row["cell_id"], "black")  # Default to black if unknown cell_id
+        plt.scatter(
+            row["cell_lon"],
+            row["cell_lat"],
+            marker="^",
+            color=color,
+            s=200,
+            label=f"Cell {row['cell_id']}",
+            zorder=2,
+            edgecolors="black",
+            linewidths=1.5,
+        )
 
     # Add labels and title
     plt.xlabel("Longitude (loc_x)")
@@ -1316,14 +1438,17 @@ def mro_plot_scatter(df: pd.DataFrame, topology: pd.DataFrame) -> None:
     by_label = dict(zip(labels, handles))
     plt.legend(by_label.values(), by_label.keys())
 
-    # Show the plot
+    # Save the plot
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.savefig(save_path, dpi=300, bbox_inches="tight")
     plt.show()
+    plt.close()
 
 
 def get_ues_cells_cartesian_df(data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFrame:
     """
     returns a cartesian dataframe of UE and cell data
-    
+
     df:
     +---------+-----------+------------+----------+
     |  ue_id  | latitude  | longitude  |   tick   |
@@ -1358,7 +1483,7 @@ def get_ues_cells_cartesian_df(data: pd.DataFrame, topology: pd.DataFrame) -> pd
 def calc_log_distance(cartesian_df: pd.DataFrame) -> pd.DataFrame:
     """
     adds a log distance column to the cartesian dataframe based on the lat/lon of the UE and cell
-    
+
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
     | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
     +========+==========+===========+======+=========+==========+==========+==============+========================+
@@ -1378,18 +1503,24 @@ def calc_log_distance(cartesian_df: pd.DataFrame) -> pd.DataFrame:
 
 def calc_rx_power(cartesian_df: pd.DataFrame) -> pd.DataFrame:
     """
-    adds a cell_rxpwr_dbm column to the cartesian dataframe,
-    based on the log distance and cell frequency using fspl
-    
-    
-    +--------+----------+-----------+------+---------+----------+----------+--------------+--------------+------------------------+
-    | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  | log_distance |
-    +========+==========+===========+======+=========+==========+==========+==============+========================+==============+
-    |   0    | 90.412   | 23.810    |  0   |    1    | 90.410   | 23.809   |     120       |        1800           |   -2.546     |
-    |   1    | 90.413   | 23.811    |  0   |    1    | 90.414   | 23.810   |     120       |        1800           |   -2.850     |
-    |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240       |        2100           |   -2.268     |
-    |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240       |        2100           |   -2.547     |
-    +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+--------------+
+        adds a cell_rxpwr_dbm column to the cartesian dataframe,
+        based on the log distance and cell frequency using fspl
+
+    +--------+----------+-----------+------+---------+----------+----------+--------------+--------------+
+    | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier |
+    |        |          |           |      |         |          |          |              | _freq_mhz   |
+    |        |          |           |      |         |          |          |              | log_distance |
+    +========+==========+===========+======+=========+==========+==========+==============+==============+
+    |   0    | 90.412   | 23.810    |  0   |    1    | 90.410   | 23.809   |     120       |        1800  |
+    |        |          |           |      |         |          |          |              |   -2.546     |
+    |   1    | 90.413   | 23.811    |  0   |    1    | 90.414   | 23.810   |     120       |        1800  |
+    |        |          |           |      |         |          |          |              |   -2.850     |
+    |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240       |        2100  |
+    |        |          |           |      |         |          |          |              |   -2.268     |
+    |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240       |        2100  |
+    |        |          |           |      |         |          |          |              |   -2.547     |
+    +--------+----------+-----------+------+---------+----------+----------+--------------+--------------+
+
 
     """
     cartesian_df["cell_rxpwr_dbm"] = cartesian_df.apply(
@@ -1403,7 +1534,7 @@ def calc_relative_bearing(cartesian_df: pd.DataFrame) -> pd.DataFrame:
     """
     adds a relative_bearing column to the cartesian dataframe,
     based on the lat/lon of the UE and cell and az_deg of the cell
-    
+
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
     | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
     +========+==========+===========+======+=========+==========+==========+==============+========================+
@@ -1412,7 +1543,7 @@ def calc_relative_bearing(cartesian_df: pd.DataFrame) -> pd.DataFrame:
     |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240      |         2100           |
     |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240      |         2100           |
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
-    
+
     """
     cartesian_df["relative_bearing"] = cartesian_df.apply(
         lambda row: GISTools.get_relative_bearing(
@@ -1430,8 +1561,9 @@ def calc_relative_bearing(cartesian_df: pd.DataFrame) -> pd.DataFrame:
 def preprocess_ue_data(data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFrame:
     """
     creates a cartesian dataframe of UE and cell data, adds log distance and rx power columns
-    
+
     df:
+
     +---------+-----------+------------+----------+
     |  ue_id  | latitude  | longitude  |   tick   |
     +=========+===========+============+==========+
@@ -1442,6 +1574,7 @@ def preprocess_ue_data(data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFra
     +---------+-----------+------------+----------+
 
     topology:
+
     +---------+----------+----------+--------------+------------------------+
     | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
     +=========+==========+==========+==============+========================+
@@ -1458,7 +1591,7 @@ def preprocess_ue_data(data: pd.DataFrame, topology: pd.DataFrame) -> pd.DataFra
 def normalize_cell_ids(df: pd.DataFrame) -> pd.DataFrame:
     """
     Normalizes the 'cell_id' column in the DataFrame by ensuring all IDs follow the 'cell_<integer>' format.
-    
+
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
     | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
     +========+==========+===========+======+=========+==========+==========+==============+========================+
@@ -1467,7 +1600,7 @@ def normalize_cell_ids(df: pd.DataFrame) -> pd.DataFrame:
     |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240      |         2100           |
     |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240      |         2100           |
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
-    
+
     """
 
     df = df.copy()
@@ -1478,7 +1611,7 @@ def normalize_cell_ids(df: pd.DataFrame) -> pd.DataFrame:
 def check_cartesian_format(df: pd.DataFrame, topology: pd.DataFrame) -> bool:
     """
     Validates that the DataFrame has the expected cartesian format for cell IDs per pixel.
-    
+
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
     | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
     +========+==========+===========+======+=========+==========+==========+==============+========================+
@@ -1487,7 +1620,7 @@ def check_cartesian_format(df: pd.DataFrame, topology: pd.DataFrame) -> bool:
     |   0    | 90.415   | 23.812    |  1   |    2    | 90.410   | 23.809   |     240      |         2100           |
     |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240      |         2100           |
     +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
-    
+
     """
     expected_cells = list(topology["cell_id"])
     expected_cell_set = set(expected_cells)
@@ -1552,7 +1685,7 @@ def add_cell_info(new_data_with_rx_data: pd.DataFrame, topology: pd.DataFrame) -
     to the DataFrame based on cell_id.
 
     Converts integer cell_id to string format like 'cell_1' to match topology.
-    
+
     df:
     +---------+-----------+------------+----------+----------------+
     | ue_id   | latitude  | longitude  | tick     | cell_rxpwr_dbm |
@@ -1571,7 +1704,6 @@ def add_cell_info(new_data_with_rx_data: pd.DataFrame, topology: pd.DataFrame) -
     |    2    | 90.414   | 23.810   |     240      |         2100           |
     +---------+----------+----------+--------------+------------------------+
 
-    
     """
     # Convert int to str format matching topology: 'cell_1', 'cell_2', etc.
     if new_data_with_rx_data["cell_id"].dtype == int:
@@ -1587,21 +1719,36 @@ def add_cell_info(new_data_with_rx_data: pd.DataFrame, topology: pd.DataFrame) -
     return new_data_topology_merged
 
 
-def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
+def plot_sinr_db_by_ue(
+    connected_df: pd.DataFrame,
+    full_df: pd.DataFrame,
+    ue_ids: Optional[List[int]] = None,
+    figsize: Tuple[int, int] = (1200, 700),
+) -> go.Figure:
     """
-    Plots SINR (in dB) over ticks for a specific ue_id.
+    Interactive Plotly visualization of SINR (in dB) over ticks with dropdown to select UEs.
 
-    - Solid bold line: Connected cell_id (from df), color-coded.
-    - Dotted lines: All cell_id sinr_db values from df2 for context.
-    - RLF events: Drop to bottom with bold black line.
+    - Solid bold line: Connected cell_id (from connected_df), color-coded.
+    - Dotted lines: All cell_id sinr_db values from full_df for context.
+    - RLF events: Drop to bottom with bold markers.
     - RLF_THRESHOLD: Horizontal dashed line.
 
     Parameters:
-    df (pd.DataFrame): Connected cell data: 'ue_id', 'tick', 'sinr_db', 'cell_id' (or 'RLF').
-    df2 (pd.DataFrame): All candidate cell data: 'ue_id', 'tick', 'cell_id', 'sinr_db'.
-    topology (pd.DataFrame): Not used.
-    ue_id (int): UE to plot.
-    
+        connected_df (pd.DataFrame): Connected cell data: 'ue_id', 'tick', 'sinr_db', 'cell_id' (or 'RLF').
+        full_df (pd.DataFrame): All candidate cell data: 'ue_id', 'tick', 'cell_id', 'sinr_db'.
+        ue_ids (Optional[List[int]]): List of UE IDs to include. If None, includes all UEs.
+        figsize (Tuple[int, int]): Figure size as (width, height) tuple in pixels.
+        rlf_threshold (float): RLF threshold value in dB.
+
+    Returns:
+        go.Figure: Plotly Figure object with interactive UE dropdown selector.
+
+    Example:
+        >>> fig = plot_sinr_db_by_ue(df_connected, df_all_candidates, ue_ids=[0, 1, 2])
+        >>> fig.show()  # Display in notebook
+        >>> fig.write_html('sinr_plot.html')  # Save to file
+
+    Data format:
     +--------+------+----------+----------+
     | ue_id  | tick | cell_id  | sinr_db  |
     +========+======+==========+==========+
@@ -1609,101 +1756,202 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
     |   0    |  0   |    2     |  12.5    |
     |   1    |  0   |    1     |  13.2    |
     |   1    |  0   |    2     |  10.8    |
-    |   0    |  1   |    1     |  16.7    |
-    |   0    |  1   |    2     |  12.3    |
-    |   1    |  1   |    1     |  -2.0    |
-    |   1    |  1   |    2     |  -4.3    |
-    +--------+------+----------+----------+ 
-    
+    +--------+------+----------+----------+
     """
-    ue_df = df[df["ue_id"] == ue_id].sort_values("tick").reset_index(drop=True)
-    ue_df2 = df2[df2["ue_id"] == ue_id].sort_values("tick")
+    # Filter UEs if specified
+    if ue_ids is not None:
+        connected_df = connected_df[connected_df["ue_id"].isin(ue_ids)].copy()
+        full_df = full_df[full_df["ue_id"].isin(ue_ids)].copy()
 
-    if ue_df.empty or ue_df2.empty:
-        print(f"No data found for ue_id {ue_id}.")
-        return
+    if len(connected_df) == 0 or len(full_df) == 0:
+        raise ValueError("No data to plot after filtering")
 
-    # Base + dynamic color map
-    base_colors = {1.0: "red", 2.0: "green", 3.0: "blue"}
-    all_cell_ids = pd.concat([
-        ue_df2["cell_id"],
-        ue_df[ue_df["cell_id"] != "RLF"]["cell_id"]
-    ]).unique()
-    missing_ids = [cid for cid in all_cell_ids if cid not in base_colors]
-    extra_colors = cm.get_cmap("tab10", len(missing_ids))
-    dynamic_colors = {cid: extra_colors(i) for i, cid in enumerate(missing_ids)}
+    # Get available UEs
+    available_ues = sorted(connected_df["ue_id"].unique())
+
+    # Create color map for cells
+    base_colors = {"1": "#EF4444", "2": "#10B981", "3": "#3B82F6", 1: "#EF4444", 2: "#10B981", 3: "#3B82F6"}
+    all_cell_ids = pd.concat([full_df["cell_id"], connected_df[connected_df["cell_id"] != "RLF"]["cell_id"]]).unique()
+    plotly_colors = ["#F59E0B", "#8B5CF6", "#EC4899", "#14B8A6", "#F97316", "#06B6D4", "#84CC16", "#A855F7"]
+    missing_ids = [cid for cid in all_cell_ids if cid not in base_colors and cid != "RLF"]
+    dynamic_colors = {cid: plotly_colors[i % len(plotly_colors)] for i, cid in enumerate(missing_ids)}
     full_color_map = {**base_colors, **dynamic_colors}
 
-    min_sinr = min(
-        ue_df2["sinr_db"].min(),
-        ue_df[ue_df["cell_id"] != "RLF"]["sinr_db"].min()
-    )
-    drop_value = min_sinr - 5
+    # Create figure
+    fig = go.Figure()
 
-    plt.figure(figsize=(12, 6))
-    legend_cells = set()
+    # Track traces per UE for visibility control
+    traces_per_ue_list = []
 
-    # --- Plot all candidate cell SINRs (dotted, bold) ---
-    for cell_id, group in ue_df2.groupby("cell_id"):
-        label = f"cell_id {cell_id}" if cell_id not in legend_cells else None
-        legend_cells.add(cell_id)
-        plt.plot(
-            group["tick"],
-            group["sinr_db"],
-            linestyle=":",
-            linewidth=2.5,
-            color=full_color_map.get(cell_id, "gray"),
-            label=label,
-            alpha=0.7,
-        )
+    # Create traces for each UE
+    for ue_id in available_ues:
+        ue_df = connected_df[connected_df["ue_id"] == ue_id].sort_values("tick").reset_index(drop=True)
+        ue_df2 = full_df[full_df["ue_id"] == ue_id].sort_values("tick")
 
-    # --- Plot connected UE SINR as a continuous line, color-coded per cell_id ---
-    previous_idx = None
-    for i in range(len(ue_df) - 1):
-        tick1, tick2 = ue_df.loc[i, "tick"], ue_df.loc[i + 1, "tick"]
-        sinr1, sinr2 = ue_df.loc[i, "sinr_db"], ue_df.loc[i + 1, "sinr_db"]
-        cell1, cell2 = ue_df.loc[i, "cell_id"], ue_df.loc[i + 1, "cell_id"]
-
-        # If current or next point is RLF, break the line
-        if cell1 == "RLF" or cell2 == "RLF":
+        if ue_df.empty or ue_df2.empty:
             continue
 
-        # Draw line from point i to i+1 with color of current cell
-        label = f"cell_id {cell1}" if cell1 not in legend_cells else None
-        if label:
-            legend_cells.add(cell1)
-        plt.plot(
-            [tick1, tick2],
-            [sinr1, sinr2],
-            color=full_color_map.get(cell1, "gray"),
-            linewidth=3,
-            label=label,
+        # Calculate drop value for RLF markers
+        # Filter out -inf and NaN values when calculating min_sinr
+        valid_sinr_df = ue_df[ue_df["cell_id"] != "RLF"]["sinr_db"].replace([-np.inf, np.inf], np.nan).dropna()
+        valid_sinr_df2 = ue_df2["sinr_db"].replace([-np.inf, np.inf], np.nan).dropna()
+
+        if len(valid_sinr_df) > 0 and len(valid_sinr_df2) > 0:
+            min_sinr = min(valid_sinr_df2.min(), valid_sinr_df.min())
+        elif len(valid_sinr_df2) > 0:
+            min_sinr = valid_sinr_df2.min()
+        elif len(valid_sinr_df) > 0:
+            min_sinr = valid_sinr_df.min()
+        else:
+            min_sinr = RLF_THRESHOLD  # Fallback to RLF threshold if no valid data
+
+        drop_value = min_sinr - 5
+
+        trace_count = 0
+        is_first_ue = ue_id == available_ues[0]
+
+        # --- Plot all candidate cell SINRs (dotted lines) ---
+        for cell_id, group in ue_df2.groupby("cell_id"):
+            color = full_color_map.get(cell_id, "#6B7280")
+            fig.add_trace(
+                go.Scatter(
+                    x=group["tick"],
+                    y=group["sinr_db"],
+                    mode="lines",
+                    name=f"Cell {cell_id} (candidate)",
+                    line=dict(width=2.5, dash="dot", color=color),
+                    opacity=0.7,
+                    legendgroup=f"ue{ue_id}",
+                    showlegend=True,
+                    hovertemplate=(
+                        f"<b>UE {ue_id} - Cell {cell_id} (candidate)</b><br>"
+                        + "Tick: %{x}<br>"
+                        + "SINR: %{y:.2f} dB<extra></extra>"
+                    ),
+                    visible=is_first_ue,
+                )
+            )
+            trace_count += 1
+
+        # --- Plot connected UE SINR as continuous lines (color-coded per cell_id) ---
+        cell_groups = {}
+        for i in range(len(ue_df)):
+            cell_id = ue_df.loc[i, "cell_id"]
+            if cell_id != "RLF":
+                if cell_id not in cell_groups:
+                    cell_groups[cell_id] = {"ticks": [], "sinr": []}
+                cell_groups[cell_id]["ticks"].append(ue_df.loc[i, "tick"])
+                cell_groups[cell_id]["sinr"].append(ue_df.loc[i, "sinr_db"])
+
+        for cell_id, data in cell_groups.items():
+            color = full_color_map.get(cell_id, "#6B7280")
+            fig.add_trace(
+                go.Scatter(
+                    x=data["ticks"],
+                    y=data["sinr"],
+                    mode="lines+markers",
+                    name=f"Cell {cell_id} (connected)",
+                    line=dict(width=3, color=color),
+                    marker=dict(size=6, color=color),
+                    legendgroup=f"ue{ue_id}",
+                    showlegend=True,
+                    hovertemplate=(
+                        f"<b>UE {ue_id} - Cell {cell_id} (CONNECTED)</b><br>"
+                        + "Tick: %{x}<br>"
+                        + "SINR: %{y:.2f} dB<extra></extra>"
+                    ),
+                    visible=is_first_ue,
+                )
+            )
+            trace_count += 1
+
+        # --- Plot RLF events ---
+        rlf_ticks = ue_df[ue_df["cell_id"] == "RLF"]["tick"].tolist()
+        if rlf_ticks:
+            fig.add_trace(
+                go.Scatter(
+                    x=rlf_ticks,
+                    y=[drop_value] * len(rlf_ticks),
+                    mode="markers",
+                    name="RLF Event",
+                    marker=dict(size=12, color="black", symbol="x"),
+                    legendgroup=f"ue{ue_id}",
+                    showlegend=True,
+                    hovertemplate=(
+                        f"<b>UE {ue_id} - RLF EVENT</b><br>" + "Tick: %{x}<br>" + "Radio Link Failure<extra></extra>"
+                    ),
+                    visible=is_first_ue,
+                )
+            )
+            trace_count += 1
+
+        # --- RLF Threshold line ---
+        fig.add_trace(
+            go.Scatter(
+                x=[ue_df2["tick"].min(), ue_df2["tick"].max()],
+                y=[RLF_THRESHOLD, RLF_THRESHOLD],
+                mode="lines",
+                name=f"RLF Threshold ({RLF_THRESHOLD} dB)",
+                line=dict(width=2, dash="dash", color="black"),
+                legendgroup=f"ue{ue_id}",
+                showlegend=True,
+                hovertemplate=f"RLF Threshold: {RLF_THRESHOLD} dB<extra></extra>",
+                visible=is_first_ue,
+            )
+        )
+        trace_count += 1
+
+        traces_per_ue_list.append(trace_count)
+
+    # Create dropdown menu to select UE
+    buttons = []
+    trace_offset = 0
+
+    for i, ue_id in enumerate(available_ues):
+        traces_count = traces_per_ue_list[i]
+
+        # Create visibility list (True only for this UE's traces)
+        visibility = [False] * sum(traces_per_ue_list)
+        visibility[trace_offset : trace_offset + traces_count] = [True] * traces_count  # noqa: E203
+
+        buttons.append(
+            dict(
+                label=f"UE {ue_id}",
+                method="update",
+                args=[
+                    {"visible": visibility},
+                    {"title": f"SINR over Time for UE {ue_id}"},
+                ],
+            )
         )
 
-    # --- Plot RLFs as vertical drops ---
-    rlf_ticks = ue_df[ue_df["cell_id"] == "RLF"]["tick"]
-    if not rlf_ticks.empty:
-        for rlf_tick in rlf_ticks:
-            plt.plot(
-                [rlf_tick],
-                [drop_value],
-                "ko",
-                markersize=8,
-                label="RLF" if "RLF" not in legend_cells else None
+        trace_offset += traces_count
+
+    # Update layout
+    fig.update_layout(
+        title=f"SINR over Time for UE {available_ues[0]}",
+        xaxis_title="Tick",
+        yaxis_title="SINR (dB)",
+        width=figsize[0],
+        height=figsize[1],
+        hovermode="closest",
+        updatemenus=[
+            dict(
+                active=0,
+                buttons=buttons,
+                direction="down",
+                x=0.02,
+                xanchor="left",
+                y=0.98,
+                yanchor="top",
             )
-            legend_cells.add("RLF")
+        ],
+        showlegend=True,
+        legend=dict(x=1.02, y=1, xanchor="left", yanchor="top"),
+    )
 
-    # --- RLF Threshold ---
-    plt.axhline(y=RLF_THRESHOLD, color="black", linestyle="--", linewidth=2)
+    return fig
 
-    # --- Final Decorations ---
-    plt.title(f"SINR over Time for UE ID {ue_id}")
-    plt.xlabel("Tick")
-    plt.ylabel("SINR (dB)")
-    plt.grid(True)
-    plt.legend(title=None, bbox_to_anchor=(1.05, 1), loc="upper left")
-    plt.tight_layout()
-    plt.show()
 
 def mro_score_3d_plot(df: pd.DataFrame) -> None:
     """
@@ -1730,3 +1978,61 @@ def mro_score_3d_plot(df: pd.DataFrame) -> None:
     fig.update_traces(marker=dict(size=5))
     fig.update_layout(margin=dict(l=0, r=0, b=0, t=30))
     fig.show()
+
+
+def find_sim_boundary(topology: pd.DataFrame, client_ue_data: pd.DataFrame) -> pd.DataFrame:
+    """
+    Find the lat/lon bounds of the simulation area, given the cell tower locations and all UE locations.
+
+    topology:
+
+    +---------+----------+----------+--------------+------------------------+
+    | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
+    +=========+==========+==========+==============+========================+
+    |    1    | 90.410   | 23.809   |     120      |         1800           |
+    |    2    | 90.414   | 23.810   |     240      |         2100           |
+    +---------+----------+----------+--------------+------------------------+
+
+    client_ue_data:
+
+    +-----------+----------+---------+----------------+
+    | longitude | latitude | cell_id | cell_rxpwr_dbm |
+    +===========+==========+=========+================+
+    | -22.6329  | 59.7982  |    1    |     -100.3     |
+    | -22.6329  | 59.7982  |    2    |     -99.8      |
+    | 119.7574  | 54.8535  |    1    |     -100.1     |
+    | 119.7574  | 54.8535  |    2    |     -99.52     |
+    +-----------+----------+---------+----------------+
+
+    """
+
+    topology_lat = pd.to_numeric(topology["cell_lat"], errors="coerce")
+    topology_lon = pd.to_numeric(topology["cell_lon"], errors="coerce")
+
+    T_MIN_LAT, T_MAX_LAT = topology_lat.min(skipna=True), topology_lat.max(skipna=True)
+    T_MIN_LON, T_MAX_LON = topology_lon.min(skipna=True), topology_lon.max(skipna=True)
+
+    # Calculate min and max latitudes and longitudes with padding
+    if isinstance(client_ue_data, pd.DataFrame) and not client_ue_data.empty:
+        ue_data_lat = pd.to_numeric(client_ue_data["latitude"], errors="coerce")
+        ue_data_lon = pd.to_numeric(client_ue_data["longitude"], errors="coerce")
+
+        UE_MIN_LAT, UE_MAX_LAT = ue_data_lat.min(skipna=True), ue_data_lat.max(skipna=True)
+        UE_MIN_LON, UE_MAX_LON = ue_data_lon.min(skipna=True), ue_data_lon.max(skipna=True)
+
+        bounds = {
+            "min_lat": min(UE_MIN_LAT, T_MIN_LAT) - BOUNDS_PADDING,
+            "max_lat": max(UE_MAX_LAT, T_MAX_LAT) + BOUNDS_PADDING,
+            "min_lon": min(UE_MIN_LON, T_MIN_LON) - BOUNDS_PADDING,
+            "max_lon": max(UE_MAX_LON, T_MAX_LON) + BOUNDS_PADDING,
+        }
+
+    else:
+        bounds = {
+            "min_lat": T_MIN_LAT - BOUNDS_PADDING,
+            "max_lat": T_MAX_LAT + BOUNDS_PADDING,
+            "min_lon": T_MIN_LON - BOUNDS_PADDING,
+            "max_lon": T_MAX_LON + BOUNDS_PADDING,
+        }
+
+    return bounds

@@ -1,3 +1,4 @@
+import logging
 import os
 import pickle
 import warnings
@@ -7,9 +8,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from gpytorch.kernels import RBFKernel, ScaleKernel
-from gpytorch.likelihoods import GaussianLikelihood
-from gpytorch.settings import cholesky_jitter
+import torch
 from gpytorch.utils.warnings import NumericalWarning
 
 from notebooks.radp_library import (
@@ -28,6 +27,9 @@ from radp.digital_twin.utils.cell_selection import perform_attachment
 # Suppress the specific NumericalWarning from gpytorch
 warnings.filterwarnings("ignore", category=NumericalWarning)
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
 
 class MobilityRobustnessOptimization(ABC):
     """
@@ -38,12 +40,15 @@ class MobilityRobustnessOptimization(ABC):
         self,
         mobility_model_params: Dict[str, Dict],
         topology: pd.DataFrame,
+        new_data: Optional[pd.DataFrame] = None,
         bdt: Optional[Dict[str, BayesianDigitalTwin]] = None,
     ):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.topology = topology
         self.bayesian_digital_twins = bdt if bdt is not None else {}
         self.mobility_model_params = mobility_model_params
         self.simulation_data = None
+        self.new_data = new_data
 
     def train_or_update_rf_twins(self, new_data: pd.DataFrame) -> None:
         """
@@ -67,45 +72,47 @@ class MobilityRobustnessOptimization(ABC):
 
         """
         try:
+            self.new_data = new_data
+
             if not isinstance(new_data, pd.DataFrame):
-                raise TypeError("The input 'new_data' must be a pandas DataFrame.")
+                logger.error("The input 'new_data' must be a pandas DataFrame.")
 
             expected_columns = {"longitude", "latitude", "cell_id", "cell_rxpwr_dbm"}
-            if not expected_columns.issubset(new_data.columns):
-                raise ValueError(f"The input DataFrame must contain the following columns: {expected_columns}")
+            if not expected_columns.issubset(self.new_data.columns):
+                logger.error(f"The input DataFrame must contain the following columns: {expected_columns}")
 
             # normalize cell_id format - regardless of dtype
             self.topology = normalize_cell_ids(self.topology)
-            new_data = normalize_cell_ids(new_data)
+            self.new_data = normalize_cell_ids(self.new_data)
 
             # Check if the new data is in the expected cartesian format
-            check_cartesian_format(new_data, self.topology)
+            check_cartesian_format(self.new_data, self.topology)
 
             # Prepare the new data for training or updating
-            prepared_data = self._prepare_train_or_update_data(new_data)
+            prepared_data = self._prepare_train_or_update_data(self.new_data)
 
             # update if bayesian digital twins exist already
             if self.bayesian_digital_twins:
-                print("Updating existing Bayesian Digital Twins with new data.")
+                logger.info("Updating existing Bayesian Digital Twins with new data.")
 
                 for cell_id, df in prepared_data.items():
                     self._update(cell_id, df)
-                print("Bayesian Digital Twins updated successfully.")
+                logger.info("Bayesian Digital Twins updated successfully.")
 
             # If no Bayesian Digital Twins exist, train from scratch
             else:
-                print("No Bayesian Digital Twins available for update. Training from scratch.")
+                logger.info("No Bayesian Digital Twins available for update. Training from scratch.")
                 self._training(maxiter=100, train_data=prepared_data)
-                print("\nBayesian Digital Twins trained successfully.")
+                logger.info("\nBayesian Digital Twins trained successfully.")
 
         except TypeError as te:
-            print(f"TypeError: {te}")
+            logger.error(f"TypeError: {te}")
         except ValueError as ve:
-            print(f"ValueError: {ve}")
+            logger.error(f"ValueError: {ve}")
         except KeyError as ke:
-            print(f"KeyError: {ke}")
+            logger.error(f"KeyError: {ke}")
         except Exception as e:
-            print(f"An unexpected error occurred: {e}")
+            logger.exception(f"An unexpected error occurred: {e}")
 
     def save_bdt(self, file_relative_path="data/mro_data") -> bool:
         """
@@ -116,7 +123,7 @@ class MobilityRobustnessOptimization(ABC):
 
         try:
             if not isinstance(self.bayesian_digital_twins, dict):
-                raise TypeError("The attribute 'bayesian_digital_twins' must be a dictionary.")
+                logger.error("The attribute 'bayesian_digital_twins' must be a dictionary.")
 
             # Ensure the directory exists
             os.makedirs(file_relative_path, exist_ok=True)
@@ -124,20 +131,20 @@ class MobilityRobustnessOptimization(ABC):
             with open(filename, "wb") as fp:
                 pickle.dump(self.bayesian_digital_twins, fp)
 
-            print(f"Twins Saved Successfully as Pickle at: {filename}")
+            logger.info(f"Twins Saved Successfully as Pickle at: {filename}")
 
             return True  # Indicate successful save
 
         except TypeError as te:
-            print(f"TypeError: {te}")
+            logger.error(f"TypeError: {te}")
             return False
 
         except OSError as oe:
-            print(f"OSError: {oe}")
+            logger.error(f"OSError: {oe}")
             return False
 
         except Exception as e:
-            print(f"An unexpected error occurred: {e}")
+            logger.exception(f"An unexpected error occurred: {e}")
             return False
 
     def load_bdt(self, file_relative_path="data/mro_data/digital_twins.pkl") -> bool:
@@ -150,16 +157,16 @@ class MobilityRobustnessOptimization(ABC):
         try:
             with open(filename, "rb") as fp:
                 self.bayesian_digital_twins = pickle.load(fp)
-            print(f"Twins Loaded Successfully from Pickle at: {filename}")
+            logger.info(f"Twins Loaded Successfully from Pickle at: {filename}")
 
             return True  # Indicate successful load
 
         except FileNotFoundError as fnf:
-            print(f"FileNotFoundError: {fnf}")
+            logger.error(f"FileNotFoundError: {fnf}")
             return False
 
         except Exception as e:
-            print(f"An unexpected error occurred: {e}")
+            logger.exception(f"An unexpected error occurred: {e}")
             return False
 
     @abstractmethod
@@ -175,7 +182,7 @@ class MobilityRobustnessOptimization(ABC):
         """
         Trains the Bayesian Digital Twins for each cell in the topology using the UE locations and features
         like log distance, relative bearing, and cell received power (Rx power).
-        
+
         +---------+----------+-----------+----------------+--------------+-------------------+
         | cell_id | latitude | longitude | cell_rxpwr_dbm | log_distance | relative_bearing  |
         +=========+==========+===========+================+==============+===================+
@@ -199,6 +206,7 @@ class MobilityRobustnessOptimization(ABC):
                 norm_method=NormMethod.MINMAX,
             )
 
+            bayesian_digital_twins[train_cell_id].model = bayesian_digital_twins[train_cell_id].model.to(self.device)
             self.bayesian_digital_twins[train_cell_id] = bayesian_digital_twins[train_cell_id]
 
             loss_vs_iters.append(
@@ -213,11 +221,10 @@ class MobilityRobustnessOptimization(ABC):
         """
         Updates the Bayesian Digital Twin (BDT) model for a specific cell.
 
-        Updates by deduplicating samples using 'log_distance' and 'relative_bearing', subsampling up to 500
-        strongest signals, reconfiguring the Gaussian Process with a Scale and RBF kernel, increasing observation
-        noise via GaussianLikelihood, and using higher jitter to stabilize Cholesky decomposition before training
-        on the processed data.
-        
+        Deduplicates samples using 'log_distance' and 'relative_bearing'. If more than 500
+        samples remain, subsamples the 500 strongest signals before updating the trained
+        GP model with the processed data.
+
         +---------+----------+-----------+----------------+--------------+-------------------+
         | cell_id | latitude | longitude | cell_rxpwr_dbm | log_distance | relative_bearing  |
         +=========+==========+===========+================+==============+===================+
@@ -240,23 +247,12 @@ class MobilityRobustnessOptimization(ABC):
             ][0]
 
         twin = self.bayesian_digital_twins[cell_id]
-
-        # Reconfigure the kernel to include scale + RBF
-        twin.model.covar_module = ScaleKernel(RBFKernel())
-
-        # Increase observation noise via GaussianLikelihood
-        if not hasattr(twin, "likelihood"):
-            twin.likelihood = GaussianLikelihood()  # type: ignore
-        twin.likelihood.noise = 1e-2  # type: ignore
-
-        # Use an increased jitter context
-        with cholesky_jitter(1e-1):
-            twin.update_trained_gpmodel([df])
+        twin.update_trained_gpmodel([df])
 
     def _prepare_train_or_update_data(self, df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         """
         Returnd key value pairs of cell_id and processed DataFrame for each cell_id.
-            
+
         +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
         | ue_id  | latitude | longitude | tick | cell_id | cell_lon | cell_lat | cell_az_deg  | cell_carrier_freq_mhz  |
         +========+==========+===========+======+=========+==========+==========+==============+========================+
@@ -266,7 +262,6 @@ class MobilityRobustnessOptimization(ABC):
         |   1    | 90.416   | 23.813    |  1   |    2    | 90.414   | 23.810   |     240       |        2100           |
         +--------+----------+-----------+------+---------+----------+----------+--------------+------------------------+
 
-        
         """
         required_columns = {"cell_lat", "cell_lon", "cell_az_deg"}
         if not required_columns.issubset(df.columns):
@@ -316,7 +311,7 @@ class MobilityRobustnessOptimization(ABC):
         """
         Predicts the received power for each User Equipment (UE) at different locations
         and ticks using Bayesian Digital Twins.
-          
+
         +---------+-----------+------------+----------+
         |  ue_id  | latitude  | longitude  |   tick   |
         +=========+===========+============+==========+
@@ -325,7 +320,7 @@ class MobilityRobustnessOptimization(ABC):
         |    1    | 90.415    | 23.812     |     1    |
         |    2    | 90.416    | 23.813     |     1    |
         +---------+-----------+------------+----------+
-        
+
         It then determines the best cell for each UE to attach based on the predicted power values.
         """
         # self.prediction_data = pred_data
@@ -357,7 +352,7 @@ class MobilityRobustnessOptimization(ABC):
 
                 else:
                     # Handle missing models, e.g., log a warning or initialize a default model
-                    print(f"No model available for cell_id {cell_id}, skipping prediction.")
+                    logger.error(f"No model available for cell_id {cell_id}, skipping prediction.")
 
         full_prediction_df = full_prediction_df.rename(columns={"latitude": "loc_y", "longitude": "loc_x"})
         if full_prediction_df["cell_id"].dtype == object:
@@ -368,7 +363,9 @@ class MobilityRobustnessOptimization(ABC):
         return predicted, full_prediction_df
 
     def _preprocess_simulation_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        '''
+        """Preprocess simulation data for MRO analysis.
+
+        Expected input format:
         +------------+-------------+-------------+-------------+------------+------------+-------------------------+
         | mock_ue_id | cell_id     | rxpower_dbm |  rxpower_stddev_dbm  |  log_distance | pred_means |     tick    |
         +============+=============+=============+=====================+==============+=============+==============+
@@ -377,8 +374,7 @@ class MobilityRobustnessOptimization(ABC):
         |     0      | "cell_2"    |   -82.1     |        1.1           |     0.207     |   -84.2     |     1      |
         |     1      | "cell_3"    |   -90.4     |        1.3           |     0.499     |   -89.0     |     1      |
         +------------+-------------+-------------+----------------------+--------------+-------------+-------------+
-
-        '''
+        """
         df.drop(
             columns=["rxpower_stddev_dbm", "rxpower_dbm", "cell_rxpwr_dbm"],
             inplace=True,
@@ -397,6 +393,7 @@ class MobilityRobustnessOptimization(ABC):
             df["cell_id"] = df["cell_id"].str.extract(r"(\d+)").astype(int)
         df = self._add_sinr_column(df)
         return df
+
     # TODO: Use Utils version of this function
     def _add_sinr_column(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -408,7 +405,7 @@ class MobilityRobustnessOptimization(ABC):
 
         Returns:
             pd.DataFrame: Updated DataFrame with an additional 'sinr_db' column.
-               
+
         +--------+---------+------------------+------------------------+
         | ue_id  | cell_id | cell_rxpower_dbm | cell_carrier_freq_mhz  |
         +========+=========+==================+========================+
@@ -421,13 +418,14 @@ class MobilityRobustnessOptimization(ABC):
         |   3    |    1    |   -100.987321    |         2100.0         |
         |   3    |    2    |   -100.864529    |         2100.0         |
         +--------+---------+------------------+------------------------+
-        
+
         """
         df = df.copy()
         sinr_column = []
 
         # Group by location
-        for (_, group) in df.groupby(["ue_id", "tick"]):
+        for _, group in df.groupby(["ue_id", "tick"]):
+
             # Group further by frequency layer within the same location
             freq_groups = group.groupby("cell_carrier_freq_mhz")
 
