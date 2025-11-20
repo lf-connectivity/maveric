@@ -127,18 +127,45 @@ def get_rsrp_dbm_sinr_db_by_layer(
 
 def perform_attachment_hyst_ttt(ue_data: pd.DataFrame, hyst: float, ttt: int, rlf_threshold: float) -> pd.DataFrame:
     """
-    Performs UE-to-cell attachment across all ticks in the simulation using a
-    NumPy-accelerated path for performance, while preserving the original
-    behavior and output schema of the prior pandas implementation.
+    Performs UE-to-cell attachment across all simulation ticks using hysteresis,
+    time-to-trigger, and radio link failure threshold mechanisms to simulate
+    realistic cellular handover behavior. Uses a NumPy-accelerated path for
+    performance, while preserving the original behavior and output schema of
+    the prior pandas implementation.
+
+    This function implements a multi-stage cell selection algorithm:
+    1. Hysteresis: Prevents frequent handovers by requiring new cell signal to exceed
+       current cell signal by a threshold (hyst) in dB
+    2. Time-to-Trigger (TTT): Requires consistent measurements over a time window
+       before executing a handover, reducing ping-pong effects
+    3. Radio Link Failure (RLF): Marks UEs as "RLF" when SINR falls below threshold
+       and no suitable alternative cell is available
 
     Parameters:
-        ue_data (pd.DataFrame): UE measurements with 'tick' and 'cell_rxpower_dbm' and 'sinr_db'.
-        hyst (float): Hysteresis threshold in dB.
-        ttt (int): Time-to-trigger window size.
-        rlf_threshold (float): Minimum SINR to maintain a connection.
+        ue_data (pd.DataFrame): UE measurement data containing:
+            - tick (int): Simulation time step
+            - ue_id: User equipment identifier
+            - cell_id: Cell tower identifier
+            - cell_rxpower_dbm (float): Received power from cell in dBm
+            - sinr_db (float): Signal-to-interference-plus-noise ratio in dB
+
+        hyst (float): Hysteresis threshold in dB. A candidate cell must exceed
+            the current serving cell's power by at least this amount to trigger
+            consideration for handover.
+
+        ttt (int): Time-to-trigger window size in ticks. The number of consecutive
+            measurements required to confirm a handover decision.
+
+        rlf_threshold (float): Minimum SINR in dB required to maintain a connection.
+            UEs with SINR below this threshold will either handover to a better cell
+            or be marked as "RLF" (Radio Link Failure) if no suitable cell exists.
 
     Returns:
-        pd.DataFrame: DataFrame of all UE-cell attachment states across all ticks.
+        pd.DataFrame: Filtered UE-cell attachment states for all ticks, containing
+            the same columns as the input, but only rows representing the actual
+            UE-to-cell attachments after applying hysteresis, TTT, and RLF logic.
+            Rows marked with cell_id="RLF" indicate radio link failures where
+            cell_rxpower_dbm and sinr_db are set to -inf.
     """
     # Fast path: use NumPy helpers and convert back preserving columns/dtypes
     matrices, mappings = _np_preprocess_to_matrices(ue_data)
