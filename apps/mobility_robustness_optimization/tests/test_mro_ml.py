@@ -351,10 +351,13 @@ class TestBayesianMRO(unittest.TestCase):
                 result = bmro.solve(n_epochs=1, init_samples=1)
                 self.assertIsNotNone(result)
                 # Verify logger.info was called with correct format
-                mock_logger_info.assert_called_once()
-                call_args = mock_logger_info.call_args[0][0]
-                self.assertIn("Optimized Hyst:", call_args)
-                self.assertIn("Optimized TTT:", call_args)
+                # The logger is called multiple times (header, separator, epochs, final result)
+                # We need to check that the final call contains the optimized parameters
+                self.assertGreater(mock_logger_info.call_count, 0)
+                # Get the last call (which should be the optimized parameters)
+                last_call_args = mock_logger_info.call_args[0][0]
+                self.assertIn("Optimized Hyst:", last_call_args)
+                self.assertIn("Optimized TTT:", last_call_args)
 
     def test_device_selection(self):
         """Test device selection logic."""
