@@ -12,13 +12,13 @@ The system is modular, allowing each step of the pipeline—from data preparatio
 
 The application is organized into several Python modules, each with a specific responsibility. All scripts are orchestrated by `main_app.py`.
 
-* **`main_app.py`**: The main entry point and pipeline orchestrator. Uses command-line arguments to execute different stages of the workflow.
-* **`data_preprocessor.py`**: A utility to prepare raw UE data for the RL environment. It reads per-tick UE CSVs and renames `lon`/`lat` columns to the expected `loc_x`/`loc_y`.
-* **`bdt_manager.py`**: Manages the one-time training of the backend Bayesian Digital Twin (BDT) model. It uses the `radp_client` to send a training job and includes a helper to copy the final trained model from the Docker container to the local filesystem.
-* **`cco_rl_env.py`**: Defines the custom `CCO_RL_Env` for reinforcement learning. This environment simulates the mobile network locally using the pre-trained BDT, presenting the RL agent with the current hour (tick) as an observation and rewarding it based on coverage, load balance, and QoS.
-* **`rl_trainer.py`**: Contains the logic to initialize the `CCO_RL_Env`, define a Stable Baselines3 RL agent (e.g., PPO), and run the training loop for a specified number of timesteps. It saves the trained agent upon completion.
-* **`rl_predictor.py`**: Loads a pre-trained RL agent and uses it to predict the optimal cell tilt configuration for a specific, user-provided tick.
-* **`cco_visualizer.py`**: A powerful tool to generate side-by-side plot comparisons. For a given test day and tick, it simulates and plots the network performance with the baseline (initial) configuration versus the configuration recommended by the trained RL agent.
+- **`main_app.py`**: The main entry point and pipeline orchestrator. Uses command-line arguments to execute different stages of the workflow.
+- **`data_preprocessor.py`**: A utility to prepare raw UE data for the RL environment. It reads per-tick UE CSVs and renames `lon`/`lat` columns to the expected `loc_x`/`loc_y`.
+- **`bdt_manager.py`**: Manages the one-time training of the backend Bayesian Digital Twin (BDT) model. It uses the `radp_client` to send a training job and includes a helper to copy the final trained model from the Docker container to the local filesystem.
+- **`cco_rl_env.py`**: Defines the custom `CCO_RL_Env` for reinforcement learning. This environment simulates the mobile network locally using the pre-trained BDT, presenting the RL agent with the current hour (tick) as an observation and rewarding it based on coverage, load balance, and QoS.
+- **`rl_trainer.py`**: Contains the logic to initialize the `CCO_RL_Env`, define a Stable Baselines3 RL agent (e.g., PPO), and run the training loop for a specified number of timesteps. It saves the trained agent upon completion.
+- **`rl_predictor.py`**: Loads a pre-trained RL agent and uses it to predict the optimal cell tilt configuration for a specific, user-provided tick.
+- **`cco_visualizer.py`**: A powerful tool to generate side-by-side plot comparisons. For a given test day and tick, it simulates and plots the network performance with the baseline (initial) configuration versus the configuration recommended by the trained RL agent.
 
 ---
 
@@ -27,38 +27,58 @@ The application is organized into several Python modules, each with a specific r
 Before running the pipeline, ensure the following setup is complete:
 
 1. **Python Environment:** Install all required packages.
-    ```bash
-    pip install -r requirements.txt
-    ```
-    *(Note: This requires a `requirements.txt` file listing packages like `pandas`, `numpy`, `matplotlib`, `shapely`, `gymnasium`, `stable-baselines3`, etc.)*
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+   _(Note: This requires a `requirements.txt` file listing packages like `pandas`, `numpy`, `matplotlib`, `shapely`, `gymnasium`, `stable-baselines3`, etc.)_
 
 2. **RADP Backend Services:** The RADP backend, including the `training` service, must be running via Docker Compose.
-    ```bash
-    # Example command
-    docker compose -f dc.yml -f dc-dev.yml up -d --build
-    ```
 
-3. **Project Path:** The `radp` library must be discoverable. The scripts attempt to find the project root automatically, but for reliability, you can set the `MAVERIC_ROOT` environment variable:
-    ```bash
-    export MAVERIC_ROOT=/path/to/your/maveric/project
-    ```
+   ```bash
+   # Example command
+   docker compose -f dc.yml -f dc-dev.yml up -d --build
+   ```
 
-4. **Input Data:** The application requires several input files placed correctly within the app's directory structure (e.g., `apps/load_balance_app/`):
-    * **`./data/topology.csv`**: Full network topology, including `cell_id`, `cell_lat`, `cell_lon`, and other parameters like `hTx` and `hRx` needed by the BDT.
-    * **`./data/config.csv`**: Initial configuration containing `cell_id` and the starting `cell_el_deg` for each cell.
-    * **`./data/dummy_ue_training_data.csv`**: **Crucially**, this should be **realistic training data** for the BDT model. The dummy name is a placeholder; the data inside must accurately reflect how RSRP changes with location and tilt for the model to be effective.
-    * **`./generated_data/`**: This directory should contain the multi-day UE location data generated by `traffic_demand_simulation.py`. The expected structure is:
+3. **Environment Configuration:** Create a `.env` file in the project root to configure the RADP service connection. When running in development mode, set:
 
-        ```bash
-        generated_data/
-        └── Day_0/
-            └── ue_data_per_tick/
-                ├── generated_ue_data_for_cco_0.csv
-                └── ...
-        └── Day_1/
-            └── ue_data_per_tick/
-                └── ...
-        ```
+   ```bash
+   RADP_SERVICE_IP=127.0.0.1
+   RADP_SERVICE_PORT=8081
+   ```
+
+   You can copy the provided `.env-dev` file as a starting point:
+
+   ```bash
+   cp .env-dev .env
+   ```
+
+   **Note:** The dev mode services run on port `8081`, while production uses `8080`. Ensure `RADP_SERVICE_PORT=8081` is set when using `dc-dev.yml`.
+
+4. **Project Path:** The `radp` library must be discoverable. The scripts attempt to find the project root automatically, but for reliability, you can set the `MAVERIC_ROOT` environment variable:
+
+   ```bash
+   export MAVERIC_ROOT=/path/to/your/maveric/project
+   ```
+
+5. **Input Data:** The application requires several input files placed correctly within the app's directory structure (e.g., `apps/load_balance_app/`):
+
+   - **`./data/topology.csv`**: Full network topology, including `cell_id`, `cell_lat`, `cell_lon`, and other parameters like `hTx` and `hRx` needed by the BDT.
+   - **`./data/config.csv`**: Initial configuration containing `cell_id` and the starting `cell_el_deg` for each cell.
+   - **`./data/dummy_ue_training_data.csv`**: **Crucially**, this should be **realistic training data** for the BDT model. The dummy name is a placeholder; the data inside must accurately reflect how RSRP changes with location and tilt for the model to be effective.
+   - **`./generated_data/`**: This directory should contain the multi-day UE location data generated by `traffic_demand_simulation.py`. The expected structure is:
+
+     ```bash
+     generated_data/
+     └── Day_0/
+         └── ue_data_per_tick/
+             ├── generated_ue_data_for_cco_0.csv
+             └── ...
+     └── Day_1/
+         └── ue_data_per_tick/
+             └── ...
+     ```
 
 ---
 
@@ -73,26 +93,47 @@ This step prepares the raw UE location data for the RL Gym by renaming columns. 
 ```bash
 python main_app.py --preprocess-data --train-days 0 1 2 3 --test-day 4
 ```
-This will read files from ./generated_data/Day_*/ue_data_per_tick/ and save the processed files to ./generated_data/Day_*/ue_data_gym_ready/.
+
+This will read files from ./generated*data/Day*_/ue*data_per_tick/ and save the processed files to ./generated_data/Day*_/ue_data_gym_ready/.
 
 ### Step 2: Train Bayesian Digital Twin (BDT) Model
+
 This step orchestrates the backend training of the RF model and copies the resulting model file (bdt_model_map.pickle) to the application directory.
 
 #### Ensure the training container name is correct
+
 ```bash
-python main_app.py --train-bdt --bdt-model-id "bdt_for_load_balance" --container "radp_dev-training-1"
+python main_app.py --train-bdt --bdt-model-id "bdt_load_balance_v1" --container "radp_dev-training-1"
 ```
+
 This uses topology.csv and dummy_ue_training_data.csv (which should contain your realistic data).
 
 After the backend reports completion, it uses docker cp to download the model.
 
+**Important Notes:**
+
+- The BDT model file (`bdt_model_map.pickle`) is **not included in the git repository** due to its large size.
+- You **must train the model** before proceeding with RL training.
+- The model is downloaded from the Docker container to your local `apps/load_balancing/` directory.
+- To verify successful download, check for the file:
+  ```bash
+  ls -lh bdt_model_map.pickle
+  ```
+- If the download fails, ensure:
+  - Docker is installed and running
+  - The container name is correct (check with `docker ps`)
+  - The backend training completed successfully
+
 ### Step 3: Train Reinforcement Learning Agent
+
 This step uses the locally saved BDT model and the preprocessed per-tick UE data to train the RL agent.
 
 #### Train on Days 0, 1, 2, 3 for 120,000 timesteps
+
 ```bash
 python main_app.py --train-rl --train-days 0 1 2 3 --total-timesteps 30000
 ```
+
 This loads ./bdt_model_map.pickle.
 
 It reads UE data from the ue_data_gym_ready directories for days 0-3.
@@ -100,36 +141,47 @@ It reads UE data from the ue_data_gym_ready directories for days 0-3.
 The training progress will be logged, and the final trained RL agent will be saved to ./cco_rl_agent_multiday.zip.
 
 ### Step 4: Run Inference
+
 Use the trained RL agent to get the optimal configuration for a specific hour on a test day.
 
 #### Get the best configuration for hour 14
+
 ```bash
 python main_app.py --infer --tick 14
 ```
+
 This loads ./cco_rl_agent_multiday.zip and prints the recommended tilts for each cell for that hour.
 
 ### Step 5: Visualize Performance
+
 Generate a side-by-side plot comparing the network performance with the initial configuration versus the RL-optimized configuration for a specific hour on a test day.
 
 #### Visualize performance on Day 4 at hour 14
+
 ```bash
 python main_app.py --visualize --test-day 4 --tick 14
 ```
+
 This loads the BDT model, the RL model, and the UE data for Day 4, Tick 14.
 
 It runs two local simulations (baseline vs. optimized) and saves a comparison plot to the ./plots/ directory.
 
 Full Workflow Example
+
 ### Step 1: Preprocess all data
+
 `python main_app.py --preprocess-data --train-days 0 1 2 3 --test-day 4`
 
 ### Step 2: Train the core RF model
+
 `python main_app.py --train-bdt`
 
 ### Step 3: Train the RL agent on data from the first four days
+
 `python main_app.py --train-rl --train-days 0 1 2 3`
 
 ### Step 4 & 5: Evaluate and visualize the agent's performance on the test day for a peak hour
+
 `python main_app.py --infer --tick 15`
 
 `python main_app.py --visualize --test-day 4 --tick 15`
