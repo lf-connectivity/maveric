@@ -77,6 +77,8 @@ class BDTManager:
                     to '{self.model_path}'..."""
         )
         try:
+            command = ["docker", "cp", f"{container_name}:{container_path}", self.model_path]
+            _ = subprocess.run(command, check=True, capture_output=True, text=True)
             logger.info("Model downloaded successfully from Docker container.")
         except FileNotFoundError:
             logger.error("Error: 'docker' command not found. Please ensure Docker is installed and in your PATH.")

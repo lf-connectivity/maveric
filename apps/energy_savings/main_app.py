@@ -6,6 +6,8 @@ import logging
 import os
 import sys
 
+from dotenv import load_dotenv
+
 # --- Python Path Setup ---
 # The application directory is determined based on the location of this file.
 # It is assumed that this application resides in a directory such as 'apps/energy_saving_app/'.
@@ -14,6 +16,9 @@ import sys
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(APP_DIR))
 sys.path.insert(0, PROJECT_ROOT)
+
+# Load environment variables from .env file at project root
+load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
 # --- Local Module Imports ---
 # Local modules required for the pipeline are imported.
