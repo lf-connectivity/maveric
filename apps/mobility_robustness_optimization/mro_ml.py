@@ -1,10 +1,12 @@
 import logging
+import warnings
 from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
 import torch
 from scipy.stats import norm
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import ConstantKernel, Matern, WhiteKernel
 
@@ -17,7 +19,16 @@ from .mobility_robustness_optimization import MobilityRobustnessOptimization, ca
 
 
 class BayesianMRO(MobilityRobustnessOptimization):
-    """Optimize hysteresis and TTT using Bayesian optimization."""
+    """Mobility Robustness Optimization using Bayesian optimization techniques.
+
+    This class implements a Bayesian optimization approach to find optimal hysteresis
+    and Time-to-Trigger (TTT) parameters for mobility robustness in cellular networks.
+    It uses either Gaussian Process Regression (GPR) or XGBoost as the surrogate model
+    to efficiently explore the parameter space and maximize the MRO metric.
+
+    The optimization uses Expected Improvement (EI) as the acquisition function to
+    balance exploration and exploitation during the search process.
+    """
 
     def __init__(
         self,
@@ -25,9 +36,29 @@ class BayesianMRO(MobilityRobustnessOptimization):
         topology: pd.DataFrame,
         bdt: Optional[Dict[str, BayesianDigitalTwin]] = None,
         model_type: str = "gpr",
+        suppress_warnings: bool = False,
     ):
+        """Initialize the BayesianMRO optimizer.
+
+        Args:
+            mobility_model_params: Dictionary containing mobility model configuration
+                parameters including UE track generation settings and simulation boundaries.
+            topology: DataFrame containing network topology information with cell locations
+                and configurations.
+            bdt: Optional dictionary of pre-trained Bayesian Digital Twin models indexed
+                by cell identifiers. Required for making predictions.
+            model_type: Surrogate model type to use for Bayesian optimization.
+                Options are 'gpr' (Gaussian Process Regression) or 'xgboost'.
+                Defaults to 'gpr'.
+            suppress_warnings: If True, suppresses convergence warnings during model
+                training. Defaults to False.
+
+        Raises:
+            ImportError: If model_type is 'xgboost' but the xgboost package is not installed.
+        """
         super().__init__(mobility_model_params, topology, new_data=None, bdt=bdt)
         self.model_type = model_type
+        self.suppress_warnings = suppress_warnings
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         logging.basicConfig(
             level=logging.INFO,
@@ -36,6 +67,26 @@ class BayesianMRO(MobilityRobustnessOptimization):
         self.logger = logging.getLogger(__name__)
 
     def _expected_improvement(self, X: np.ndarray, model, best_y: float) -> np.ndarray:
+        """Calculate the Expected Improvement (EI) acquisition function.
+
+        The Expected Improvement measures the expected increase in the objective
+        function value at candidate points, balancing exploitation of known good
+        regions with exploration of uncertain regions.
+
+        For XGBoost models, a simplified version is used that compares predictions
+        directly to the best observed value. For Gaussian Process models, the full
+        EI formula incorporating both mean and uncertainty is computed.
+
+        Args:
+            X: Candidate points to evaluate, shape (n_samples, n_features).
+                Each row contains [hysteresis, TTT] parameters.
+            model: Trained surrogate model (XGBRegressor or GaussianProcessRegressor).
+            best_y: Best objective function value observed so far.
+
+        Returns:
+            Array of expected improvement values for each candidate point,
+            shape (n_samples,). Higher values indicate more promising candidates.
+        """
         if self.model_type == "xgboost":
             y_pred = model.predict(X)
             return y_pred - best_y
@@ -46,6 +97,27 @@ class BayesianMRO(MobilityRobustnessOptimization):
             return (mu - best_y) * norm.cdf(Z) + std * norm.pdf(Z)
 
     def _init_model(self):
+        """Initialize and configure the surrogate model for Bayesian optimization.
+
+        Creates either a Gaussian Process Regressor or XGBoost regressor based on
+        the model_type specified during initialization.
+
+        For Gaussian Process:
+            - Uses a composite kernel: ConstantKernel * Matern + WhiteKernel
+            - Matern kernel with nu=2.5 for smoothness
+            - WhiteKernel for noise modeling
+            - Normalizes target values (normalize_y=True)
+
+        For XGBoost:
+            - Uses squared error regression objective
+            - Default hyperparameters from XGBRegressor
+
+        Returns:
+            Initialized surrogate model ready for training.
+
+        Raises:
+            ImportError: If model_type is 'xgboost' but xgboost package is not installed.
+        """
         if self.model_type == "xgboost":
             try:
                 from xgboost import XGBRegressor  # type: ignore
@@ -59,6 +131,42 @@ class BayesianMRO(MobilityRobustnessOptimization):
             return GaussianProcessRegressor(kernel=kernel, normalize_y=True)
 
     def solve(self, n_epochs=20, init_samples: int = 5):
+        """Optimize hysteresis and TTT parameters using Bayesian optimization.
+
+        This method performs the complete optimization workflow:
+        1. Validates that Bayesian Digital Twins are trained
+        2. Sets up simulation boundaries and generates UE track data
+        3. Makes predictions using the digital twins
+        4. Initializes the optimization with random samples
+        5. Iteratively refines parameters using Expected Improvement
+        6. Logs progress and returns optimal parameters
+
+        The optimization uses a two-phase approach:
+        - Initialization: Random sampling to explore the parameter space
+        - Refinement: Expected Improvement-guided search for optimal values
+
+        Args:
+            n_epochs: Number of Bayesian optimization iterations to perform.
+                More epochs allow for better convergence but increase runtime.
+                Defaults to 20.
+            init_samples: Number of random initial samples to collect before
+                starting Bayesian optimization. These provide an initial
+                understanding of the objective function landscape. Defaults to 5.
+
+        Returns:
+            tuple: A tuple (best_hyst, best_ttt) containing:
+                - best_hyst (float): Optimal hysteresis value in dB
+                - best_ttt (int): Optimal Time-to-Trigger value in ticks
+
+        Raises:
+            ValueError: If Bayesian Digital Twins are not trained before calling solve.
+
+        Notes:
+            - The hysteresis range is automatically determined based on signal differences
+            - The TTT range is constrained by the number of simulation ticks
+            - All evaluated configurations are stored in self.score DataFrame
+            - Optimization progress is logged showing epoch, parameters, and metrics
+        """
         if not self.bayesian_digital_twins:
             raise ValueError("Bayesian Digital Twins are not trained. Train the models before calculating metrics.")
 
@@ -102,8 +210,17 @@ class BayesianMRO(MobilityRobustnessOptimization):
         best_y = y.max()
         best_idx = y.argmax()
 
-        for _ in range(n_epochs):
-            model.fit(X, y)
+        header = f"{'Epoch':<6} {'Hyst':<14} {'TTT':<6} {'MRO Metric':<12}"
+        self.logger.info(header)
+        self.logger.info("-" * len(header))
+
+        for i in range(n_epochs):
+            if self.suppress_warnings:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=ConvergenceWarning)
+                    model.fit(X, y)
+            else:
+                model.fit(X, y)
             cand_hyst = np.random.uniform(hyst_range[0], hyst_range[1], size=100)
             cand_ttt = np.random.randint(ttt_range[0], ttt_range[1], size=100)
             candidates = np.column_stack([cand_hyst, cand_ttt])
@@ -113,6 +230,7 @@ class BayesianMRO(MobilityRobustnessOptimization):
             ttt = int(round(ttt))
             attached_df = perform_attachment_hyst_ttt(self.simulation_data, hyst, ttt, rlf_threshold)
             metric = calculate_mro_metric(attached_df)
+            self.logger.info(f"{i:<6} {hyst:<14.10f} {ttt:<6} {metric:<12.6f}")
             X = np.vstack([X, [hyst, ttt]])
             y = np.append(y, metric)
             self.score.loc[len(self.score)] = [hyst, ttt, metric]
