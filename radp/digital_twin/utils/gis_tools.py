@@ -568,6 +568,76 @@ class GISTools:
         G_db = -12 * np.power(relative_tilt / theta_3db, 2)
         return G_db
 
+    # ------------------------------------------------------------------
+    # Vectorized GIS helpers — accept numpy arrays / pandas Series
+    # Scalar originals are preserved for backward compatibility.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def get_log_distance_vec(
+        lat1: float,
+        lon1: float,
+        lat2: np.ndarray,
+        lon2: np.ndarray,
+        epsilon: float = 1.0,
+    ) -> np.ndarray:
+        """Vectorized haversine log-distance (meters, log-scaled).
+
+        lat2/lon2 may be numpy arrays or pandas Series; lat1/lon1 are scalars
+        (the cell anchor point).  Numerically identical to the scalar version
+        within floating-point rounding.
+        """
+        lat2 = np.asarray(lat2, dtype=np.float64)
+        lon2 = np.asarray(lon2, dtype=np.float64)
+        phi1 = math.radians(lat1)
+        lam1 = math.radians(lon1)
+        phi2 = np.radians(lat2)
+        lam2 = np.radians(lon2)
+        d = (
+            2.0
+            * GISTools.R
+            * np.arcsin(
+                np.sqrt(
+                    np.sin((phi2 - phi1) / 2.0) ** 2
+                    + math.cos(phi1) * np.cos(phi2) * np.sin((lam2 - lam1) / 2.0) ** 2
+                )
+            )
+        )
+        return np.log(epsilon + 1000.0 * d)
+
+    @staticmethod
+    def _get_bearing_vec(
+        lat1: float,
+        lon1: float,
+        lat2: np.ndarray,
+        lon2: np.ndarray,
+    ) -> np.ndarray:
+        """Vectorized bearing (degrees, range (-180, 180])."""
+        lat2 = np.asarray(lat2, dtype=np.float64)
+        lon2 = np.asarray(lon2, dtype=np.float64)
+        phi1 = math.radians(lat1)
+        lam1 = math.radians(lon1)
+        phi2 = np.radians(lat2)
+        lam2 = np.radians(lon2)
+        y = np.sin(lam2 - lam1) * np.cos(phi2)
+        x = math.cos(phi1) * np.sin(phi2) - math.sin(phi1) * np.cos(phi2) * np.cos(
+            lam2 - lam1
+        )
+        return np.degrees(np.arctan2(y, x))
+
+    @staticmethod
+    def get_relative_bearing_vec(
+        cell_az_deg: float,
+        cell_lat: float,
+        cell_lon: float,
+        lat: np.ndarray,
+        lon: np.ndarray,
+    ) -> np.ndarray:
+        """Vectorized relative bearing (degrees, range [0, 360))."""
+        bearing = GISTools._get_bearing_vec(cell_lat, cell_lon, lat, lon)
+        bearing_0_360 = (bearing + 360.0) % 360.0
+        return (bearing_0_360 - cell_az_deg) % 360.0
+
     @staticmethod
     def converting_xy_points_into_lonlat_pairs(
         xy_points: List,
