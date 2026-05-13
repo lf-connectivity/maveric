@@ -4,6 +4,10 @@
 # LICENSE file in the root directory of this source tree.
 
 import unittest
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
 from api_manager.exceptions.invalid_parameter_exception import InvalidParameterException
 from api_manager.validators.simulation_request_validator import (

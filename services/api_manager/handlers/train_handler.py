@@ -11,7 +11,14 @@ from api_manager.config.kafka import kafka_producer_config
 from api_manager.dtos.requests.train_request import TrainRequest
 from api_manager.dtos.responses.train_response import TrainResponse
 from api_manager.exceptions.invalid_parameter_exception import InvalidParameterException
-from confluent_kafka import Producer
+from api_manager.validators.training_validator import TrainingRequestValidator
+
+try:
+    from confluent_kafka import Producer
+except ImportError:  # pragma: no cover - exercised only when dependency is absent.
+    class Producer:  # type: ignore[no-redef]
+        def __init__(self, *args, **kwargs):
+            raise ImportError("confluent_kafka is required to create a Kafka producer")
 
 from radp.common import constants
 from radp.common.enums import ModelStatus, ModelType
@@ -31,8 +38,9 @@ class TrainHandler:
     """
 
     def __init__(self):
-        """Initialize kafka producer"""
+        """Initialize kafka producer and request validator."""
         self.producer = Producer(kafka_producer_config)
+        self.validator = TrainingRequestValidator()
 
     # TODO: consider making this train API model-type agnostic once we begin
     # training mobility models
@@ -48,6 +56,9 @@ class TrainHandler:
         }
 
         """
+        self.validator.validate(request)
+        self.validator.validate_training_files(files)
+
         # parse the request
         train_request: TrainRequest = self._parse_train_request(request)
         logger.info(f"Received request to train model: {train_request}")

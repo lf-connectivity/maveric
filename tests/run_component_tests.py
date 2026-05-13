@@ -63,8 +63,11 @@ def run_tests(source_paths) -> Tuple[List[unittest.TestResult], int]:
 # get the top-level paths
 radp_top_level_path = get_top_level(RADP_RELATIVE_PATH)
 services_top_level_path = get_top_level(SERVICES_RELATIVE_PATH)
+repo_root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 # insert library paths into Python path for testing
+sys.path.insert(0, repo_root_path)
+sys.path.insert(0, services_top_level_path)
 library_package_paths = get_package_roots(radp_top_level_path)
 for path in library_package_paths:
     sys.path.insert(0, path)
