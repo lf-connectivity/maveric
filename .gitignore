@@ -101,3 +101,11 @@ notebooks/data/agentic_data
 
 # pre-commit hook
 .flake8
+session.md
+venv/
+Task 3.1.md
+Task 3.2.md
+Task 3.3.md
+Task 3.4.md
+Task 3.5.md
+sprint_implementation_report.md

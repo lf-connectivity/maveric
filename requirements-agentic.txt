@@ -1,0 +1,24 @@
+# Pinned dependencies for the Agentic upstream (MRO + Mobility).
+# Sprint 3.5 — isolate LangGraph/LangChain so a stray `pip install` cannot
+# silently break the agentic stack. Install with:
+#   pip install -r requirements-agentic.txt
+# Versions pinned to the working set verified on 2026-05-20.
+
+# LangGraph framework
+langgraph==1.2.0
+langgraph-checkpoint==4.1.0
+
+# LangChain bindings (one per provider used by radp/agentic)
+langchain-core==1.4.0
+langchain-groq==1.1.2
+langchain-aws==1.5.0
+
+# Provider SDKs (transitively required, pinned for reproducibility)
+groq==0.37.1
+boto3==1.43.11
+botocore==1.43.11
+
+# Shared utilities used by chains/nodes
+pydantic==2.13.4
+tenacity==9.1.4
+geopy==2.4.1
