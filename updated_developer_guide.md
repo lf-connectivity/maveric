@@ -6,13 +6,13 @@
 
 ## 1. What's Different in Sprint 3 (At a Glance)
 
-| Change | Reason |
-|--------|--------|
-| New pinned requirements file: `requirements-agentic.txt` at the repo root | Locks the LangGraph/LangChain agentic stack so a stray `pip install` cannot break the notebooks |
-| New shared LLM provider module: `radp/agentic/llm/provider.py` | Single source of truth for Groq / Bedrock / OpenAI / local-Ollama selection, used by **both** Agentic MRO and Agentic Mobility |
-| Three new scenario presets in `radp/digital_twin/agentic_mobility/defaults/` | Reproducible urban / suburban / rural mobility outputs |
-| New `--preset` CLI flag on `end_to_end_example.py` | Discoverable way to run any of the three scenarios |
-| New test directories: `tests/agentic/`, `tests/agentic_mobility/`, and `apps/mobility_robustness_optimization/agentic_mro/tests/` | Validation + swap + pipeline + preset tests; all offline-safe |
+| Change                                                                                                                            | Reason                                                                                                                         |
+| --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| New pinned requirements file: `requirements-agentic.txt` at the repo root                                                         | Locks the LangGraph/LangChain agentic stack so a stray `pip install` cannot break the notebooks                                |
+| New shared LLM provider module: `radp/agentic/llm/provider.py`                                                                    | Single source of truth for Groq / Bedrock / OpenAI / local-Ollama selection, used by **both** Agentic MRO and Agentic Mobility |
+| Three new scenario presets in `radp/digital_twin/agentic_mobility/defaults/`                                                      | Reproducible urban / suburban / rural mobility outputs                                                                         |
+| New `--preset` CLI flag on `end_to_end_example.py`                                                                                | Discoverable way to run any of the three scenarios                                                                             |
+| New test directories: `tests/agentic/`, `tests/agentic_mobility/`, and `apps/mobility_robustness_optimization/agentic_mro/tests/` | Validation + swap + pipeline + preset tests; all offline-safe                                                                  |
 
 Everything else in the existing Developer Guide — Python version, virtual environment, `PYTHONPATH`, Docker, core RADP setup, services setup, MRO/CCO/Energy/LB setup — **is unchanged**. Follow it as-is.
 
@@ -139,9 +139,9 @@ If any of the above fail with `ModuleNotFoundError`, your `PYTHONPATH` is not se
 
 ```bash
 # Needs a GROQ_API_KEY (or Bedrock credentials) in the .env file
-python radp/digital_twin/agentic_mobility/examples/end_to_end_example.py --preset urban
-python radp/digital_twin/agentic_mobility/examples/end_to_end_example.py --preset suburban
-python radp/digital_twin/agentic_mobility/examples/end_to_end_example.py --preset rural
+python -m radp.digital_twin.agentic_mobility.examples.end_to_end_example --preset urban
+python -m radp.digital_twin.agentic_mobility.examples.end_to_end_example --preset suburban
+python -m radp.digital_twin.agentic_mobility.examples.end_to_end_example --preset rural
 ```
 
 Each call should print a UE distribution summary and write a distinct CSV under `radp/digital_twin/agentic_mobility/examples/generated_ues/`.
