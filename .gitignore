@@ -70,6 +70,9 @@ srv/
 # lock files
 *.lock
 
+# lock files
+*.lock
+
 # notebook data
 notebooks/data/sim_data/
 notebooks/data/mro_data/

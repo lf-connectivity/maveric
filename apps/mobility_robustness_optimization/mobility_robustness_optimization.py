@@ -454,6 +454,7 @@ class MobilityRobustnessOptimization(ABC):
 
 # Compute SINR for each row (UE–cell pair), given its group
 def _compute_row_level_sinr(signal_dbm: float, interference_dbm_list: list, noise_db: float) -> float:
+def _compute_row_level_sinr(signal_dbm: float, interference_dbm_list: list, noise_db: float) -> float:
     """
         Computes the SINR for a single UE–cell pair by removing interference
         and noise from the received signal power.
@@ -479,6 +480,12 @@ def _compute_row_level_sinr(signal_dbm: float, interference_dbm_list: list, nois
         Returns:
             float: The computed SINR value in decibels for the current UE–cell pair.
     """
+    signal_linear = 10 ** (signal_dbm / 10)
+    interference_linear = sum(10 ** (p / 10) for p in interference_dbm_list)
+    noise_linear = 10 ** (noise_db / 10)
+
+    sinr_linear = signal_linear / (interference_linear + noise_linear)
+    return 10 * np.log10(sinr_linear)
     signal_linear = 10 ** (signal_dbm / 10)
     interference_linear = sum(10 ** (p / 10) for p in interference_dbm_list)
     noise_linear = 10 ** (noise_db / 10)

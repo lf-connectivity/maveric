@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+import numpy as np
 import pandas as pd
 
 from apps.mobility_robustness_optimization.mobility_robustness_optimization import (
@@ -223,6 +224,25 @@ class TestMobilityRobustnessOptimization(unittest.TestCase):
         )  # Check columns
 
     def test_preprocess_simulation_data(self):
+        self.dummy_topology = pd.DataFrame({"cell_id": ["cell_1", "cell_2"]})
+        self.optimizer = SimpleMRO({}, self.dummy_topology)
+        self.optimizer.topology["cell_id"] = self.optimizer.topology["cell_id"].str.replace("cell_", "").astype(int)
+
+        df = pd.DataFrame(
+            {
+                "mock_ue_id": [0],
+                "tick": [1],
+                "cell_id": ["cell_1"],
+                "log_distance": [0.75],
+                "pred_means": [-95],
+                "rxpower_stddev_dbm": [1.0],
+                "rxpower_dbm": [-90],
+                "cell_rxpwr_dbm": [-92],
+                "cell_carrier_freq_mhz": [1800],  # Required for SINR calculation
+            }
+        )
+
+        result = self.optimizer._preprocess_simulation_data(df)
         self.dummy_topology = pd.DataFrame({"cell_id": ["cell_1", "cell_2"]})
         self.optimizer = SimpleMRO({}, self.dummy_topology)
         self.optimizer.topology["cell_id"] = self.optimizer.topology["cell_id"].str.replace("cell_", "").astype(int)

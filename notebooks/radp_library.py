@@ -1630,6 +1630,7 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
         return
 
     # Base + dynamic color map
+    # Base + dynamic color map
     base_colors = {1.0: "red", 2.0: "green", 3.0: "blue"}
     all_cell_ids = pd.concat([ue_df2["cell_id"], ue_df[ue_df["cell_id"] != "RLF"]["cell_id"]]).unique()
 
@@ -1644,9 +1645,13 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
 
     plt.figure(figsize=(12, 6))
     legend_cells = set()
+    legend_cells = set()
 
     # --- Plot all candidate cell SINRs (dotted, bold) ---
+    # --- Plot all candidate cell SINRs (dotted, bold) ---
     for cell_id, group in ue_df2.groupby("cell_id"):
+        label = f"cell_id {cell_id}" if cell_id not in legend_cells else None
+        legend_cells.add(cell_id)
         label = f"cell_id {cell_id}" if cell_id not in legend_cells else None
         legend_cells.add(cell_id)
         plt.plot(
@@ -1654,7 +1659,10 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
             group["sinr_db"],
             linestyle=":",
             linewidth=2.5,
+            linewidth=2.5,
             color=full_color_map.get(cell_id, "gray"),
+            label=label,
+            alpha=0.7,
             label=label,
             alpha=0.7,
         )
@@ -1698,12 +1706,16 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
 
     # --- RLF Threshold ---
     plt.axhline(y=RLF_THRESHOLD, color="black", linestyle="--", linewidth=2)
+    # --- RLF Threshold ---
+    plt.axhline(y=RLF_THRESHOLD, color="black", linestyle="--", linewidth=2)
 
+    # --- Final Decorations ---
     # --- Final Decorations ---
     plt.title(f"SINR over Time for UE ID {ue_id}")
     plt.xlabel("Tick")
     plt.ylabel("SINR (dB)")
     plt.grid(True)
+    plt.legend(title=None, bbox_to_anchor=(1.05, 1), loc="upper left")
     plt.legend(title=None, bbox_to_anchor=(1.05, 1), loc="upper left")
     plt.tight_layout()
     plt.show()
