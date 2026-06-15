@@ -1659,12 +1659,10 @@ def plot_sinr_db_by_ue(df: pd.DataFrame, df2: pd.DataFrame, ue_id: int) -> None:
             group["sinr_db"],
             linestyle=":",
             linewidth=2.5,
-            linewidth=2.5,
             color=full_color_map.get(cell_id, "gray"),
             label=label,
             alpha=0.7,
-            label=label,
-            alpha=0.7,
+
         )
 
     # --- Plot connected UE SINR as a continuous line, color-coded per cell_id ---
