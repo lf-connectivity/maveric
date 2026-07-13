@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 import numpy as np
@@ -8,7 +9,7 @@ from gymnasium.spaces import Box
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-from notebooks.radp_library import get_ue_data
+from notebooks.radp_library import find_sim_boundary, get_ue_data
 from radp.digital_twin.rf.bayesian.bayesian_engine import BayesianDigitalTwin
 from radp.digital_twin.utils.cell_selection import find_hyst_diff, perform_attachment_hyst_ttt
 from radp.digital_twin.utils.constants import RLF_THRESHOLD
@@ -25,9 +26,15 @@ class ReinforcedMRO(MobilityRobustnessOptimization):
         self,
         mobility_model_params: dict[str, dict],
         topology: pd.DataFrame,
+        new_data: Optional[pd.DataFrame] = None,
         bdt: Optional[dict[str, BayesianDigitalTwin]] = None,
     ):
-        super().__init__(mobility_model_params, topology, bdt)
+        super().__init__(mobility_model_params, topology, new_data, bdt)
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
+        self.logger = logging.getLogger(__name__)
 
     def solve(self, total_timesteps=100):
         """
@@ -35,6 +42,10 @@ class ReinforcedMRO(MobilityRobustnessOptimization):
         """
         if not self.bayesian_digital_twins:
             raise ValueError("Bayesian Digital Twins are not trained. Train the models before calculating metrics.")
+
+        # Determine simulation boundaries
+        bounds = find_sim_boundary(self.topology, self.new_data)
+        self.mobility_model_params["ue_tracks_generation"]["params"]["lat_lon_boundaries"].update(bounds)
 
         # Load and prepare simulation data
         self.simulation_data = get_ue_data(self.mobility_model_params)
@@ -67,7 +78,7 @@ class ReinforcedMRO(MobilityRobustnessOptimization):
         # Ensure ttt is an integer
         hyst, ttt = action[0]
         ttt = int(round(ttt))
-        print(f"\nOptimized Hyst: {hyst},\nOptimized TTT: {ttt}")
+        self.logger.info(f"\nOptimized Hyst: {hyst},\nOptimized TTT: {ttt}")
         return hyst, ttt
 
 
@@ -85,6 +96,7 @@ class ReinforcedMROEnv(Env):
             dtype=np.float64,
         )
         self.observation_space = Box(low=0, high=1, shape=(1,), dtype=np.float64)
+        self.logger = logging.getLogger(__name__)
 
         self.state = np.array([0.0])
         self.current_step = 0
@@ -107,14 +119,14 @@ class ReinforcedMROEnv(Env):
         terminated = self.current_step >= self.max_steps
         truncated = False  # Can be customized if needed
 
-        print(
+        self.logger.info(
             f"Episode: {self.episode_num}, Timestep: {self.current_step}, "
             f"Hyst: {hyst:.6f}, TTT: {ttt}, Reward: {reward:.6f}, Done: {terminated}"
         )
 
         if terminated:
             avg_reward = self.episode_reward / self.max_steps
-            print(f"Episode {self.episode_num} average reward: {avg_reward:.6f}\n")
+            self.logger.info(f"Episode {self.episode_num} average reward: {avg_reward:.6f}\n")
             self.episode_num += 1
             self.episode_reward = 0.0
 
@@ -126,4 +138,4 @@ class ReinforcedMROEnv(Env):
         return self.state, {}
 
     def render(self):
-        print(f"Current State: {self.state}, Current Step: {self.current_step}")
+        self.logger.info(f"Current State: {self.state}, Current Step: {self.current_step}")

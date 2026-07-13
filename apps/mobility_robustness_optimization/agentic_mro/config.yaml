@@ -1,0 +1,78 @@
+# Agentic MRO Configuration File
+
+# ==============================================================================
+# LLM Provider Configurations
+# ==============================================================================
+# Provider selection priority:
+#   1. LLM_PROVIDER environment variable (shared with Agentic Mobility)
+#   2. default_provider below (fallback)
+
+default_provider: "bedrock"
+
+providers:
+  groq:
+    provider: "groq"
+    model: "openai/gpt-oss-120b"
+    temperature: 0.2
+    max_tokens: 2000
+    api_key: "PUT_YOUR_GROQ_API_KEY_HERE"  # Or set GROQ_API_KEY env var
+
+  bedrock:
+    provider: "bedrock"
+    model: "global.anthropic.claude-sonnet-4-20250514-v1:0"
+    region: "us-east-1"
+    temperature: 0.2
+    max_tokens: 2000
+    # AWS credentials priority:
+    #   1. aws_access_key_id/aws_secret_access_key in this config
+    #   2. AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY env vars
+    #   3. AWS default credentials (~/.aws/credentials or IAM role)
+
+  openai:
+    provider: "openai"
+    model: "gpt-4"
+    temperature: 0.2
+    max_tokens: 2000
+    # Set OPENAI_API_KEY env var or add api_key: "your_key" here
+
+# ==============================================================================
+# MRO Optimization Parameters
+# ==============================================================================
+
+optimization:
+  # Target MRO score for early stopping (in seconds of effective operational time)
+  # Max possible = 50 seconds (total simulation time)
+  # Target 48 = 96% efficiency (allowing 2 seconds for handover interruptions)
+  target_score: 100.0
+
+  # Maximum number of optimization iterations (coordinator loop)
+  max_iterations: 20
+
+  # Radio Link Failure threshold in dB
+  rlf_threshold: -4.0
+
+  # Plateau detection threshold (percentage improvement)
+  plateau_threshold: 0.01  # 1%
+
+# ==============================================================================
+# Data Paths (Example - adjust to your setup)
+# ==============================================================================
+
+data:
+  # Input CSV with UE data
+  input_csv: "data/agentic_data/mro/ue_mobility_data.csv"
+
+  # Topology CSV with cell information
+  topology_csv: "data/agentic_data/mro/cell_topology.csv"
+
+  # Output directory for results
+  output_dir: "outputs/"
+
+# ==============================================================================
+# Logging Configuration
+# ==============================================================================
+
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  save_logs: true
+  log_dir: "logs/"
