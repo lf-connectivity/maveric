@@ -1,0 +1,10 @@
+{
+  "_comment": "Golden baseline for Task 3.1 validation tests. Generated from sim_data_small.csv with mocked LLM returning hyst=2.0, ttt=5.",
+  "expected_hyst": 2.0,
+  "expected_ttt": 5,
+  "expected_score": 10.0,
+  "expected_iterations": 1,
+  "hyst_tolerance": 0.5,
+  "ttt_tolerance": 1,
+  "score_tolerance": 5.0
+}

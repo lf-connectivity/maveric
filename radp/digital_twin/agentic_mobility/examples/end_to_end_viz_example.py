@@ -1,0 +1,180 @@
+"""End-to-end example: Natural language → Mobility simulation + Visualization + Topology."""
+import json
+import os
+
+import matplotlib
+import matplotlib.cm as cm
+import matplotlib.pyplot as plt
+import pandas as pd
+
+from radp.digital_twin.agentic_mobility.integration import AgenticMobilityIntegration
+from radp.digital_twin.agentic_mobility.topology_generator import TopologyGenerator
+from radp.digital_twin.agentic_mobility.visualization.tracks import plot_ue_tracks_with_topology
+
+matplotlib.use("Agg")
+
+# Output directory for generated artifacts (relative to this file)
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "generated_ues")
+
+
+# ----------------------------------------------------------------------
+# Visualization functions
+# ----------------------------------------------------------------------
+
+
+def plot_ue_tracks(df: pd.DataFrame) -> None:
+    """Plots the movement tracks of unique UE IDs on a grid of subplots."""
+    batch_indices = []
+    for i in range(1, len(df)):
+        if df.loc[i, "tick"] == 0 and df.loc[i - 1, "tick"] != 0:
+            batch_indices.append(i)
+    batch_indices.append(len(df))
+
+    start_idx = 0
+    for batch_num, end_idx in enumerate(batch_indices):
+        batch_data = df.iloc[start_idx:end_idx]
+        plt.figure(figsize=(10, 6))
+        color_map = cm.get_cmap("tab20", len(batch_data["mock_ue_id"].unique()))
+        for idx, ue_id in enumerate(batch_data["mock_ue_id"].unique()):
+            ue_data = batch_data[batch_data["mock_ue_id"] == ue_id]
+            color = color_map(idx)
+            for i in range(len(ue_data) - 1):
+                x_start = ue_data.iloc[i]["lon"]
+                y_start = ue_data.iloc[i]["lat"]
+                x_end = ue_data.iloc[i + 1]["lon"]
+                y_end = ue_data.iloc[i + 1]["lat"]
+                dx = x_end - x_start
+                dy = y_end - y_start
+                plt.quiver(
+                    x_start,
+                    y_start,
+                    dx,
+                    dy,
+                    angles="xy",
+                    scale_units="xy",
+                    scale=1,
+                    color=color,
+                    width=0.002,
+                    headwidth=3,
+                    headlength=5,
+                )
+            plt.scatter(
+                ue_data["lon"].iloc[0],
+                ue_data["lat"].iloc[0],
+                color=color,
+            )
+        plt.title(f"UE Tracks with Direction for Batch {batch_num + 1}")
+        plt.xlabel("Longitude")
+        plt.ylabel("Latitude")
+        plt.legend(loc="upper right", bbox_to_anchor=(1.2, 1))
+
+        # Save to output directory
+        tracks_path = os.path.join(OUTPUT_DIR, "ue_tracks.png")
+        plt.savefig(tracks_path)
+        start_idx = end_idx
+
+
+# ----------------------------------------------------------------------
+# Main pipeline
+# ----------------------------------------------------------------------
+def main():
+    # Create output directory if it doesn't exist
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    print(f"📁 Output directory: {OUTPUT_DIR}\n")
+
+    print("=" * 80)
+    print("Agentic Mobility Generation - End-to-End Example with Visualization & Topology")
+    print("Natural Language → Parameters → Simulation → DataFrame → Topology → Plot")
+    print("=" * 80)
+
+    # You can specify the number of cell towers in the query!
+    # Examples of queries with explicit tower counts:
+    # - "Give me 5 cell towers for Tokyo suburban area with 200 devices"
+    # - "Deploy 10 towers in Tokyo with lots of pedestrians and cars"
+    # - "I need exactly 20 cells for Tokyo"
+    # If you don't specify, LLM calculates optimal count based on area and UE density
+
+    query1 = (
+        "Give me for Tokyo. consider it as a suburban area with lots of pedestrians and cars. "
+        "There are so many motorbikes, consider them as cyclists. Have two hundreds total devices."
+        # Add tower count here if desired, e.g.:
+        " Deploy 5 cell towers."
+    )
+
+    print(f"Query: '{query1}'\nProcessing...")
+
+    df1, metadata1 = AgenticMobilityIntegration.generate_from_natural_language(query1)
+    print(f"\n✓ Generated {len(df1)} mobility points for {metadata1['query_intent']['num_ues']} UEs.")
+
+    # Optional: preprocess and alpha prediction
+    # ue_data = preprocess_ue_data(df1)
+    # alpha_val = get_predicted_alpha(ue_data)
+    # print(f"Predicted alpha: {alpha_val:.3f}")
+
+    # Generate topology using LLM-based parameter generation with GA optimization
+    print("\n📡 Generating cell topology using LLM with GA optimization...")
+    location_data = metadata1.get("location_data", {})
+    query_intent = metadata1.get("query_intent", {})
+
+    # Save parameters to JSON for debugging
+    params_info = {
+        "query": query1,
+        "location_data": location_data,
+        "query_intent": query_intent,
+        "mobility_metadata": {
+            "retry_count": metadata1.get("retry_count"),
+            "validation_warnings": metadata1.get("validation_warnings"),
+        },
+    }
+
+    params_json_path = os.path.join(OUTPUT_DIR, "generation_params.json")
+    with open(params_json_path, "w") as f:
+        json.dump(params_info, f, indent=2)
+    print(f"💾 Saved generation parameters to: {params_json_path}")
+
+    topology_df = TopologyGenerator.generate_from_llm(
+        area_type=location_data.get("area_type", "suburban"),
+        num_ues=query_intent.get("num_ues", 200),
+        min_lat=location_data.get("min_lat", df1["lat"].min()),
+        max_lat=location_data.get("max_lat", df1["lat"].max()),
+        min_lon=location_data.get("min_lon", df1["lon"].min()),
+        max_lon=location_data.get("max_lon", df1["lon"].max()),
+        raw_query=query1,
+        mobility_df=df1,  # NEW: Pass mobility data for SINR calculation
+        use_genetic_algorithm=True,  # NEW: Enable GA optimization
+    )
+
+    print(f"✓ Generated {len(topology_df)} cells with optimized locations and azimuths")
+
+    # Show azimuth optimization results
+    print(f"  Azimuth range: {topology_df['cell_az_deg'].min()}° to {topology_df['cell_az_deg'].max()}°")
+    print(f"  All {len(topology_df)} cells have unique locations")
+    print("\nTopology preview:")
+    print(topology_df.to_string())
+
+    # Save topology to CSV
+    topology_csv_path = os.path.join(OUTPUT_DIR, "cell_topology.csv")
+    topology_df.to_csv(topology_csv_path, index=False)
+    print(f"\n💾 Saved topology to: {topology_csv_path}")
+
+    # Print boundary info
+    print("\nBoundary Check:")
+    print(
+        f"  Lat boundaries: {location_data.get('min_lat', df1['lat'].min()):.6f} to {location_data.get('max_lat', df1['lat'].max()):.6f}"
+    )
+    print(
+        f"  Lon boundaries: {location_data.get('min_lon', df1['lon'].min()):.6f} to {location_data.get('max_lon', df1['lon'].max()):.6f}"
+    )
+    print(f"  Cell lat range: {topology_df['cell_lat'].min():.6f} to {topology_df['cell_lat'].max():.6f}")
+    print(f"  Cell lon range: {topology_df['cell_lon'].min():.6f} to {topology_df['cell_lon'].max():.6f}")
+
+    # Visualize with topology
+    print("\n📈 Visualizing UE mobility tracks with cell towers...")
+    plot_ue_tracks_with_topology(df1, topology_df)
+
+    print("\nExample complete!")
+    print("=" * 80)
+
+
+if __name__ == "__main__":
+    main()

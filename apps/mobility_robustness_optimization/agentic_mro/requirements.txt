@@ -1,0 +1,11 @@
+# Core Dependencies
+# pandas # Uncomment if facing any pandas error
+# numpy # Uncomment if facing any numpy error
+
+# LangGraph Framework
+langgraph
+langgraph-checkpoint
+
+# LLM Provider SDKs
+groq
+boto3 
